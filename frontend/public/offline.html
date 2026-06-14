@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GlossFlow offline</title>
+    <style>
+      body{margin:0;min-height:100vh;display:grid;place-items:center;background:#070910;color:#f8fafc;font-family:Inter,system-ui,sans-serif;padding:24px}
+      main{max-width:560px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);border-radius:28px;padding:32px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+      h1{font-size:clamp(2rem,6vw,3.4rem);margin:0 0 12px}p{color:#cbd5e1;line-height:1.7}button{border:0;border-radius:999px;background:#f7c873;color:#111827;padding:12px 18px;font-weight:800;cursor:pointer}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Você está offline</h1>
+      <p>O GlossFlow mantém a estrutura principal em cache, mas agenda, financeiro e área administrativa precisam de internet para proteger os dados do salão.</p>
+      <button onclick="location.reload()">Tentar novamente</button>
+    </main>
+  </body>
+</html>

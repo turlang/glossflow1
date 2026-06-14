@@ -10,6 +10,7 @@ import { observabilityRoutes } from './observability.routes';
 import { integrationsRoutes } from './integrations.routes';
 import { platformRoutes } from './platform.routes';
 import { commercialRoutes } from './commercial.routes';
+import { analyticsRoutes } from './analytics.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 
@@ -33,6 +34,7 @@ export async function appRoutes(app: FastifyInstance) {
     admin.register(businessRoutes);
     admin.register(securityRoutes);
     admin.register(observabilityRoutes);
+    admin.register(analyticsRoutes);
     admin.register(integrationsRoutes);
   });
 }

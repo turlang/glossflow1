@@ -35,6 +35,7 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
    */
   const menu = [
     { key: 'executive', label: 'Dashboard', description: 'Receita, lucro e crescimento', icon: '📊' },
+    { key: 'analytics', label: 'Métricas Avançadas', description: 'LTV, churn, ocupação e previsão', icon: '📈' },
     { key: 'services', label: 'Serviços', description: 'Preços, duração e imagens', icon: '✂' },
     { key: 'professionals', label: 'Profissionais', description: 'Equipe e especialidades', icon: '♛' },
     { key: 'portfolio', label: 'Vitrine', description: 'Galeria pública do salão', icon: '◐' },
@@ -137,6 +138,7 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
 
         <section className="admin-pro-content">
           {tab === 'executive' && <ExecutiveDashboard services={services} professionals={professionals} appointments={appointments} clients={clients} inventory={inventory} financialEntries={financialEntries} commissions={commissions} insights={insights} setTab={setTab} />}
+          {tab === 'analytics' && <AdvancedMetricsAdmin setTab={setTab} />}
           {tab === 'services' && <ServicesAdmin services={services} reload={reload} />}
           {tab === 'professionals' && <ProfessionalsAdmin professionals={professionals} reload={reload} />}
           {tab === 'portfolio' && <PortfolioAdmin portfolio={portfolio} reload={reload} />}
@@ -1690,16 +1692,127 @@ function SecurityAdmin({ clients, reload }) {
   );
 }
 
+
+function AdvancedMetricsAdmin({ setTab }) {
+  const [data, setData] = useState(null);
+  const [message, setMessage] = useState('');
+
+  async function load() {
+    setMessage('');
+    setData(await request('/admin/analytics/advanced'));
+  }
+
+  useEffect(() => { load().catch((err) => setMessage(err.message)); }, []);
+
+  const kpis = data?.kpis || {};
+  const kpiCards = [
+    { label: 'Score do negócio', value: `${kpis.businessScore || 0}/100`, hint: 'Combina lucro, retenção, ocupação e alertas' },
+    { label: 'Receita prevista', value: currency(kpis.revenueForecast || 0), hint: 'Projeção até o fim do mês' },
+    { label: 'LTV estimado', value: currency(kpis.estimatedLtv || 0), hint: 'Valor médio projetado por cliente' },
+    { label: 'Churn em risco', value: `${kpis.churnRiskRate || 0}%`, hint: `${kpis.churnRiskClients || 0} cliente(s) em risco` },
+    { label: 'Ocupação da agenda', value: `${kpis.occupancyRate || 0}%`, hint: 'Capacidade mensal usada' },
+    { label: 'Ticket médio', value: currency(kpis.averageTicket || 0), hint: 'Média por atendimento' },
+    { label: 'Retenção', value: `${kpis.retentionRate || 0}%`, hint: 'Clientes que voltaram' },
+    { label: 'Valor do estoque', value: currency(kpis.inventoryValue || 0), hint: `${kpis.lowStockCount || 0} item(ns) em alerta` }
+  ];
+
+  return (
+    <section className="advanced-metrics-center">
+      <div className="panel-card analytics-hero full-span">
+        <div>
+          <span className="eyebrow">Métricas avançadas</span>
+          <h2>Indicadores de mercado para decisão do dono do salão</h2>
+          <p className="panel-help">Agora o GlossFlow calcula LTV estimado, churn em risco, ocupação, previsão de receita, ranking comercial e alertas executivos.</p>
+        </div>
+        <div className="analytics-score"><strong>{kpis.businessScore || 0}</strong><span>business score</span></div>
+      </div>
+
+      {message && <p className="feedback full-span">{message}</p>}
+
+      <div className="analytics-kpi-grid full-span">
+        {kpiCards.map((item) => (
+          <article key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.hint}</small>
+          </article>
+        ))}
+      </div>
+
+      <section className="analytics-grid full-span">
+        <article className="panel-card">
+          <div className="section-inline-head"><h2>Alertas executivos</h2><button className="secondary" type="button" onClick={load}>Atualizar</button></div>
+          <div className="recommendation-list">
+            {(data?.alerts || []).map((item) => <p key={item}>• {item}</p>)}
+          </div>
+        </article>
+        <article className="panel-card">
+          <h2>Oportunidades comerciais</h2>
+          <div className="recommendation-list">
+            {(data?.opportunities || []).map((item) => <p key={item}>• {item}</p>)}
+          </div>
+        </article>
+      </section>
+
+      <section className="analytics-grid full-span">
+        <AnalyticsRanking title="Serviços por receita" items={data?.rankings?.services || []} />
+        <AnalyticsRanking title="Profissionais por receita" items={data?.rankings?.professionals || []} />
+      </section>
+
+      <section className="executive-actions panel-card full-span">
+        <div><span className="eyebrow">Ações a partir dos dados</span><h2>Transforme métrica em operação</h2></div>
+        <div className="executive-action-grid">
+          <button type="button" onClick={() => setTab('automations')}>Criar campanha de retorno</button>
+          <button type="button" onClick={() => setTab('financial')}>Revisar financeiro</button>
+          <button type="button" onClick={() => setTab('inventory')}>Corrigir estoque baixo</button>
+          <button type="button" onClick={() => setTab('assistant')}>Gerar plano com IA</button>
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function AnalyticsRanking({ title, items }) {
+  return (
+    <article className="panel-card executive-ranking-card">
+      <h2>{title}</h2>
+      <div className="executive-ranking-list">
+        {items.map((item, index) => (
+          <div key={`${title}-${item.name}`}>
+            <b>{index + 1}</b>
+            <span><strong>{item.name}</strong><small>{item.appointments} atendimento(s)</small></span>
+            <em>{currency(item.revenue || 0)}</em>
+          </div>
+        ))}
+        {items.length === 0 && <p className="empty-state">Ainda não há dados suficientes para ranking.</p>}
+      </div>
+    </article>
+  );
+}
+
 function PWAAdmin() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
+  const [standalone, setStandalone] = useState(window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone);
+  const [swState, setSwState] = useState('verificando');
 
   useEffect(() => {
     const beforeInstall = (event) => { event.preventDefault(); setInstallPrompt(event); };
     const updateOnline = () => setOnline(navigator.onLine);
+    const updateStandalone = () => setStandalone(window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone);
     window.addEventListener('beforeinstallprompt', beforeInstall);
     window.addEventListener('online', updateOnline);
     window.addEventListener('offline', updateOnline);
+    window.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', updateStandalone);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((registration) => setSwState(registration.active ? 'ativo' : 'registrado'))
+        .catch(() => setSwState('indisponível'));
+    } else {
+      setSwState('não suportado');
+    }
+
     return () => {
       window.removeEventListener('beforeinstallprompt', beforeInstall);
       window.removeEventListener('online', updateOnline);
@@ -1714,25 +1827,41 @@ function PWAAdmin() {
     setInstallPrompt(null);
   }
 
+  const cards = [
+    { title: 'Instalação no celular', text: 'Manifesto completo com nome, ícone maskable, atalhos e abertura em modo standalone.' },
+    { title: 'Offline seguro', text: 'Cache da vitrine e da casca do app; rotas administrativas não são cacheadas por segurança.' },
+    { title: 'Atalhos comerciais', text: 'Acesso rápido para novo agendamento, painel administrativo e métricas.' },
+    { title: 'Experiência mobile-first', text: 'Layout responsivo, navegação compacta e foco em uso por recepção, dono e tablet.' }
+  ];
+
   return (
     <section className="pwa-center">
       <div className="panel-card pwa-hero full-span">
         <div>
-          <span className="eyebrow">PWA real</span>
-          <h2>Instale o GlossFlow no celular, tablet ou desktop</h2>
-          <p className="panel-help">A aplicação agora registra service worker, possui manifest avançado e cache básico para experiência mais próxima de aplicativo.</p>
+          <span className="eyebrow">Aplicativo móvel / PWA</span>
+          <h2>GlossFlow instalável, responsivo e com modo offline controlado</h2>
+          <p className="panel-help">Esta versão não é apenas uma página responsiva: ela inclui manifesto avançado, service worker, página offline, atalhos de app e telemetria de status para operação mobile.</p>
         </div>
-        <div className="pwa-status"><strong>{online ? 'Online' : 'Offline'}</strong><span>Status atual</span></div>
+        <div className="pwa-status"><strong>{standalone ? 'Instalado' : online ? 'Online' : 'Offline'}</strong><span>status do app</span></div>
       </div>
+
       <div className="pwa-grid full-span">
-        <article><strong>Instalação</strong><p>Use o botão abaixo ou o menu do navegador para adicionar o GlossFlow à tela inicial.</p><button className="primary" type="button" onClick={installApp} disabled={!installPrompt}>Instalar aplicativo</button></article>
-        <article><strong>Offline parcial</strong><p>A vitrine e a estrutura principal ficam em cache; áreas administrativas continuam exigindo conexão para segurança.</p></article>
-        <article><strong>Mobile-first</strong><p>Ideal para recepção, dono do salão e consulta rápida em tablet.</p></article>
+        {cards.map((card) => <article key={card.title}><strong>{card.title}</strong><p>{card.text}</p></article>)}
       </div>
+
+      <section className="panel-card full-span">
+        <div className="section-inline-head"><h2>Diagnóstico PWA</h2><button className="primary" type="button" onClick={installApp} disabled={!installPrompt}>Instalar aplicativo</button></div>
+        <div className="pwa-diagnostics">
+          <span><b>Conexão</b><strong>{online ? 'Online' : 'Offline'}</strong></span>
+          <span><b>Service Worker</b><strong>{swState}</strong></span>
+          <span><b>Modo app</b><strong>{standalone ? 'Standalone' : 'Navegador'}</strong></span>
+          <span><b>Cache</b><strong>Vitrine + assets</strong></span>
+        </div>
+        <p className="panel-help">Para publicar nas lojas Android/iOS, o próximo passo é empacotar este PWA com Capacitor/Tauri ou criar apps nativos consumindo a mesma API.</p>
+      </section>
     </section>
   );
 }
-
 
 function EcosystemAdmin() {
   const [data, setData] = useState(null);

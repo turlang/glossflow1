@@ -37,6 +37,19 @@ export default function App() {
   const isAuthenticated = Boolean(authToken);
 
   /**
+   * Atalhos do PWA.
+   * Quando o usuário abre o app pelo ícone ou por um atalho do manifesto,
+   * a query string decide se ele cai direto na vitrine, agendamento ou painel.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    if (action === 'booking') setPage('booking');
+    if (action === 'admin') setPage(authToken ? 'admin' : 'login');
+    localStorage.setItem('glossflow.pwa.query-action', action || 'public');
+  }, []);
+
+  /**
    * Preferência visual persistente.
    * O atributo data-theme permite alternar entre tema dark premium e light premium
    * sem duplicar componentes, seguindo boas práticas de design tokens.

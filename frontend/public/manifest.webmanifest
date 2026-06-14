@@ -1,34 +1,28 @@
 {
   "name": "GlossFlow SaaS",
   "short_name": "GlossFlow",
-  "description": "Gestão premium para salões de beleza.",
-  "start_url": "/",
+  "description": "Gestão premium para salões de beleza, barbearias e clínicas de estética.",
+  "start_url": "/?source=pwa",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "background_color": "#070910",
   "theme_color": "#0f172a",
-  "icons": [
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ],
   "id": "/",
   "scope": "/",
   "orientation": "portrait-primary",
+  "categories": ["business", "productivity", "lifestyle"],
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    { "src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "form_factor": "narrow", "label": "GlossFlow no celular" },
+    { "src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "form_factor": "wide", "label": "Painel administrativo GlossFlow" }
+  ],
   "shortcuts": [
-    {
-      "name": "Novo agendamento",
-      "short_name": "Agendar",
-      "url": "/?action=booking",
-      "description": "Abrir fluxo de agendamento"
-    },
-    {
-      "name": "Painel administrativo",
-      "short_name": "Admin",
-      "url": "/?action=admin",
-      "description": "Abrir painel do salão"
-    }
+    { "name": "Novo agendamento", "short_name": "Agendar", "url": "/?action=booking", "description": "Abrir fluxo de agendamento" },
+    { "name": "Painel administrativo", "short_name": "Admin", "url": "/?action=admin", "description": "Abrir painel do salão" },
+    { "name": "Métricas", "short_name": "Métricas", "url": "/?action=admin&tab=analytics", "description": "Abrir indicadores avançados" }
   ]
 }

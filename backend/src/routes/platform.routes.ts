@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getIntegrationStatus } from '../services/integrationStatus.service';
 import { buildOpenApiDocument } from '../services/openapi.service';
+import { getPrometheusMetrics } from './metrics';
 
 export async function platformRoutes(app: FastifyInstance) {
   app.get('/health', async () => ({ ok: true, service: 'glossflow-api', version: '10.0.0', checkedAt: new Date().toISOString() }));
@@ -21,4 +22,9 @@ export async function platformRoutes(app: FastifyInstance) {
   });
 
   app.get('/openapi.json', async () => buildOpenApiDocument());
+
+  /** Endpoint compatível com coleta Prometheus/Grafana. */
+  app.get('/metrics', async (_request, reply) => {
+    return reply.header('Content-Type', 'text/plain; version=0.0.4').send(getPrometheusMetrics());
+  });
 }
