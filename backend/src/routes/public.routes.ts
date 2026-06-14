@@ -4,7 +4,8 @@ import { getMainSalon } from './helpers';
 
 /** Rotas públicas usadas pela vitrine e pelo fluxo de agendamento do cliente. */
 export async function publicRoutes(app: FastifyInstance) {
-  app.get('/health', async () => ({ ok: true, app: 'GlossFlow API' }));
+  // A rota GET /health fica centralizada em platform.routes.ts.
+  // Não declare health check aqui para evitar FST_ERR_DUPLICATED_ROUTE no Fastify.
 
   app.get('/public/salon', async () => getMainSalon());
 
