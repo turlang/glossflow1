@@ -1,0 +1,58 @@
+# Como usar o GlossFlow SaaS Pro
+
+## 1. Acessar a vitrine
+
+Abra o frontend em `http://localhost:5173`. A vitrine mostra serviços, profissionais, portfólio e botão de agendamento.
+
+## 2. Fazer login no painel
+
+Clique em **Admin** e use:
+
+```txt
+admin@glossflow.com
+123456
+```
+
+## 3. Cadastrar serviços
+
+Entre em **Serviços**. Preencha imagem, nome, descrição, preço e duração. Clique em salvar. Para alterar, use **Editar** na lista.
+
+## 4. Cadastrar profissionais
+
+Entre em **Profissionais**. Cadastre foto, nome, especialidade e biografia. Esses dados aparecem na vitrine pública e no agendamento.
+
+## 5. Cadastrar trabalhos da vitrine
+
+Entre em **Vitrine**. Adicione título, categoria, descrição e imagem do resultado. Use fotos reais do salão para aumentar conversão.
+
+## 6. Visualizar agendamentos
+
+Entre em **Agenda**. Os agendamentos aparecem no modelo semanal com post-its, mantendo a visualização atual escolhida para o projeto.
+
+## 7. Controlar estoque
+
+Entre em **Estoque**. Cadastre produtos, fornecedor, quantidade, quantidade mínima, custo e imagem. Use movimentações para entrada, saída e ajuste.
+
+## 8. Cadastrar clientes
+
+Entre em **Clientes**. Cadastre nome, WhatsApp, e-mail, aniversário, preferências e observações. Clientes que agendam pela vitrine também entram automaticamente no CRM.
+
+## 9. Controlar financeiro
+
+Entre em **Financeiro**. Registre receitas e despesas com categoria, descrição, valor, forma de pagamento e data. O painel mostra receita, despesa e resultado.
+
+## 10. Configurar comissões
+
+Entre em **Comissões**. Cadastre o percentual de cada profissional. O sistema calcula projeções com base nos serviços agendados.
+
+## 11. Criar fidelidade
+
+Entre em **Fidelidade**. Configure o programa e registre pontos por cliente. Use para campanhas de retorno e descontos.
+
+## 12. Configurar assinatura
+
+Entre em **Assinatura**. Veja o plano ativo do salão e altere status. Esse módulo prepara o projeto para venda como SaaS.
+
+## 13. Preparar WhatsApp e IA
+
+Entre em **Automações**. Cadastre templates de WhatsApp e veja insights gerenciais. Em produção, conecte com Evolution API/Twilio e OpenAI API.

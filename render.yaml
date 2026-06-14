@@ -1,0 +1,34 @@
+# Render Blueprint — GlossFlow API
+# Use este arquivo se quiser criar o Web Service pelo fluxo de Blueprint/IaC do Render.
+# Também é possível configurar manualmente pelo dashboard usando os mesmos comandos.
+services:
+  - type: web
+    name: glossflow-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "180"
+      - key: ACCESS_TOKEN_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_DAYS
+        value: "7"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini

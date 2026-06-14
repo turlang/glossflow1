@@ -1,0 +1,34 @@
+{
+  "name": "GlossFlow SaaS",
+  "short_name": "GlossFlow",
+  "description": "Gestão premium para salões de beleza.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070910",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "/",
+  "scope": "/",
+  "orientation": "portrait-primary",
+  "shortcuts": [
+    {
+      "name": "Novo agendamento",
+      "short_name": "Agendar",
+      "url": "/?action=booking",
+      "description": "Abrir fluxo de agendamento"
+    },
+    {
+      "name": "Painel administrativo",
+      "short_name": "Admin",
+      "url": "/?action=admin",
+      "description": "Abrir painel do salão"
+    }
+  ]
+}
