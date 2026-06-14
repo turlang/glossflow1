@@ -3,6 +3,7 @@ import { request } from './services/api';
 import { Header, PublicShowcase, BookingPage, LoginPage } from './components/public/PublicExperience.jsx';
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.jsx';
+import { CommercialLanding } from './components/commercial/CommercialLanding.jsx';
 
 /**
  * GlossFlow Frontend
@@ -128,6 +129,8 @@ export default function App() {
           setPage={setPage}
         />
       )}
+
+      {!loading && !error && page === 'commercial' && <CommercialLanding />}
 
       {!loading && !error && page === 'booking' && (
         <BookingPage services={services} professionals={professionals} onCreated={loadPublicData} />

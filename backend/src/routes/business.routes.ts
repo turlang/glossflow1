@@ -37,19 +37,24 @@ export async function businessRoutes(app: FastifyInstance) {
     }));
   });
 
-  app.put('/admin/clients/:id', async (request) => {
+  app.put('/admin/clients/:id', async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = clientSchema.parse(request.body);
-    return prisma.client.update({
-      where: { id },
-      data: { ...data, email: data.email || null, birthDate: data.birthDate ? new Date(data.birthDate) : null, salonId: tenant.salonId }
+    const result = await prisma.client.updateMany({
+      where: { id, salonId: tenant.salonId },
+      data: { ...data, email: data.email || null, birthDate: data.birthDate ? new Date(data.birthDate) : null }
     });
+    if (result.count === 0) return reply.status(404).send({ message: 'Cliente não encontrado neste salão.' });
+    return prisma.client.findUnique({ where: { id } });
   });
 
-  app.delete('/admin/clients/:id', async (request) => {
+  app.delete('/admin/clients/:id', async (request, reply) => {
+    const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
-    return prisma.client.delete({ where: { id } });
+    const result = await prisma.client.deleteMany({ where: { id, salonId: tenant.salonId } });
+    if (result.count === 0) return reply.status(404).send({ message: 'Cliente não encontrado neste salão.' });
+    return reply.status(204).send();
   });
 
   app.get('/admin/financial', async (request) => {
@@ -65,18 +70,24 @@ export async function businessRoutes(app: FastifyInstance) {
     }));
   });
 
-  app.put('/admin/financial/:id', async (request) => {
+  app.put('/admin/financial/:id', async (request, reply) => {
+    const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = financialEntrySchema.parse(request.body);
-    return prisma.financialEntry.update({
-      where: { id },
+    const result = await prisma.financialEntry.updateMany({
+      where: { id, salonId: tenant.salonId },
       data: { ...data, paymentMethod: data.paymentMethod || null, referenceDate: data.referenceDate ? new Date(data.referenceDate) : new Date() }
     });
+    if (result.count === 0) return reply.status(404).send({ message: 'Lançamento financeiro não encontrado neste salão.' });
+    return prisma.financialEntry.findUnique({ where: { id } });
   });
 
-  app.delete('/admin/financial/:id', async (request) => {
+  app.delete('/admin/financial/:id', async (request, reply) => {
+    const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
-    return prisma.financialEntry.delete({ where: { id } });
+    const result = await prisma.financialEntry.deleteMany({ where: { id, salonId: tenant.salonId } });
+    if (result.count === 0) return reply.status(404).send({ message: 'Lançamento financeiro não encontrado neste salão.' });
+    return reply.status(204).send();
   });
 
   app.get('/admin/commissions', async (request) => {
@@ -101,14 +112,20 @@ export async function businessRoutes(app: FastifyInstance) {
     return reply.status(201).send(await prisma.commissionRule.create({ data: { ...data, salonId: tenant.salonId } }));
   });
 
-  app.put('/admin/commissions/rules/:id', async (request) => {
+  app.put('/admin/commissions/rules/:id', async (request, reply) => {
+    const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
-    return prisma.commissionRule.update({ where: { id }, data: commissionRuleSchema.parse(request.body) });
+    const result = await prisma.commissionRule.updateMany({ where: { id, salonId: tenant.salonId }, data: commissionRuleSchema.parse(request.body) });
+    if (result.count === 0) return reply.status(404).send({ message: 'Regra de comissão não encontrada neste salão.' });
+    return prisma.commissionRule.findUnique({ where: { id } });
   });
 
-  app.delete('/admin/commissions/rules/:id', async (request) => {
+  app.delete('/admin/commissions/rules/:id', async (request, reply) => {
+    const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
-    return prisma.commissionRule.delete({ where: { id } });
+    const result = await prisma.commissionRule.deleteMany({ where: { id, salonId: tenant.salonId } });
+    if (result.count === 0) return reply.status(404).send({ message: 'Regra de comissão não encontrada neste salão.' });
+    return reply.status(204).send();
   });
 
   app.get('/admin/loyalty', async (request) => {

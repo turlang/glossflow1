@@ -1,100 +1,79 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { getIntegrationStatus } from '../services/integrationStatus.service';
+import { sendWhatsAppMessage } from '../services/whatsapp.service';
+import { createMercadoPagoPix, createStripeCheckout } from '../services/payments.service';
+
+const testWhatsAppSchema = z.object({
+  to: z.string().min(10),
+  message: z.string().min(1).max(1200).default('Teste GlossFlow: integração WhatsApp pronta.'),
+  dryRun: z.boolean().optional().default(true)
+});
+
+const paymentSchema = z.object({
+  provider: z.enum(['mercadopago', 'stripe']).default('mercadopago'),
+  amount: z.number().positive(),
+  description: z.string().min(3).max(180),
+  payerEmail: z.string().email().optional(),
+  successUrl: z.string().url().optional(),
+  failureUrl: z.string().url().optional(),
+  dryRun: z.boolean().optional().default(true)
+});
 
 /**
- * Ecossistema de integrações.
+ * Central de integrações da Fase 2.
  * -----------------------------------------------------------------------------
- * O objetivo é deixar claro o nível de prontidão de cada integração real do SaaS.
- * As chaves ficam em variáveis de ambiente e nunca devem ser versionadas.
+ * Todas as rotas abaixo estão prontas para receber credenciais reais por ENV.
+ * Sem credenciais, trabalham em modo dry-run/diagnóstico para permitir QA seguro.
  */
 export async function integrationsRoutes(app: FastifyInstance) {
   app.get('/admin/ecosystem/integrations', async () => {
-    const integrations = [
-      {
-        key: 'openai',
-        name: 'OpenAI',
-        category: 'IA',
-        status: process.env.OPENAI_API_KEY ? 'connected' : 'ready',
-        env: 'OPENAI_API_KEY',
-        description: 'Gera análises, campanhas, previsões e respostas executivas com contexto real do salão.'
-      },
-      {
-        key: 'whatsapp',
-        name: 'WhatsApp Business',
-        category: 'Comunicação',
-        status: process.env.WHATSAPP_API_URL && process.env.WHATSAPP_API_TOKEN ? 'connected' : 'ready',
-        env: 'WHATSAPP_API_URL + WHATSAPP_API_TOKEN',
-        description: 'Permite envio real de confirmações, lembretes, aniversários e campanhas.'
-      },
-      {
-        key: 'mercadopago',
-        name: 'Mercado Pago',
-        category: 'Pagamentos',
-        status: process.env.MERCADO_PAGO_ACCESS_TOKEN ? 'connected' : 'ready',
-        env: 'MERCADO_PAGO_ACCESS_TOKEN',
-        description: 'Base preparada para cobrança de reservas, planos e pagamentos avulsos.'
-      },
-      {
-        key: 'stripe',
-        name: 'Stripe',
-        category: 'Assinaturas',
-        status: process.env.STRIPE_SECRET_KEY ? 'connected' : 'ready',
-        env: 'STRIPE_SECRET_KEY',
-        description: 'Base preparada para assinatura SaaS recorrente e trial controlado.'
-      },
-      {
-        key: 'google-calendar',
-        name: 'Google Calendar',
-        category: 'Agenda',
-        status: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? 'connected' : 'ready',
-        env: 'GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET',
-        description: 'Sincronização futura de agenda dos profissionais e eventos externos.'
-      },
-      {
-        key: 'cloudinary',
-        name: 'Cloudinary',
-        category: 'Imagens',
-        status: process.env.CLOUDINARY_URL ? 'connected' : 'ready',
-        env: 'CLOUDINARY_URL',
-        description: 'Armazenamento profissional de fotos da vitrine, serviços, produtos e profissionais.'
-      },
-      {
-        key: 'sentry',
-        name: 'Sentry',
-        category: 'Observabilidade',
-        status: process.env.SENTRY_DSN ? 'connected' : 'ready',
-        env: 'SENTRY_DSN',
-        description: 'Monitoramento externo de erros, performance e estabilidade do frontend/backend.'
-      },
-      {
-        key: 'meta-ads',
-        name: 'Meta Ads',
-        category: 'Marketing',
-        status: process.env.META_ACCESS_TOKEN ? 'connected' : 'ready',
-        env: 'META_ACCESS_TOKEN',
-        description: 'Preparado para campanhas de remarketing, públicos personalizados e promoções.'
-      }
-    ];
-
+    const integrations = getIntegrationStatus();
     const connected = integrations.filter((integration) => integration.status === 'connected').length;
+    const ready = integrations.filter((integration) => integration.status !== 'missing').length;
+
     return {
       connected,
+      ready,
       total: integrations.length,
       score: Math.round((connected / integrations.length) * 100),
+      nextAction: connected === integrations.length
+        ? 'Todas as integrações essenciais estão configuradas.'
+        : 'Preencha as variáveis ausentes no ambiente de produção e rode npm run deploy:verify.',
       integrations
     };
   });
 
   app.post('/admin/ecosystem/integrations/:key/test', async (request) => {
     const { key } = z.object({ key: z.string() }).parse(request.params);
-    const known = ['openai', 'whatsapp', 'mercadopago', 'stripe', 'google-calendar', 'cloudinary', 'sentry', 'meta-ads'];
+    const integrations = getIntegrationStatus();
+    const integration = integrations.find((item) => item.key === key);
+
     return {
       key,
-      ok: known.includes(key),
+      ok: Boolean(integration),
       testedAt: new Date().toISOString(),
-      message: known.includes(key)
-        ? 'Conector reconhecido. Configure as variáveis de ambiente para ativação real.'
+      integration: integration || null,
+      message: integration
+        ? integration.missingEnv.length
+          ? `Conector reconhecido. Variáveis pendentes: ${integration.missingEnv.join(', ')}.`
+          : 'Conector reconhecido e variáveis mínimas presentes.'
         : 'Conector ainda não cadastrado no GlossFlow.'
     };
+  });
+
+  app.post('/admin/whatsapp/send-test', async (request, reply) => {
+    const payload = testWhatsAppSchema.parse(request.body);
+    const result = await sendWhatsAppMessage(payload);
+    return reply.status(result.ok ? 200 : 400).send(result);
+  });
+
+  app.post('/admin/payments/checkout', async (request, reply) => {
+    const payload = paymentSchema.parse(request.body);
+    const result = payload.provider === 'stripe'
+      ? await createStripeCheckout(payload)
+      : await createMercadoPagoPix(payload);
+
+    return reply.status(result.ok ? 200 : 400).send(result);
   });
 }

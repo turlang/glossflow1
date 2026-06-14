@@ -8,6 +8,8 @@ import { businessRoutes } from './business.routes';
 import { securityRoutes } from './security.routes';
 import { observabilityRoutes } from './observability.routes';
 import { integrationsRoutes } from './integrations.routes';
+import { platformRoutes } from './platform.routes';
+import { commercialRoutes } from './commercial.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 
@@ -16,6 +18,8 @@ import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
  * As rotas públicas ficam abertas; rotas administrativas recebem autenticação e RBAC.
  */
 export async function appRoutes(app: FastifyInstance) {
+  app.register(platformRoutes);
+  app.register(commercialRoutes);
   app.register(authRoutes);
   app.register(publicRoutes);
   app.register(appointmentRoutes);

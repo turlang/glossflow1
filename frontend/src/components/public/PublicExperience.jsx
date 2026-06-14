@@ -19,6 +19,7 @@ export function Header({ page, setPage, isAuthenticated, theme, toggleTheme }) {
       <nav className="nav">
         <button className={page === 'public' ? 'active' : ''} onClick={() => setPage('public')}>Vitrine</button>
         <button className={page === 'booking' ? 'active' : ''} onClick={() => setPage('booking')}>Agendar</button>
+        <button className={page === 'commercial' ? 'active' : ''} onClick={() => setPage('commercial')}>SaaS</button>
         <button className={page === 'admin' ? 'active' : ''} onClick={() => setPage(isAuthenticated ? 'admin' : 'login')}>Admin</button>
         <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label="Alternar tema visual">{theme === 'dark' ? '☀️ Claro' : '🌙 Escuro'}</button>
       </nav>

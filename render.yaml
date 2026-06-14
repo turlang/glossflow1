@@ -7,7 +7,7 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm install --include=dev && npx prisma generate && npm run build
+    buildCommand: npm install --include=dev && npx prisma generate --schema prisma/schema.prisma && npm run build
     startCommand: npm run start
     autoDeploy: true
     healthCheckPath: /health
@@ -32,3 +32,21 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
+      - key: WHATSAPP_PROVIDER
+        value: meta
+      - key: WHATSAPP_DRY_RUN
+        value: "true"
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: PAYMENTS_DRY_RUN
+        value: "true"
+      - key: MERCADO_PAGO_ACCESS_TOKEN
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

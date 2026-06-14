@@ -480,3 +480,48 @@ p{max-width:72ch}
   .integration-grid,.observability-kpis,.quick-action-grid,.tour-steps{grid-template-columns:1fr;}
   .route-table article{flex-direction:column;}
 }
+
+.commercial-hero {
+  padding: 72px 0;
+  background: radial-gradient(circle at top right, rgba(255,255,255,.12), transparent 32%), linear-gradient(135deg, rgba(14,12,23,.98), rgba(54,31,74,.9));
+}
+
+.commercial-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+  gap: 32px;
+  align-items: center;
+}
+
+.commercial-grid h1 {
+  max-width: 820px;
+  font-size: clamp(2.2rem, 5vw, 4.6rem);
+  line-height: .98;
+  letter-spacing: -.06em;
+}
+
+.commercial-grid p {
+  max-width: 680px;
+  font-size: 1.08rem;
+  color: var(--muted);
+}
+
+.commercial-panel {
+  display: grid;
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: rgba(255,255,255,.08);
+  box-shadow: var(--shadow);
+}
+
+.commercial-panel span {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.08);
+}
+
+@media (max-width: 820px) {
+  .commercial-grid { grid-template-columns: 1fr; }
+}

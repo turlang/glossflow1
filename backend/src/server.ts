@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import { ZodError } from 'zod';
 import { appRoutes } from './routes/appRoutes';
 import { recordMetric } from './routes/metrics';
+import { captureOperationalError } from './services/sentry.service';
 
 const app = Fastify({ logger: true });
 
@@ -97,7 +98,8 @@ app.setErrorHandler((error, _request, reply) => {
   }
 
   app.log.error(error);
-  return reply.status(500).send({ message: error.message || 'Erro interno do servidor.' });
+  captureOperationalError(error, { method: _request.method, url: _request.url });
+  return reply.status(500).send({ message: process.env.NODE_ENV === 'production' ? 'Erro interno do servidor.' : (error.message || 'Erro interno do servidor.') });
 });
 
 app.register(appRoutes);
