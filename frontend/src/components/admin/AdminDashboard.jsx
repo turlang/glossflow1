@@ -35,6 +35,7 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
    */
   const menu = [
     { key: 'executive', label: 'Dashboard', description: 'Receita, lucro e crescimento', icon: '📊' },
+    { key: 'onboarding', label: 'Implantação Guiada', description: 'Passo a passo para configurar seu salão', icon: '✅' },
     { key: 'analytics', label: 'Métricas Avançadas', description: 'LTV, churn, ocupação e previsão', icon: '📈' },
     { key: 'services', label: 'Serviços', description: 'Preços, duração e imagens', icon: '✂' },
     { key: 'professionals', label: 'Profissionais', description: 'Equipe e especialidades', icon: '♛' },
@@ -71,18 +72,12 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
       <aside className="admin-pro-sidebar">
         <button className="admin-pro-brand" type="button" onClick={() => setPage('public')} aria-label="Voltar para vitrine pública">
           <span className="brand-mark">G</span>
-          <span><strong>GlossFlow</strong><small>Beauty SaaS</small></span>
+          <span><strong>GlossFlow</strong></span>
         </button>
 
         <button className="sidebar-collapse" type="button" onClick={() => setSidebarCollapsed((value) => !value)} aria-label="Recolher ou expandir menu lateral">
-          {sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+          <span className="collapse-icon" aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span><span className="collapse-label">{sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}</span>
         </button>
-
-        <div className="salon-card-mini">
-          <span>Salão conectado</span>
-          <strong>{salon.name}</strong>
-          <small>{salon.openingHours}</small>
-        </div>
 
         <nav className="admin-pro-nav" aria-label="Módulos administrativos">
           <label className="global-command">
@@ -90,7 +85,7 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
             <input value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Buscar módulo..." />
           </label>
           {filteredMenu.map((item) => (
-            <button key={item.key} type="button" className={tab === item.key ? 'active' : ''} onClick={() => setTab(item.key)}>
+            <button key={item.key} type="button" className={tab === item.key ? 'active' : ''} onClick={() => setTab(item.key)} title={item.label}>
               <span className="menu-icon">{item.icon}</span>
               <span><strong>{item.label}</strong><small>{item.description}</small></span>
             </button>
@@ -114,16 +109,8 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
           </div>
         </header>
 
-        <OnboardingChecklist
-          services={services}
-          professionals={professionals}
-          portfolio={portfolio}
-          whatsappTemplates={whatsappTemplates}
-          inventory={inventory}
-          setTab={setTab}
-        />
-
-        <section className="admin-pro-stats" aria-label="Resumo administrativo">
+        {tab === 'executive' && (
+          <section className="admin-pro-stats" aria-label="Resumo administrativo">
           {stats.map((item) => (
             <article className="pro-stat-card" key={item.label}>
               <span className="pro-stat-icon">{item.icon}</span>
@@ -134,9 +121,20 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
               </div>
             </article>
           ))}
-        </section>
+          </section>
+        )}
 
         <section className="admin-pro-content">
+          {tab === 'onboarding' && (
+            <OnboardingChecklist
+              services={services}
+              professionals={professionals}
+              portfolio={portfolio}
+              whatsappTemplates={whatsappTemplates}
+              inventory={inventory}
+              setTab={setTab}
+            />
+          )}
           {tab === 'executive' && <ExecutiveDashboard services={services} professionals={professionals} appointments={appointments} clients={clients} inventory={inventory} financialEntries={financialEntries} commissions={commissions} insights={insights} setTab={setTab} />}
           {tab === 'analytics' && <AdvancedMetricsAdmin setTab={setTab} />}
           {tab === 'services' && <ServicesAdmin services={services} reload={reload} />}
