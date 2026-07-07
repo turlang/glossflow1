@@ -1,27 +1,39 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { getTenant } from './helpers';
 import { inventoryMovementSchema, inventoryProductSchema, objectIdSchema, portfolioSchema, professionalSchema, salonSchema, serviceSchema, userSchema } from './schemas';
 import { z } from 'zod';
 
+function requireRouteRoles(roles: string[]) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const tenant = getTenant(request);
+    if (!roles.includes(tenant.role)) {
+      return reply.status(403).send({ message: 'Permissão insuficiente para esta operação.' });
+    }
+  };
+}
+
+const adminOnly = { preHandler: requireRouteRoles(['ADMIN']) };
+const adminOrReception = { preHandler: requireRouteRoles(['ADMIN', 'RECEPTION']) };
+
 /**
  * Rotas administrativas de CRUD.
  * Cada consulta usa salonId vindo do token para garantir isolamento multi-tenant.
  */
 export async function adminCrudRoutes(app: FastifyInstance) {
-  app.put('/admin/salon', async (request) => {
+  app.put('/admin/salon', adminOnly, async (request) => {
     const tenant = getTenant(request);
     const data = salonSchema.parse(request.body);
     return prisma.salon.update({ where: { id: tenant.salonId }, data });
   });
 
-  app.get('/admin/users', async (request) => {
+  app.get('/admin/users', adminOnly, async (request) => {
     const tenant = getTenant(request);
     return prisma.user.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: 'asc' }, select: { id: true, name: true, email: true, role: true, active: true, createdAt: true } });
   });
 
-  app.post('/admin/users', async (request, reply) => {
+  app.post('/admin/users', adminOnly, async (request, reply) => {
     const tenant = getTenant(request);
     const data = userSchema.parse(request.body);
     const password = data.password || '123456';
@@ -31,7 +43,7 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     return reply.status(201).send({ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active });
   });
 
-  app.put('/admin/users/:id', async (request, reply) => {
+  app.put('/admin/users/:id', adminOnly, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = userSchema.parse(request.body);
@@ -39,11 +51,12 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
     const result = await prisma.user.updateMany({ where: { id, salonId: tenant.salonId }, data: updateData });
     if (result.count === 0) return reply.status(404).send({ message: 'Usuário não encontrado neste salão.' });
-    const user = await prisma.user.findUniqueOrThrow({ where: { id } });
+    const user = await prisma.user.findFirst({ where: { id, salonId: tenant.salonId } });
+    if (!user) return reply.status(404).send({ message: 'Usuário não encontrado neste salão.' });
     return { id: user.id, name: user.name, email: user.email, role: user.role, active: user.active };
   });
 
-  app.delete('/admin/users/:id', async (request, reply) => {
+  app.delete('/admin/users/:id', adminOnly, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     if (id === tenant.id) return reply.status(400).send({ message: 'Você não pode desativar o próprio usuário.' });
@@ -52,19 +65,21 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  app.post('/admin/services', async (request, reply) => {
+  app.post('/admin/services', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const data = serviceSchema.parse(request.body);
     return reply.status(201).send(await prisma.service.create({ data: { ...data, salonId: tenant.salonId } }));
   });
-  app.put('/admin/services/:id', async (request, reply) => {
+
+  app.put('/admin/services/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.service.updateMany({ where: { id, salonId: tenant.salonId }, data: serviceSchema.parse(request.body) });
     if (result.count === 0) return reply.status(404).send({ message: 'Serviço não encontrado neste salão.' });
-    return prisma.service.findUnique({ where: { id } });
+    return prisma.service.findFirst({ where: { id, salonId: tenant.salonId } });
   });
-  app.delete('/admin/services/:id', async (request, reply) => {
+
+  app.delete('/admin/services/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.service.deleteMany({ where: { id, salonId: tenant.salonId } });
@@ -72,19 +87,21 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  app.post('/admin/professionals', async (request, reply) => {
+  app.post('/admin/professionals', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const data = professionalSchema.parse(request.body);
     return reply.status(201).send(await prisma.professional.create({ data: { ...data, salonId: tenant.salonId } }));
   });
-  app.put('/admin/professionals/:id', async (request, reply) => {
+
+  app.put('/admin/professionals/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.professional.updateMany({ where: { id, salonId: tenant.salonId }, data: professionalSchema.parse(request.body) });
     if (result.count === 0) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
-    return prisma.professional.findUnique({ where: { id } });
+    return prisma.professional.findFirst({ where: { id, salonId: tenant.salonId } });
   });
-  app.delete('/admin/professionals/:id', async (request, reply) => {
+
+  app.delete('/admin/professionals/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.professional.deleteMany({ where: { id, salonId: tenant.salonId } });
@@ -92,19 +109,21 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  app.post('/admin/portfolio', async (request, reply) => {
+  app.post('/admin/portfolio', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const data = portfolioSchema.parse(request.body);
     return reply.status(201).send(await prisma.portfolioItem.create({ data: { ...data, salonId: tenant.salonId } }));
   });
-  app.put('/admin/portfolio/:id', async (request, reply) => {
+
+  app.put('/admin/portfolio/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.portfolioItem.updateMany({ where: { id, salonId: tenant.salonId }, data: portfolioSchema.parse(request.body) });
     if (result.count === 0) return reply.status(404).send({ message: 'Item de portfólio não encontrado neste salão.' });
-    return prisma.portfolioItem.findUnique({ where: { id } });
+    return prisma.portfolioItem.findFirst({ where: { id, salonId: tenant.salonId } });
   });
-  app.delete('/admin/portfolio/:id', async (request, reply) => {
+
+  app.delete('/admin/portfolio/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.portfolioItem.deleteMany({ where: { id, salonId: tenant.salonId } });
@@ -112,12 +131,12 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  app.get('/admin/inventory', async (request) => {
+  app.get('/admin/inventory', adminOrReception, async (request) => {
     const tenant = getTenant(request);
     return prisma.inventoryProduct.findMany({ where: { salonId: tenant.salonId }, include: { movements: { orderBy: { createdAt: 'desc' }, take: 6 } }, orderBy: { name: 'asc' } });
   });
 
-  app.post('/admin/inventory', async (request, reply) => {
+  app.post('/admin/inventory', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const data = inventoryProductSchema.parse(request.body);
     const product = await prisma.inventoryProduct.create({ data: { ...data, salonId: tenant.salonId } });
@@ -127,15 +146,15 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     return reply.status(201).send(product);
   });
 
-  app.put('/admin/inventory/:id', async (request, reply) => {
+  app.put('/admin/inventory/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.inventoryProduct.updateMany({ where: { id, salonId: tenant.salonId }, data: inventoryProductSchema.parse(request.body) });
     if (result.count === 0) return reply.status(404).send({ message: 'Produto não encontrado neste salão.' });
-    return prisma.inventoryProduct.findUnique({ where: { id } });
+    return prisma.inventoryProduct.findFirst({ where: { id, salonId: tenant.salonId } });
   });
 
-  app.delete('/admin/inventory/:id', async (request, reply) => {
+  app.delete('/admin/inventory/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const result = await prisma.inventoryProduct.deleteMany({ where: { id, salonId: tenant.salonId } });
@@ -143,7 +162,7 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  app.post('/admin/inventory/movements', async (request, reply) => {
+  app.post('/admin/inventory/movements', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const data = inventoryMovementSchema.parse(request.body);
     const product = await prisma.inventoryProduct.findFirst({ where: { id: data.productId, salonId: tenant.salonId } });
