@@ -16,7 +16,8 @@ import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 
 /**
  * Composição central das rotas.
- * As rotas públicas ficam abertas; rotas administrativas recebem autenticação e RBAC.
+ * As rotas públicas ficam abertas; rotas administrativas recebem autenticação,
+ * auditoria e RBAC por nível de risco.
  */
 export async function appRoutes(app: FastifyInstance) {
   app.register(platformRoutes);
@@ -25,16 +26,41 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(publicRoutes);
   app.register(appointmentRoutes);
 
-  app.register(async (admin) => {
-    admin.addHook('preHandler', ensureAuthenticated);
-    admin.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']));
-    admin.addHook('onResponse', writeAuditLog);
-    admin.register(dashboardRoutes);
-    admin.register(adminCrudRoutes);
-    admin.register(businessRoutes);
-    admin.register(securityRoutes);
-    admin.register(observabilityRoutes);
-    admin.register(analyticsRoutes);
-    admin.register(integrationsRoutes);
+  /**
+   * Rotas operacionais do salão.
+   * Profissionais podem acessar apenas o bloco operacional; as rotas internas
+   * ainda aplicam permissões específicas quando a ação é sensível.
+   */
+  app.register(async (operational) => {
+    operational.addHook('preHandler', ensureAuthenticated);
+    operational.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']));
+    operational.addHook('onResponse', writeAuditLog);
+    operational.register(dashboardRoutes);
+    operational.register(adminCrudRoutes);
+  });
+
+  /**
+   * Rotas comerciais e CRM.
+   * Financeiro, comissão e assinatura possuem proteção interna adicional para ADMIN.
+   */
+  app.register(async (business) => {
+    business.addHook('preHandler', ensureAuthenticated);
+    business.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION']));
+    business.addHook('onResponse', writeAuditLog);
+    business.register(businessRoutes);
+    business.register(analyticsRoutes);
+  });
+
+  /**
+   * Rotas críticas da plataforma.
+   * Segurança, observabilidade e integrações ficam restritas ao ADMIN.
+   */
+  app.register(async (criticalAdmin) => {
+    criticalAdmin.addHook('preHandler', ensureAuthenticated);
+    criticalAdmin.addHook('preHandler', requireRoles(['ADMIN']));
+    criticalAdmin.addHook('onResponse', writeAuditLog);
+    criticalAdmin.register(securityRoutes);
+    criticalAdmin.register(observabilityRoutes);
+    criticalAdmin.register(integrationsRoutes);
   });
 }
