@@ -11,6 +11,7 @@ import { integrationsRoutes } from './integrations.routes';
 import { platformRoutes } from './platform.routes';
 import { commercialRoutes } from './commercial.routes';
 import { analyticsRoutes } from './analytics.routes';
+import { growthRoutes } from './growth.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 
@@ -40,8 +41,8 @@ export async function appRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Rotas comerciais e CRM.
-   * Financeiro, comissão e assinatura possuem proteção interna adicional para ADMIN.
+   * Rotas comerciais, CRM e evolução SaaS.
+   * Financeiro, comissão, assinatura e Super Admin possuem proteção interna para ADMIN.
    */
   app.register(async (business) => {
     business.addHook('preHandler', ensureAuthenticated);
@@ -49,6 +50,7 @@ export async function appRoutes(app: FastifyInstance) {
     business.addHook('onResponse', writeAuditLog);
     business.register(businessRoutes);
     business.register(analyticsRoutes);
+    business.register(growthRoutes);
   });
 
   /**
