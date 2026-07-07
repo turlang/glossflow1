@@ -6,34 +6,62 @@ import { appRoutes } from './routes/appRoutes';
 import { recordMetric } from './routes/metrics';
 import { captureOperationalError } from './services/sentry.service';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+/**
+ * Validação mínima de variáveis críticas.
+ * Em produção, a API não deve subir com configuração insegura ou incompleta.
+ */
+function assertRequiredProductionEnv() {
+  if (!isProduction) return;
+
+  const required = ['DATABASE_URL', 'JWT_SECRET', 'FRONTEND_ORIGIN'];
+  const missing = required.filter((key) => !process.env[key]?.trim());
+
+  if (missing.length > 0) {
+    throw new Error(`Variáveis obrigatórias ausentes em produção: ${missing.join(', ')}`);
+  }
+
+  if ((process.env.JWT_SECRET || '').length < 32) {
+    throw new Error('JWT_SECRET precisa ter pelo menos 32 caracteres em produção.');
+  }
+}
+
+assertRequiredProductionEnv();
+
 const app = Fastify({ logger: true });
 
 /**
  * Configuração de CORS.
- * Em desenvolvimento, permite o frontend local. Em produção, recomenda-se
- * configurar FRONTEND_ORIGIN com o domínio oficial do SaaS.
+ * Em desenvolvimento, permite o frontend local e ferramentas sem Origin.
+ * Em produção, FRONTEND_ORIGIN é obrigatório e deve listar os domínios aceitos.
  */
 const allowedOrigins = (process.env.FRONTEND_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const developmentOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const corsOrigins = isProduction ? allowedOrigins : [...allowedOrigins, ...developmentOrigins];
+
 app.register(cors, {
   origin: (origin, callback) => {
     /**
-     * Em desenvolvimento, ferramentas como Postman e chamadas server-side podem
-     * chegar sem header Origin. Essas chamadas são permitidas.
+     * Chamadas server-side, Postman e healthchecks podem não enviar Origin.
+     * Em produção seguimos permitindo esse cenário, mas browsers continuam
+     * limitados por FRONTEND_ORIGIN quando o Origin existe.
      */
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (corsOrigins.includes(origin)) {
       return callback(null, true);
     }
 
     return callback(new Error(`Origem não permitida pelo CORS: ${origin}`), false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 });
 
 /**
@@ -46,7 +74,8 @@ app.addHook('onRequest', async (request, reply) => {
   const windowMs = 60_000;
   const maxRequests = Number(process.env.RATE_LIMIT_PER_MINUTE || 180);
   const now = Date.now();
-  const ip = request.ip || request.headers['x-forwarded-for']?.toString() || 'unknown';
+  const forwardedFor = request.headers['x-forwarded-for']?.toString().split(',')[0]?.trim();
+  const ip = forwardedFor || request.ip || 'unknown';
   const current = buckets.get(ip);
 
   if (!current || current.resetAt < now) {
@@ -99,7 +128,7 @@ app.setErrorHandler((error, _request, reply) => {
 
   app.log.error(error);
   captureOperationalError(error, { method: _request.method, url: _request.url });
-  return reply.status(500).send({ message: process.env.NODE_ENV === 'production' ? 'Erro interno do servidor.' : (error.message || 'Erro interno do servidor.') });
+  return reply.status(500).send({ message: isProduction ? 'Erro interno do servidor.' : (error.message || 'Erro interno do servidor.') });
 });
 
 app.register(appRoutes);
