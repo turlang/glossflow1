@@ -3,6 +3,16 @@ import jwt from 'jsonwebtoken';
 import { AuthContext } from '../routes/helpers';
 import { prisma } from '../lib/prisma';
 
+function resolveJwtSecret() {
+  const secret = process.env.JWT_SECRET?.trim();
+
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET obrigatório em produção.');
+  }
+
+  return secret || 'glossflow-local-development-secret';
+}
+
 /**
  * Autenticação JWT com RBAC básico.
  * O payload carrega salonId para isolar dados entre salões diferentes.
@@ -15,8 +25,8 @@ export async function ensureAuthenticated(request: FastifyRequest, reply: Fastif
   }
 
   try {
-    const token = authorization.replace('Bearer ', '');
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'glossflow-dev-secret') as AuthContext;
+    const accessToken = authorization.replace('Bearer ', '');
+    const payload = jwt.verify(accessToken, resolveJwtSecret()) as AuthContext;
 
     /**
      * Compatibilidade acadêmica para versões anteriores do projeto:
