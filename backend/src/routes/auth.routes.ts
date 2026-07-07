@@ -8,6 +8,24 @@ import { loginSchema } from './schemas';
 const ACCESS_TOKEN_MINUTES = Number(process.env.ACCESS_TOKEN_MINUTES || 30);
 const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 7);
 
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET?.trim();
+
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET obrigatório em produção.');
+    }
+
+    return 'glossflow-local-dev-secret-change-before-production';
+  }
+
+  if (process.env.NODE_ENV === 'production' && secret.length < 32) {
+    throw new Error('JWT_SECRET precisa ter pelo menos 32 caracteres em produção.');
+  }
+
+  return secret;
+}
+
 function hashToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
@@ -15,7 +33,7 @@ function hashToken(token: string) {
 function signAccessToken(user: { id: string; email: string; role: string; salonId: string }) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, salonId: user.salonId },
-    process.env.JWT_SECRET || 'glossflow-dev-secret',
+    getJwtSecret(),
     { expiresIn: `${ACCESS_TOKEN_MINUTES}m` }
   );
 }
