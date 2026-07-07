@@ -16,7 +16,7 @@ function getJwtSecret() {
       throw new Error('JWT_SECRET obrigatório em produção.');
     }
 
-    return 'glossflow-local-dev-secret-change-before-production';
+    return 'glossflow-local-development-secret';
   }
 
   if (process.env.NODE_ENV === 'production' && secret.length < 32) {
