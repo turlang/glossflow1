@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Preview do GlossFlow Enterprise</title>
+  <desc id="desc">Apresentação visual de um SaaS premium para salões de beleza, agenda, clientes e gestão financeira.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#120b18"/><stop offset="0.55" stop-color="#2b1233"/><stop offset="1" stop-color="#120b18"/></linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff79c6"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="20" stdDeviation="25" flood-color="#000" flood-opacity=".45"/></filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="1380" cy="120" r="280" fill="#ff79c6" opacity=".08"/><circle cx="180" cy="840" r="300" fill="#a855f7" opacity=".08"/>
+  <g font-family="Inter,Arial,sans-serif">
+    <text x="92" y="92" fill="#f9d7ee" font-size="28" font-weight="800">GLOSSFLOW</text>
+    <rect x="92" y="142" width="235" height="44" rx="22" fill="#ffffff" opacity=".08" stroke="#ff79c6"/>
+    <text x="116" y="172" fill="#ffb6df" font-size="18" font-weight="700">BEAUTY BUSINESS OS</text>
+    <text x="92" y="292" fill="#ffffff" font-size="82" font-weight="900">Gestão que</text>
+    <text x="92" y="382" fill="url(#accent)" font-size="82" font-weight="900">faz seu salão crescer.</text>
+    <text x="96" y="444" fill="#d8c9dd" font-size="25">Agenda, clientes, estoque, financeiro e automações</text>
+    <text x="96" y="480" fill="#d8c9dd" font-size="25">reunidos em uma experiência SaaS premium.</text>
+    <g transform="translate(94 545)">
+      <rect width="180" height="54" rx="27" fill="url(#accent)"/><text x="33" y="35" fill="#170b1c" font-size="18" font-weight="900">AGENDAMENTO</text>
+      <rect x="198" width="142" height="54" rx="27" fill="#ffffff" opacity=".08" stroke="#ffffff" stroke-opacity=".18"/><text x="226" y="35" fill="#fff" font-size="18" font-weight="800">CRM</text>
+      <rect x="358" width="174" height="54" rx="27" fill="#ffffff" opacity=".08" stroke="#ffffff" stroke-opacity=".18"/><text x="389" y="35" fill="#fff" font-size="18" font-weight="800">MULTIEMPRESA</text>
+    </g>
+    <g transform="translate(860 112)" filter="url(#shadow)">
+      <rect width="650" height="650" rx="38" fill="#fcf7fb"/>
+      <rect width="650" height="72" rx="38" fill="#25142c"/><circle cx="38" cy="36" r="8" fill="#ff79c6"/><circle cx="64" cy="36" r="8" fill="#a855f7"/><circle cx="90" cy="36" r="8" fill="#f4c2df"/>
+      <text x="126" y="44" fill="#fff" font-size="20" font-weight="800">Dashboard executivo</text>
+      <rect x="34" y="104" width="180" height="112" rx="22" fill="#fff" stroke="#ead9e7"/><text x="54" y="135" fill="#725568" font-size="15">Faturamento</text><text x="54" y="180" fill="#241128" font-size="32" font-weight="900">R$ 28.450</text>
+      <rect x="234" y="104" width="180" height="112" rx="22" fill="#fff" stroke="#ead9e7"/><text x="254" y="135" fill="#725568" font-size="15">Agendamentos</text><text x="254" y="180" fill="#241128" font-size="32" font-weight="900">126</text>
+      <rect x="434" y="104" width="180" height="112" rx="22" fill="#fff" stroke="#ead9e7"/><text x="454" y="135" fill="#725568" font-size="15">Clientes ativos</text><text x="454" y="180" fill="#241128" font-size="32" font-weight="900">384</text>
+      <rect x="34" y="244" width="380" height="250" rx="24" fill="#fff" stroke="#ead9e7"/><text x="58" y="280" fill="#241128" font-size="19" font-weight="800">Agenda de hoje</text>
+      <g fill="#f9e7f3"><rect x="58" y="306" width="330" height="45" rx="13"/><rect x="58" y="364" width="330" height="45" rx="13"/><rect x="58" y="422" width="330" height="45" rx="13"/></g>
+      <g fill="#6d4562" font-size="15"><text x="76" y="334">09:00  •  Corte + escova</text><text x="76" y="392">11:30  •  Coloração premium</text><text x="76" y="450">14:00  •  Manicure</text></g>
+      <rect x="434" y="244" width="180" height="250" rx="24" fill="#25142c"/><text x="458" y="282" fill="#fff" font-size="18" font-weight="800">Health score</text><circle cx="524" cy="365" r="61" fill="none" stroke="#604366" stroke-width="18"/><path d="M524 304a61 61 0 1 1-55 87" fill="none" stroke="#ff79c6" stroke-width="18" stroke-linecap="round"/><text x="490" y="378" fill="#fff" font-size="31" font-weight="900">92%</text>
+      <rect x="34" y="522" width="580" height="92" rx="22" fill="url(#accent)"/><text x="60" y="557" fill="#241128" font-size="16" font-weight="800">PRÓXIMA AÇÃO</text><text x="60" y="590" fill="#241128" font-size="22" font-weight="900">Confirmar agenda e ativar campanha de fidelidade</text>
+    </g>
+    <text x="92" y="820" fill="#9e879f" font-size="19">React • Fastify • TypeScript • Prisma • MongoDB • PWA</text>
+  </g>
+</svg>
