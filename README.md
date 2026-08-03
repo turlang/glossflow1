@@ -2,6 +2,10 @@
 
 SaaS para salões de beleza, barbearias e clínicas de estética, com foco em gestão operacional, relacionamento com clientes, agendamento online, financeiro, automações e estrutura multiempresa.
 
+## Preview
+
+![Preview do GlossFlow Enterprise](docs/preview.svg)
+
 ## Visão geral
 
 O GlossFlow foi criado para centralizar a rotina de negócios de beleza em uma única plataforma: vitrine pública, agenda, serviços, profissionais, clientes, estoque, financeiro, comissões, fidelidade, templates de WhatsApp, automações e painéis administrativos.
