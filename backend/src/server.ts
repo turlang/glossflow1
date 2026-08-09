@@ -33,6 +33,21 @@ assertRequiredProductionEnv();
 const app = Fastify({ logger: true });
 
 /**
+ * Mantém o corpo JSON bruto para validar X-Hub-Signature-256 da Meta.
+ * Depois da captura, o conteúdo continua sendo entregue às rotas como JSON normal.
+ */
+app.removeContentTypeParser('application/json');
+app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
+  const rawBody = String(body || '');
+  (request as typeof request & { rawBody?: string }).rawBody = rawBody;
+  try {
+    done(null, rawBody ? JSON.parse(rawBody) : {});
+  } catch (error) {
+    done(error as Error, undefined);
+  }
+});
+
+/**
  * Configuração de CORS.
  * - FRONTEND_ORIGIN mantém origens administrativas/demonstração explícitas.
  * - PUBLIC_ROOT_DOMAIN libera subdomínios white-label do GlossFlow.
