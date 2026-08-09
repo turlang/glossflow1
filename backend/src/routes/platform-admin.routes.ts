@@ -1,9 +1,16 @@
 import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { DEFAULT_ENABLED_MODULES, MODULE_LABELS, normalizeEnabledModules, SALON_MODULES } from '../services/module-access.service';
 
 function brl(value: number) {
   return Number(value || 0).toFixed(2);
 }
+
+const salonIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'ID de salão inválido.');
+const modulesSchema = z.object({
+  enabledModules: z.array(z.enum(SALON_MODULES)).default([])
+});
 
 /**
  * Rotas exclusivas do Super Admin GlossFlow.
@@ -12,6 +19,11 @@ function brl(value: number) {
  * no grupo dedicado em appRoutes.ts.
  */
 export async function platformAdminRoutes(app: FastifyInstance) {
+  app.get('/platform-admin/modules/catalog', async () => ({
+    modules: SALON_MODULES.map((key) => ({ key, label: MODULE_LABELS[key] })),
+    defaults: DEFAULT_ENABLED_MODULES
+  }));
+
   app.get('/platform-admin/overview', async () => {
     const [salons, users, plans, subscriptions, activeSubscriptions] = await Promise.all([
       prisma.salon.count({ where: { slug: { not: 'glossflow-platform' } } }),
@@ -80,6 +92,8 @@ export async function platformAdminRoutes(app: FastifyInstance) {
       customDomain: salon.customDomain,
       users: salon.users.length,
       activeUsers: salon.users.filter((user: any) => user.active).length,
+      modulesConfigured: Boolean(salon.modulesConfigured),
+      enabledModules: normalizeEnabledModules(salon),
       metrics: {
         appointments: salon._count.appointments,
         clients: salon._count.clients,
@@ -94,5 +108,29 @@ export async function platformAdminRoutes(app: FastifyInstance) {
       } : null,
       createdAt: salon.createdAt
     }));
+  });
+
+  app.put('/platform-admin/salons/:id/modules', async (request, reply) => {
+    const { id } = z.object({ id: salonIdSchema }).parse(request.params);
+    const { enabledModules } = modulesSchema.parse(request.body);
+    const salon = await prisma.salon.findUnique({ where: { id } });
+    if (!salon || salon.slug === 'glossflow-platform') {
+      return reply.status(404).send({ message: 'Salão não encontrado.' });
+    }
+
+    const updated = await prisma.salon.update({
+      where: { id },
+      data: {
+        modulesConfigured: true,
+        enabledModules: [...new Set(enabledModules)]
+      }
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      modulesConfigured: true,
+      enabledModules: normalizeEnabledModules(updated)
+    };
   });
 }
