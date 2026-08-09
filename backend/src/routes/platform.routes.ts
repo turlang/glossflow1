@@ -4,7 +4,16 @@ import { buildOpenApiDocument } from '../services/openapi.service';
 import { getPrometheusMetrics } from './metrics';
 
 export async function platformRoutes(app: FastifyInstance) {
-  app.get('/health', async () => ({ ok: true, service: 'glossflow-api', version: '10.0.0', checkedAt: new Date().toISOString() }));
+  app.get('/health', async () => ({
+    ok: true,
+    service: 'glossflow-api',
+    version: '10.0.0',
+    superAdminBootstrapConfigured: Boolean(
+      String(process.env.SUPER_ADMIN_EMAIL || '').trim()
+      && String(process.env.SUPER_ADMIN_PASSWORD || '')
+    ),
+    checkedAt: new Date().toISOString()
+  }));
 
   app.get('/ready', async (_request, reply) => {
     const required = ['DATABASE_URL', 'JWT_SECRET'];
