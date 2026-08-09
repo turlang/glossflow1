@@ -25,6 +25,17 @@ function publicTenantHeaders() {
   };
 }
 
+function apiErrorMessage(data) {
+  const firstIssue = Array.isArray(data?.issues) ? data.issues[0] : null;
+  if (firstIssue?.message) {
+    const field = Array.isArray(firstIssue.path) && firstIssue.path.length
+      ? `${firstIssue.path.join('.')}: `
+      : '';
+    return `${field}${firstIssue.message}`;
+  }
+  return data?.message || 'Não foi possível concluir a solicitação.';
+}
+
 async function refreshAccessToken() {
   const refreshToken = localStorage.getItem('glossflow.refreshToken');
   if (!refreshToken) return null;
@@ -68,7 +79,7 @@ export async function request(path, options = {}, retry = true) {
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(data?.message || 'Não foi possível concluir a solicitação.');
+    throw new Error(apiErrorMessage(data));
   }
 
   return data;
