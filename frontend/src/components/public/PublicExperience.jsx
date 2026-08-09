@@ -18,13 +18,13 @@ function tenantStyle(salon) {
  * GlossFlow continua aparecendo apenas no backoffice/login da plataforma.
  */
 export function Header({ page, setPage, isAuthenticated, theme, toggleTheme, salon }) {
-  const backoffice = page === 'admin' || page === 'login' || page === 'commercial';
+  const backoffice = ['admin', 'login', 'commercial', 'site-settings', 'agent-test'].includes(page);
   const brandName = backoffice ? 'GlossFlow' : (salon?.name || 'Salão');
   const initial = brandName.trim().charAt(0).toUpperCase() || 'G';
 
   return (
     <header className="header" style={backoffice ? undefined : tenantStyle(salon)}>
-      <button className="brand" onClick={() => setPage('public')} aria-label="Ir para o início">
+      <button className="brand" onClick={() => setPage(backoffice && isAuthenticated ? 'admin' : 'public')} aria-label="Ir para o início">
         {salon?.logoUrl && !backoffice
           ? <img src={salon.logoUrl} alt={brandName} style={{ width: 42, height: 42, objectFit: 'contain', borderRadius: 14 }} />
           : <span className="brand-mark">{initial}</span>}
@@ -36,6 +36,8 @@ export function Header({ page, setPage, isAuthenticated, theme, toggleTheme, sal
           <>
             <button onClick={() => setPage('public')}>Ver site</button>
             {isAuthenticated && <button className={page === 'admin' ? 'active' : ''} onClick={() => setPage('admin')}>Painel</button>}
+            {isAuthenticated && <button className={page === 'site-settings' ? 'active' : ''} onClick={() => setPage('site-settings')}>Site & Marca</button>}
+            {isAuthenticated && <button className={page === 'agent-test' ? 'active' : ''} onClick={() => setPage('agent-test')}>Testar IA</button>}
           </>
         ) : (
           <>
