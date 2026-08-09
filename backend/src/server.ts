@@ -5,6 +5,7 @@ import { ZodError } from 'zod';
 import { appRoutes } from './routes/appRoutes';
 import { recordMetric } from './routes/metrics';
 import { captureOperationalError } from './services/sentry.service';
+import { prisma } from './lib/prisma';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -33,8 +34,9 @@ const app = Fastify({ logger: true });
 
 /**
  * Configuração de CORS.
- * Em desenvolvimento, permite o frontend local e ferramentas sem Origin.
- * Em produção, FRONTEND_ORIGIN é obrigatório e deve listar os domínios aceitos.
+ * - FRONTEND_ORIGIN mantém origens administrativas/demonstração explícitas.
+ * - PUBLIC_ROOT_DOMAIN libera subdomínios white-label do GlossFlow.
+ * - domínios próprios cadastrados no Salon são reconhecidos dinamicamente.
  */
 const allowedOrigins = (process.env.FRONTEND_ORIGIN || '')
   .split(',')
@@ -42,25 +44,45 @@ const allowedOrigins = (process.env.FRONTEND_ORIGIN || '')
   .filter(Boolean);
 
 const developmentOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-const corsOrigins = isProduction ? allowedOrigins : [...allowedOrigins, ...developmentOrigins];
+const rootDomain = (process.env.PUBLIC_ROOT_DOMAIN || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+async function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.includes(origin)) return true;
+  if (!isProduction && developmentOrigins.includes(origin)) return true;
+
+  let hostname = '';
+  try {
+    hostname = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return false;
+  }
+
+  if (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`))) {
+    return true;
+  }
+
+  if (isProduction && hostname) {
+    const salon = await prisma.salon.findFirst({ where: { customDomain: hostname }, select: { id: true } });
+    if (salon) return true;
+  }
+
+  return false;
+}
 
 app.register(cors, {
   origin: (origin, callback) => {
-    /**
-     * Chamadas server-side, Postman e healthchecks podem não enviar Origin.
-     * Em produção seguimos permitindo esse cenário, mas browsers continuam
-     * limitados por FRONTEND_ORIGIN quando o Origin existe.
-     */
+    /** Chamadas server-side, Postman e healthchecks podem não enviar Origin. */
     if (!origin) return callback(null, true);
 
-    if (corsOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error(`Origem não permitida pelo CORS: ${origin}`), false);
+    isAllowedOrigin(origin)
+      .then((allowed) => {
+        if (allowed) return callback(null, true);
+        return callback(new Error(`Origem não permitida pelo CORS: ${origin}`), false);
+      })
+      .catch((error) => callback(error, false));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Salon-Slug', 'X-Salon-Host'],
   credentials: true
 });
 
@@ -126,9 +148,18 @@ app.setErrorHandler((error, _request, reply) => {
     return reply.status(400).send({ message: 'Dados inválidos.', issues: error.issues });
   }
 
-  app.log.error(error);
-  captureOperationalError(error, { method: _request.method, url: _request.url });
-  return reply.status(500).send({ message: isProduction ? 'Erro interno do servidor.' : (error.message || 'Erro interno do servidor.') });
+  const statusCode = Number((error as Error & { statusCode?: number }).statusCode || 500);
+
+  if (statusCode >= 500) {
+    app.log.error(error);
+    captureOperationalError(error, { method: _request.method, url: _request.url });
+  }
+
+  const message = statusCode >= 500 && isProduction
+    ? 'Erro interno do servidor.'
+    : (error.message || 'Erro interno do servidor.');
+
+  return reply.status(statusCode).send({ message });
 });
 
 app.register(appRoutes);
