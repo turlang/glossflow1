@@ -8,6 +8,12 @@ import { captureOperationalError } from './services/sentry.service';
 import { prisma } from './lib/prisma';
 
 const isProduction = process.env.NODE_ENV === 'production';
+const buildId = (
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GIT_COMMIT ||
+  process.env.COMMIT_SHA ||
+  'local'
+).slice(0, 12);
 
 /**
  * Validação mínima de variáveis críticas.
@@ -98,6 +104,7 @@ app.register(cors, {
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Salon-Slug', 'X-Salon-Host'],
+  exposedHeaders: ['X-GlossFlow-Build'],
   credentials: true
 });
 
@@ -128,9 +135,10 @@ app.addHook('onRequest', async (request, reply) => {
 
 /**
  * Cabeçalhos básicos de segurança.
- * Mantidos sem dependência externa para preservar simplicidade de instalação.
+ * X-GlossFlow-Build facilita confirmar se Render e GitHub estão no mesmo commit.
  */
 app.addHook('onSend', async (_request, reply, payload) => {
+  reply.header('X-GlossFlow-Build', buildId);
   reply.header('X-Content-Type-Options', 'nosniff');
   reply.header('X-Frame-Options', 'DENY');
   reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -182,7 +190,7 @@ app.register(appRoutes);
 const start = async () => {
   const port = Number(process.env.PORT) || 3333;
   await app.listen({ port, host: '0.0.0.0' });
-  console.log(`🚀 GlossFlow API rodando em http://localhost:${port}`);
+  console.log(`🚀 GlossFlow API rodando em http://localhost:${port} • build ${buildId}`);
 };
 
 start().catch((error) => {
