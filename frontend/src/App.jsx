@@ -3,6 +3,7 @@ import { request } from './services/api';
 import { Header, PublicShowcase, BookingPage, LoginPage } from './components/public/PublicExperience.jsx';
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.jsx';
+import { SiteSettings } from './components/admin/SiteSettings.jsx';
 import { CommercialLanding } from './components/commercial/CommercialLanding.jsx';
 
 /**
@@ -40,6 +41,7 @@ export default function App() {
     const action = params.get('action');
     if (action === 'booking') setPage('booking');
     if (action === 'admin') setPage(authToken ? 'admin' : 'login');
+    if (action === 'site-settings') setPage(authToken ? 'site-settings' : 'login');
     if (action === 'commercial') setPage('commercial');
     localStorage.setItem('glossflow.pwa.query-action', action || 'public');
   }, []);
@@ -51,7 +53,7 @@ export default function App() {
 
   useEffect(() => {
     if (!salon) return;
-    document.title = page === 'admin' || page === 'login'
+    document.title = ['admin', 'login', 'site-settings'].includes(page)
       ? `GlossFlow • ${salon.name}`
       : salon.name;
   }, [salon, page]);
@@ -142,13 +144,7 @@ export default function App() {
       {!loading && error && <StateMessage title="Não foi possível conectar à API." text={error} danger />}
 
       {!loading && !error && page === 'public' && (
-        <PublicShowcase
-          salon={salon}
-          services={services}
-          professionals={professionals}
-          portfolio={portfolio}
-          setPage={setPage}
-        />
+        <PublicShowcase salon={salon} services={services} professionals={professionals} portfolio={portfolio} setPage={setPage} />
       )}
 
       {!loading && !error && page === 'commercial' && <CommercialLanding />}
@@ -159,6 +155,12 @@ export default function App() {
 
       {!loading && !error && page === 'login' && (
         <LoginPage setPage={setPage} onLogin={setAuthToken} />
+      )}
+
+      {!loading && !error && page === 'site-settings' && (
+        isAuthenticated
+          ? <SiteSettings salon={salon} reload={loadPublicData} setPage={setPage} />
+          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
       {!loading && !error && page === 'admin' && (
