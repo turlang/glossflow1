@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { request } from '../../services/api';
 import { MODULE_CATALOG } from '../../utils/modules';
 import { NewClientWizard } from './NewClientWizard.jsx';
+import { PlatformPlans } from './PlatformPlans.jsx';
 import { PlatformSiteManager } from './PlatformSiteManager.jsx';
 
 function money(value) {
@@ -438,34 +439,14 @@ export function PlatformAdmin({ setPage }) {
         {!loading && !error && tab === 'sites' && <PlatformSiteManager salons={salons} />}
 
         {!loading && !error && tab === 'plans' && (
-          <>
-            <section className="panel-card">
-              <span className="eyebrow">Catálogo comercial</span>
-              <h2>Criar plano</h2>
-              <form onSubmit={createPlan} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12, marginTop: 16 }}>
-                <label><span>Nome</span><input required value={newPlan.name} onChange={(event) => setNewPlan((current) => ({ ...current, name: event.target.value }))} /></label>
-                <label><span>Preço mensal</span><input required type="number" min="0" step="0.01" value={newPlan.price} onChange={(event) => setNewPlan((current) => ({ ...current, price: event.target.value }))} /></label>
-                <label><span>Máx. usuários</span><input required type="number" min="1" value={newPlan.maxUsers} onChange={(event) => setNewPlan((current) => ({ ...current, maxUsers: event.target.value }))} /></label>
-                <label style={{ gridColumn: '1 / -1' }}><span>Recursos/descrição</span><textarea required value={newPlan.features} onChange={(event) => setNewPlan((current) => ({ ...current, features: event.target.value }))} /></label>
-                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}><button className="primary" disabled={saving === 'new-plan'}>{saving === 'new-plan' ? 'Criando...' : 'Criar plano'}</button></div>
-              </form>
-            </section>
-
-            <section className="panel-card">
-              <span className="eyebrow">Planos cadastrados</span>
-              <h2>Oferta da plataforma</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 12, marginTop: 16 }}>
-                {plans.map((plan) => (
-                  <article key={plan.id} style={box(plan.active)}>
-                    <strong>{plan.name}</strong>
-                    <div style={{ fontSize: 26, fontWeight: 900, margin: '8px 0' }}>{money(plan.price)}<small>/mês</small></div>
-                    <p>{plan.features}</p>
-                    <small>{plan.maxUsers} usuário(s) • {plan.active ? 'Ativo' : 'Inativo'}</small>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </>
+          <PlatformPlans
+            plans={plans}
+            salons={salons}
+            value={newPlan}
+            setValue={setNewPlan}
+            saving={saving === 'new-plan'}
+            onSubmit={createPlan}
+          />
         )}
 
         {!loading && !error && tab === 'infra' && (
