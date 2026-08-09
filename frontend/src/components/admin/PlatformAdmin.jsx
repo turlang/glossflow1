@@ -11,27 +11,61 @@ function StatusBadge({ status }) {
   return <span className={`status-badge status-${label.toLowerCase().replaceAll('_', '-')}`}>{label}</span>;
 }
 
+const initialClient = {
+  name: '', slug: '', phone: '', whatsapp: '', address: '', openingHours: 'Segunda a sábado, 09h às 19h',
+  description: '', instagram: '', adminName: '', adminEmail: '', adminPassword: '', enabledModules: ['SITE', 'AGENDA']
+};
+
+const initialPlan = { name: '', price: '', maxUsers: 5, maxSalons: 1, features: '', active: true };
+
+function cardStyle(active = false) {
+  return {
+    border: `1px solid ${active ? 'rgba(52,211,153,.45)' : 'var(--line)'}`,
+    background: active ? 'rgba(52,211,153,.08)' : 'rgba(255,255,255,.025)',
+    borderRadius: 16,
+    padding: 14
+  };
+}
+
 export function PlatformAdmin({ setPage }) {
+  const [tab, setTab] = useState('overview');
   const [overview, setOverview] = useState(null);
   const [salons, setSalons] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [infra, setInfra] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [editingSalonId, setEditingSalonId] = useState('');
   const [moduleDrafts, setModuleDrafts] = useState({});
-  const [savingModules, setSavingModules] = useState('');
-  const [moduleMessage, setModuleMessage] = useState('');
+  const [metricsBySalon, setMetricsBySalon] = useState({});
+  const [subscriptionDrafts, setSubscriptionDrafts] = useState({});
+  const [adminDrafts, setAdminDrafts] = useState({});
+  const [saving, setSaving] = useState('');
+  const [newClient, setNewClient] = useState(initialClient);
+  const [newPlan, setNewPlan] = useState(initialPlan);
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const [overviewData, salonsData] = await Promise.all([
+      const [overviewData, salonsData, plansData] = await Promise.all([
         request('/platform-admin/overview'),
-        request('/platform-admin/salons')
+        request('/platform-admin/salons'),
+        request('/platform-admin/plans')
       ]);
       setOverview(overviewData);
       setSalons(salonsData);
+      setPlans(plansData);
       setModuleDrafts(Object.fromEntries(salonsData.map((salon) => [salon.id, salon.enabledModules || []])));
+      setSubscriptionDrafts(Object.fromEntries(salonsData.map((salon) => [salon.id, {
+        planId: salon.subscription?.planId || '',
+        status: salon.subscription?.status || 'TRIAL',
+        endsAt: salon.subscription?.endsAt ? String(salon.subscription.endsAt).slice(0, 10) : ''
+      }])));
+      setAdminDrafts(Object.fromEntries(salonsData.map((salon) => [salon.id, {
+        name: salon.owner?.name || '', email: salon.owner?.email || '', password: '', active: salon.owner?.active !== false
+      }])));
     } catch (err) {
       setError(err.message || 'Não foi possível carregar o painel global.');
     } finally {
@@ -39,12 +73,22 @@ export function PlatformAdmin({ setPage }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  async function loadInfra() {
+    try {
+      const [integrations, observability] = await Promise.all([
+        request('/platform-admin/integrations'),
+        request('/platform-admin/observability')
+      ]);
+      setInfra({ integrations, observability });
+    } catch (err) {
+      setMessage(err.message || 'Não foi possível carregar a infraestrutura.');
+    }
+  }
 
-  const activeSalons = useMemo(
-    () => salons.filter((salon) => salon.subscription?.status === 'ACTIVE').length,
-    [salons]
-  );
+  useEffect(() => { load(); }, []);
+  useEffect(() => { if (tab === 'infra' && !infra) loadInfra(); }, [tab]);
+
+  const activeSalons = useMemo(() => salons.filter((salon) => salon.subscription?.status === 'ACTIVE').length, [salons]);
 
   function logout() {
     localStorage.removeItem('glossflow.token');
@@ -53,52 +97,120 @@ export function PlatformAdmin({ setPage }) {
   }
 
   function toggleModule(salonId, moduleKey) {
-    setModuleMessage('');
     setModuleDrafts((current) => {
       const active = new Set(current[salonId] || []);
-      if (active.has(moduleKey)) active.delete(moduleKey);
-      else active.add(moduleKey);
+      if (active.has(moduleKey)) active.delete(moduleKey); else active.add(moduleKey);
       return { ...current, [salonId]: [...active] };
     });
   }
 
-  async function saveModules(salon) {
-    setSavingModules(salon.id);
-    setModuleMessage('Salvando módulos...');
-    try {
-      const updated = await request(`/platform-admin/salons/${salon.id}/modules`, {
-        method: 'PUT',
-        body: JSON.stringify({ enabledModules: moduleDrafts[salon.id] || [] })
-      });
-      setSalons((current) => current.map((item) => item.id === salon.id
-        ? { ...item, modulesConfigured: true, enabledModules: updated.enabledModules }
-        : item));
-      setModuleDrafts((current) => ({ ...current, [salon.id]: updated.enabledModules }));
-      setModuleMessage(`Módulos de ${salon.name} atualizados.`);
-    } catch (err) {
-      setModuleMessage(err.message || 'Não foi possível atualizar os módulos.');
-    } finally {
-      setSavingModules('');
+  function toggleNewClientModule(moduleKey) {
+    setNewClient((current) => {
+      const active = new Set(current.enabledModules || []);
+      if (active.has(moduleKey)) active.delete(moduleKey); else active.add(moduleKey);
+      return { ...current, enabledModules: [...active] };
+    });
+  }
+
+  async function openSalon(salon) {
+    const next = editingSalonId === salon.id ? '' : salon.id;
+    setEditingSalonId(next);
+    setMessage('');
+    if (next && !metricsBySalon[salon.id]) {
+      try {
+        const metrics = await request(`/platform-admin/salons/${salon.id}/metrics`);
+        setMetricsBySalon((current) => ({ ...current, [salon.id]: metrics }));
+      } catch (err) {
+        setMessage(err.message || 'Não foi possível carregar as métricas deste salão.');
+      }
     }
   }
 
-  function enableAll(salonId) {
-    setModuleDrafts((current) => ({ ...current, [salonId]: MODULE_CATALOG.map((item) => item.key) }));
+  async function saveModules(salon) {
+    setSaving(`modules-${salon.id}`);
+    setMessage('');
+    try {
+      const updated = await request(`/platform-admin/salons/${salon.id}/modules`, {
+        method: 'PUT', body: JSON.stringify({ enabledModules: moduleDrafts[salon.id] || [] })
+      });
+      setSalons((current) => current.map((item) => item.id === salon.id ? { ...item, modulesConfigured: true, enabledModules: updated.enabledModules } : item));
+      setMessage(`Módulos de ${salon.name} atualizados.`);
+    } catch (err) {
+      setMessage(err.message || 'Não foi possível atualizar os módulos.');
+    } finally { setSaving(''); }
   }
 
-  function disableAll(salonId) {
-    setModuleDrafts((current) => ({ ...current, [salonId]: [] }));
+  async function saveSubscription(salon) {
+    const draft = subscriptionDrafts[salon.id] || {};
+    if (!draft.planId) return setMessage('Escolha um plano antes de salvar a assinatura.');
+    setSaving(`subscription-${salon.id}`);
+    try {
+      await request(`/platform-admin/salons/${salon.id}/subscription`, {
+        method: 'PUT', body: JSON.stringify(draft)
+      });
+      setMessage(`Assinatura de ${salon.name} atualizada.`);
+      await load();
+    } catch (err) { setMessage(err.message || 'Não foi possível atualizar a assinatura.'); }
+    finally { setSaving(''); }
   }
+
+  async function saveAdminAccess(salon) {
+    const draft = adminDrafts[salon.id] || {};
+    setSaving(`admin-${salon.id}`);
+    try {
+      const payload = { name: draft.name, email: draft.email, active: draft.active };
+      if (draft.password) payload.password = draft.password;
+      await request(`/platform-admin/salons/${salon.id}/admin-access`, { method: 'PUT', body: JSON.stringify(payload) });
+      setMessage(`Acesso administrativo de ${salon.name} atualizado.`);
+      setAdminDrafts((current) => ({ ...current, [salon.id]: { ...current[salon.id], password: '' } }));
+      await load();
+    } catch (err) { setMessage(err.message || 'Não foi possível atualizar o acesso do cliente.'); }
+    finally { setSaving(''); }
+  }
+
+  async function createClient(event) {
+    event.preventDefault();
+    setSaving('new-client');
+    setMessage('');
+    try {
+      await request('/platform-admin/salons', { method: 'POST', body: JSON.stringify(newClient) });
+      setNewClient(initialClient);
+      setMessage('Cliente criado. O salão e o primeiro ADMIN já estão prontos para login.');
+      await load();
+    } catch (err) { setMessage(err.message || 'Não foi possível cadastrar o cliente.'); }
+    finally { setSaving(''); }
+  }
+
+  async function createPlan(event) {
+    event.preventDefault();
+    setSaving('new-plan');
+    setMessage('');
+    try {
+      await request('/platform-admin/plans', { method: 'POST', body: JSON.stringify(newPlan) });
+      setNewPlan(initialPlan);
+      setMessage('Plano criado com sucesso.');
+      await load();
+    } catch (err) { setMessage(err.message || 'Não foi possível criar o plano.'); }
+    finally { setSaving(''); }
+  }
+
+  const tabs = [
+    ['overview', '◈', 'Visão geral', 'MRR e saúde comercial'],
+    ['clients', '◆', 'Clientes', 'Tenants, acessos e módulos'],
+    ['plans', '◇', 'Planos', 'Planos e assinaturas'],
+    ['infra', '📡', 'Infraestrutura', 'Integrações e observabilidade']
+  ];
 
   return (
     <main className="admin-pro-shell" aria-label="Super Admin GlossFlow">
       <aside className="admin-pro-sidebar">
-        <button className="admin-pro-brand" type="button">
-          <span className="brand-mark">G</span>
-          <span><strong>GlossFlow</strong><small>Super Admin</small></span>
-        </button>
+        <button className="admin-pro-brand" type="button"><span className="brand-mark">G</span><span><strong>GlossFlow</strong><small>Super Admin</small></span></button>
         <nav className="admin-pro-nav">
-          <button type="button" className="active"><span className="menu-icon">◈</span><span><strong>Plataforma</strong><small>Visão geral do SaaS</small></span></button>
+          {tabs.map(([key, icon, label, description]) => (
+            <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>
+              <span className="menu-icon">{icon}</span><span><strong>{label}</strong><small>{description}</small></span>
+            </button>
+          ))}
           <button type="button" onClick={() => setPage('public')}><span className="menu-icon">↗</span><span><strong>Ver site</strong><small>Vitrine pública</small></span></button>
         </nav>
         <button className="admin-logout" type="button" onClick={logout}>Sair do Super Admin</button>
@@ -106,100 +218,82 @@ export function PlatformAdmin({ setPage }) {
 
       <section className="admin-pro-main">
         <header className="admin-pro-topbar">
-          <div>
-            <span className="eyebrow">GlossFlow Platform</span>
-            <h1>Super Admin</h1>
-            <p>Visão global da plataforma, clientes, assinaturas, receita e módulos contratados.</p>
-          </div>
-          <div className="topbar-actions">
-            <button className="primary" type="button" onClick={load}>Atualizar dados</button>
-          </div>
+          <div><span className="eyebrow">GlossFlow Platform</span><h1>{tabs.find(([key]) => key === tab)?.[2] || 'Super Admin'}</h1><p>Administração global separada da operação dos salões.</p></div>
+          <div className="topbar-actions"><button className="primary" type="button" onClick={load}>Atualizar dados</button></div>
         </header>
 
-        {loading && <section className="panel-card"><p>Carregando métricas globais...</p></section>}
+        {loading && <section className="panel-card"><p>Carregando plataforma...</p></section>}
         {error && <section className="panel-card"><p className="feedback error">{error}</p></section>}
+        {message && <section className="panel-card"><p className="feedback">{message}</p></section>}
 
-        {!loading && !error && overview && (
+        {!loading && !error && overview && tab === 'overview' && (
           <>
             <section className="admin-pro-stats">
-              <article className="pro-stat-card"><span className="pro-stat-icon">◆</span><div><strong>{overview.totals?.salons || 0}</strong><span>Salões cadastrados</span><small>Todos os tenants</small></div></article>
-              <article className="pro-stat-card"><span className="pro-stat-icon">●</span><div><strong>{activeSalons}</strong><span>Salões ativos</span><small>Assinaturas ACTIVE</small></div></article>
-              <article className="pro-stat-card"><span className="pro-stat-icon">◎</span><div><strong>{overview.totals?.users || 0}</strong><span>Usuários</span><small>Contas na plataforma</small></div></article>
-              <article className="pro-stat-card"><span className="pro-stat-icon">R$</span><div><strong>{money(overview.revenue?.mrr || 0)}</strong><span>MRR</span><small>Receita recorrente mensal</small></div></article>
+              <article className="pro-stat-card"><span className="pro-stat-icon">◆</span><div><strong>{overview.totals?.salons || 0}</strong><span>Clientes</span><small>Tenants cadastrados</small></div></article>
+              <article className="pro-stat-card"><span className="pro-stat-icon">●</span><div><strong>{activeSalons}</strong><span>Ativos</span><small>Assinaturas ACTIVE</small></div></article>
+              <article className="pro-stat-card"><span className="pro-stat-icon">◎</span><div><strong>{overview.totals?.users || 0}</strong><span>Usuários</span><small>Contas de clientes</small></div></article>
+              <article className="pro-stat-card"><span className="pro-stat-icon">R$</span><div><strong>{money(overview.revenue?.mrr || 0)}</strong><span>MRR</span><small>Receita recorrente</small></div></article>
               <article className="pro-stat-card"><span className="pro-stat-icon">◌</span><div><strong>{overview.subscriptionStatus?.trial || 0}</strong><span>Trials</span><small>Em avaliação</small></div></article>
               <article className="pro-stat-card"><span className="pro-stat-icon">!</span><div><strong>{overview.subscriptionStatus?.pastDue || 0}</strong><span>Inadimplentes</span><small>PAST_DUE</small></div></article>
             </section>
+            <section className="panel-card"><span className="eyebrow">Movimentação comercial</span><h2>Assinaturas recentes</h2><div className="list full-span">{(overview.recentSubscriptions || []).map((item) => <div className="list-row" key={item.id}><span><strong>{item.salon || 'Salão'}</strong><br/><small>{item.plan || 'Sem plano'}</small></span><span><StatusBadge status={item.status}/><br/><small>{money(item.price || 0)}</small></span></div>)}</div></section>
+          </>
+        )}
+
+        {!loading && !error && tab === 'clients' && (
+          <>
+            <section className="panel-card">
+              <span className="eyebrow">Novo cliente</span><h2>Cadastrar salão e administrador</h2>
+              <p className="panel-help">Cria um tenant independente e o primeiro usuário ADMIN. A senha inicial não é exibida depois do cadastro.</p>
+              <form onSubmit={createClient} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginTop: 18 }}>
+                {[['name','Nome do salão'],['slug','Slug (ex: studio-bella)'],['phone','Telefone'],['whatsapp','WhatsApp'],['address','Endereço'],['openingHours','Horário'],['instagram','Instagram'],['adminName','Nome do administrador'],['adminEmail','E-mail do administrador'],['adminPassword','Senha inicial (12+ caracteres)']].map(([key,label]) => (
+                  <label key={key}><span>{label}</span><input type={key === 'adminPassword' ? 'password' : key === 'adminEmail' ? 'email' : 'text'} required={!['instagram'].includes(key)} value={newClient[key]} onChange={(e) => setNewClient((c) => ({ ...c, [key]: key === 'slug' ? e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') : e.target.value }))}/></label>
+                ))}
+                <label style={{ gridColumn: '1 / -1' }}><span>Descrição</span><textarea value={newClient.description} onChange={(e) => setNewClient((c) => ({ ...c, description: e.target.value }))}/></label>
+                <div style={{ gridColumn: '1 / -1' }}><strong>Módulos iniciais</strong><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 8, marginTop: 10 }}>{MODULE_CATALOG.map((module) => { const checked = newClient.enabledModules.includes(module.key); return <label key={module.key} style={cardStyle(checked)}><input type="checkbox" checked={checked} onChange={() => toggleNewClientModule(module.key)}/> <strong>{module.label}</strong><br/><small>{module.description}</small></label>; })}</div></div>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}><button className="primary" disabled={saving === 'new-client'}>{saving === 'new-client' ? 'Cadastrando...' : 'Cadastrar cliente'}</button></div>
+              </form>
+            </section>
 
             <section className="panel-card">
-              <span className="eyebrow">Clientes da plataforma</span>
-              <h2>Salões, assinaturas e módulos</h2>
-              <p className="panel-help">Abra um salão para escolher exatamente quais módulos aquele cliente pode utilizar. A proteção é aplicada no painel e também na API.</p>
-              {moduleMessage && <p className="feedback" style={{ marginTop: 14 }}>{moduleMessage}</p>}
+              <span className="eyebrow">Clientes da plataforma</span><h2>Gestão por salão</h2>
               <div className="list full-span" style={{ marginTop: 18 }}>
                 {salons.map((salon) => {
                   const expanded = editingSalonId === salon.id;
                   const activeModules = moduleDrafts[salon.id] || [];
-                  return (
-                    <div key={salon.id} style={{ borderBottom: '1px solid var(--line)', padding: '14px 0' }}>
-                      <div className="list-row" style={{ border: 0, padding: 0 }}>
-                        <span>
-                          <strong>{salon.name}</strong><br />
-                          <small>{salon.slug} • {salon.users} usuário(s) • {activeModules.length}/{MODULE_CATALOG.length} módulos ativos</small>
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                          <span><StatusBadge status={salon.subscription?.status} /><br /><small>{salon.subscription?.plan || 'Sem plano'} {salon.subscription?.price != null ? `• ${money(salon.subscription.price)}` : ''}</small></span>
-                          <button className="secondary" type="button" onClick={() => setEditingSalonId(expanded ? '' : salon.id)}>{expanded ? 'Fechar' : 'Gerenciar módulos'}</button>
-                        </span>
-                      </div>
+                  const metrics = metricsBySalon[salon.id];
+                  const sub = subscriptionDrafts[salon.id] || {};
+                  const admin = adminDrafts[salon.id] || {};
+                  return <div key={salon.id} style={{ borderBottom: '1px solid var(--line)', padding: '14px 0' }}>
+                    <div className="list-row" style={{ border: 0, padding: 0 }}><span><strong>{salon.name}</strong><br/><small>{salon.slug} • {salon.owner?.email || 'sem ADMIN'} • {activeModules.length}/{MODULE_CATALOG.length} módulos</small></span><span style={{ display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',justifyContent:'flex-end' }}><StatusBadge status={salon.subscription?.status}/><button className="secondary" type="button" onClick={() => openSalon(salon)}>{expanded ? 'Fechar' : 'Gerenciar cliente'}</button></span></div>
+                    {expanded && <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
+                      <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10 }}>{metrics ? [
+                        ['Agendamentos',metrics.operation.appointments],['Próximos',metrics.operation.upcoming],['Clientes',metrics.operation.clients],['Profissionais',metrics.operation.professionals],['Serviços',metrics.operation.services],['Estoque baixo',metrics.operation.lowStock],['Receita mês',money(metrics.finance.monthRevenue)],['Lucro mês',money(metrics.finance.monthProfit)]
+                      ].map(([label,value]) => <div key={label} style={cardStyle()}><small>{label}</small><div style={{fontSize:22,fontWeight:800,marginTop:4}}>{value}</div></div>) : <p>Carregando métricas do salão...</p>}</div>
 
-                      {expanded && (
-                        <div style={{ marginTop: 18, padding: 18, borderRadius: 18, background: 'rgba(255,255,255,.04)', border: '1px solid var(--line)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-                            <div><strong>Módulos de {salon.name}</strong><br /><small>{salon.modulesConfigured ? 'Configuração personalizada' : 'Ainda no padrão: todos os módulos habilitados'}</small></div>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <button className="ghost-button" type="button" onClick={() => enableAll(salon.id)}>Ativar todos</button>
-                              <button className="ghost-button" type="button" onClick={() => disableAll(salon.id)}>Desativar todos</button>
-                            </div>
-                          </div>
+                      <div style={cardStyle()}><strong>Módulos contratados</strong><div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:8,marginTop:10 }}>{MODULE_CATALOG.map((module) => { const checked = activeModules.includes(module.key); return <label key={module.key} style={cardStyle(checked)}><input type="checkbox" checked={checked} onChange={() => toggleModule(salon.id,module.key)}/> <strong>{module.label}</strong><br/><small>{module.description}</small></label>; })}</div><div style={{display:'flex',justifyContent:'flex-end',marginTop:12}}><button className="primary" type="button" disabled={saving === `modules-${salon.id}`} onClick={() => saveModules(salon)}>Salvar módulos</button></div></div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
-                            {MODULE_CATALOG.map((module) => {
-                              const checked = activeModules.includes(module.key);
-                              return (
-                                <label key={module.key} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 14, borderRadius: 16, border: `1px solid ${checked ? 'rgba(52,211,153,.42)' : 'var(--line)'}`, background: checked ? 'rgba(52,211,153,.08)' : 'rgba(255,255,255,.025)', cursor: 'pointer' }}>
-                                  <input type="checkbox" checked={checked} onChange={() => toggleModule(salon.id, module.key)} style={{ marginTop: 4 }} />
-                                  <span><strong>{module.label}</strong><br /><small>{module.description}</small></span>
-                                </label>
-                              );
-                            })}
-                          </div>
+                      <div style={cardStyle()}><strong>Plano e assinatura</strong><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10,marginTop:10}}><label><span>Plano</span><select value={sub.planId || ''} onChange={(e) => setSubscriptionDrafts((c) => ({...c,[salon.id]:{...c[salon.id],planId:e.target.value}}))}><option value="">Selecione</option>{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} — {money(plan.price)}</option>)}</select></label><label><span>Status</span><select value={sub.status || 'TRIAL'} onChange={(e) => setSubscriptionDrafts((c) => ({...c,[salon.id]:{...c[salon.id],status:e.target.value}}))}>{['TRIAL','ACTIVE','PAST_DUE','CANCELED'].map((status) => <option key={status}>{status}</option>)}</select></label><label><span>Vencimento/fim</span><input type="date" value={sub.endsAt || ''} onChange={(e) => setSubscriptionDrafts((c) => ({...c,[salon.id]:{...c[salon.id],endsAt:e.target.value}}))}/></label></div><div style={{display:'flex',justifyContent:'flex-end',marginTop:12}}><button className="primary" type="button" onClick={() => saveSubscription(salon)}>Salvar assinatura</button></div></div>
 
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-                            <button className="primary" type="button" disabled={savingModules === salon.id} onClick={() => saveModules(salon)}>{savingModules === salon.id ? 'Salvando...' : 'Salvar módulos do cliente'}</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
+                      <div style={cardStyle()}><strong>Acesso do ADMIN do salão</strong><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10,marginTop:10}}><label><span>Nome</span><input value={admin.name || ''} onChange={(e) => setAdminDrafts((c) => ({...c,[salon.id]:{...c[salon.id],name:e.target.value}}))}/></label><label><span>E-mail</span><input type="email" value={admin.email || ''} onChange={(e) => setAdminDrafts((c) => ({...c,[salon.id]:{...c[salon.id],email:e.target.value}}))}/></label><label><span>Nova senha (opcional)</span><input type="password" placeholder="12+ caracteres" value={admin.password || ''} onChange={(e) => setAdminDrafts((c) => ({...c,[salon.id]:{...c[salon.id],password:e.target.value}}))}/></label><label style={{display:'flex',alignItems:'center',gap:8}}><input type="checkbox" checked={admin.active !== false} onChange={(e) => setAdminDrafts((c) => ({...c,[salon.id]:{...c[salon.id],active:e.target.checked}}))}/> Conta ativa</label></div><div style={{display:'flex',justifyContent:'flex-end',marginTop:12}}><button className="primary" type="button" onClick={() => saveAdminAccess(salon)}>Salvar acesso</button></div></div>
+                    </div>}
+                  </div>;
                 })}
-                {salons.length === 0 && <p className="empty-state">Nenhum salão cadastrado.</p>}
-              </div>
-            </section>
-
-            <section className="panel-card">
-              <span className="eyebrow">Assinaturas recentes</span>
-              <h2>Movimentação comercial</h2>
-              <div className="list full-span">
-                {(overview.recentSubscriptions || []).map((item) => (
-                  <div className="list-row" key={item.id}>
-                    <span><strong>{item.salon || 'Salão'}</strong><br /><small>{item.plan || 'Sem plano'}</small></span>
-                    <span><StatusBadge status={item.status} /><br /><small>{money(item.price || 0)}</small></span>
-                  </div>
-                ))}
+                {salons.length === 0 && <p className="empty-state">Nenhum cliente cadastrado.</p>}
               </div>
             </section>
           </>
         )}
+
+        {!loading && !error && tab === 'plans' && <>
+          <section className="panel-card"><span className="eyebrow">Catálogo comercial</span><h2>Criar plano</h2><form onSubmit={createPlan} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12,marginTop:16}}><label><span>Nome</span><input required value={newPlan.name} onChange={(e)=>setNewPlan((c)=>({...c,name:e.target.value}))}/></label><label><span>Preço mensal</span><input required type="number" min="0" step="0.01" value={newPlan.price} onChange={(e)=>setNewPlan((c)=>({...c,price:e.target.value}))}/></label><label><span>Máx. usuários</span><input required type="number" min="1" value={newPlan.maxUsers} onChange={(e)=>setNewPlan((c)=>({...c,maxUsers:e.target.value}))}/></label><label style={{gridColumn:'1 / -1'}}><span>Recursos/descrição</span><textarea required value={newPlan.features} onChange={(e)=>setNewPlan((c)=>({...c,features:e.target.value}))}/></label><div style={{gridColumn:'1 / -1',display:'flex',justifyContent:'flex-end'}}><button className="primary" disabled={saving==='new-plan'}>{saving==='new-plan'?'Criando...':'Criar plano'}</button></div></form></section>
+          <section className="panel-card"><span className="eyebrow">Planos cadastrados</span><h2>Oferta da plataforma</h2><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12,marginTop:16}}>{plans.map((plan)=><article key={plan.id} style={cardStyle(plan.active)}><strong>{plan.name}</strong><div style={{fontSize:26,fontWeight:900,margin:'8px 0'}}>{money(plan.price)}<small>/mês</small></div><p>{plan.features}</p><small>{plan.maxUsers} usuário(s) • {plan.active?'Ativo':'Inativo'}</small></article>)}</div></section>
+        </>}
+
+        {!loading && !error && tab === 'infra' && <>
+          <section className="panel-card"><span className="eyebrow">Infraestrutura</span><h2>Saúde da plataforma</h2>{infra ? <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10,marginTop:14}}>{[['Uptime',`${Math.round((infra.observability.service.uptimeSeconds||0)/60)} min`],['Latência',`${infra.observability.service.averageLatency||0} ms`],['Requisições',infra.observability.service.totalRequests||0],['Erros',infra.observability.service.errors||0],['Sessões ativas',infra.observability.security.activeSessions||0],['Auditorias',infra.observability.security.auditLogs||0]].map(([label,value])=><div key={label} style={cardStyle()}><small>{label}</small><div style={{fontSize:22,fontWeight:800}}>{value}</div></div>)}</div> : <p>Carregando...</p>}</section>
+          <section className="panel-card"><span className="eyebrow">Conectores globais</span><h2>Integrações do GlossFlow</h2>{infra && <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:10,marginTop:14}}>{(infra.integrations.integrations||[]).map((item)=><article key={item.key} style={cardStyle(item.status==='connected')}><strong>{item.name || item.key}</strong><p><StatusBadge status={item.status}/></p>{item.missingEnv?.length>0 && <small>Pendente: {item.missingEnv.join(', ')}</small>}</article>)}</div>}</section>
+        </>}
       </section>
     </main>
   );
