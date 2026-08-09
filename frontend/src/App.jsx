@@ -217,7 +217,7 @@ export default function App() {
 
       {!loading && !error && page === 'site-settings' && (
         isAuthenticated && !isSuperAdmin
-          ? <SiteSettings salon={backofficeSalon} reload={loadPublicData} setPage={setPage} />
+          ? <SiteSettings salon={backofficeSalon} services={services} professionals={professionals} reload={loadPublicData} setPage={setPage} />
           : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
