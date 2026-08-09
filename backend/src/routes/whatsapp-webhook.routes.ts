@@ -94,7 +94,7 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
           : 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
 
         const result = await sendWhatsAppMessage({ to: from, message: replyText, phoneNumberId });
-        const providerData = result as { data?: { messages?: Array<{ id?: string }> };
+        const providerData = result as { data?: { messages?: Array<{ id?: string }> } };
         const outboundId = providerData.data?.messages?.[0]?.id;
         await saveWhatsAppMessage({ salonId: salon.id, providerMessageId: outboundId, phone: from, direction: 'OUT', text: replyText });
 
