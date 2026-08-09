@@ -1,6 +1,5 @@
-# Render Blueprint — GlossFlow API
-# Use este arquivo se quiser criar o Web Service pelo fluxo de Blueprint/IaC do Render.
-# Também é possível configurar manualmente pelo dashboard usando os mesmos comandos.
+# Render Blueprint — GlossFlow API / Client Ready
+# Um único backend atende vários salões por tenant, vitrine white-label e WhatsApp.
 services:
   - type: web
     name: glossflow-api
@@ -22,16 +21,34 @@ services:
         sync: false
       - key: FRONTEND_ORIGIN
         sync: false
+
+      # White-label / multi-tenant
+      - key: PUBLIC_ROOT_DOMAIN
+        sync: false
+      - key: DEFAULT_PUBLIC_SALON_SLUG
+        value: glossflow
+
+      # Operação e segurança
       - key: RATE_LIMIT_PER_MINUTE
         value: "180"
       - key: ACCESS_TOKEN_MINUTES
         value: "30"
       - key: REFRESH_TOKEN_DAYS
         value: "7"
+      - key: BUSINESS_TIMEZONE
+        value: America/Sao_Paulo
+      - key: BUSINESS_TIMEZONE_OFFSET
+        value: "-03:00"
+      - key: BOOKING_SLOT_INTERVAL_MINUTES
+        value: "30"
+
+      # IA
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
+
+      # WhatsApp Cloud API / Meta
       - key: WHATSAPP_PROVIDER
         value: meta
       - key: WHATSAPP_DRY_RUN
@@ -40,6 +57,12 @@ services:
         sync: false
       - key: WHATSAPP_PHONE_NUMBER_ID
         sync: false
+      - key: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+
+      # Pagamentos — não são necessários para o primeiro cliente, permanecem opcionais
       - key: PAYMENTS_DRY_RUN
         value: "true"
       - key: MERCADO_PAGO_ACCESS_TOKEN
@@ -48,5 +71,7 @@ services:
         sync: false
       - key: STRIPE_PRICE_ID
         sync: false
+
+      # Observabilidade
       - key: SENTRY_DSN
         sync: false
