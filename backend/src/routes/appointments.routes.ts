@@ -2,11 +2,12 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
+import { enforceSalonModuleAccess, hasSalonModule } from '../services/module-access.service';
 import { appointmentSchema, appointmentUpdateSchema, objectIdSchema } from './schemas';
 import { getPublicSalon, getTenant } from './helpers';
 
 const adminAgendaAccess = {
-  preHandler: [ensureAuthenticated, requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL'])]
+  preHandler: [ensureAuthenticated, requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']), enforceSalonModuleAccess]
 };
 
 /** Rotas de agenda. A rota POST pública permite ao cliente criar reserva. */
@@ -15,8 +16,11 @@ export async function appointmentRoutes(app: FastifyInstance) {
    * A vitrine pública só recebe os intervalos ocupados necessários para
    * disponibilidade. Dados pessoais do cliente nunca saem por esta rota.
    */
-  app.get('/appointments', async (request) => {
+  app.get('/appointments', async (request, reply) => {
     const salon = await getPublicSalon(request);
+    if (!hasSalonModule(salon, 'AGENDA')) {
+      return reply.status(403).send({ message: 'Agendamento online não está habilitado para este salão.', code: 'MODULE_DISABLED', module: 'AGENDA' });
+    }
     return prisma.appointment.findMany({
       where: {
         salonId: salon.id,
@@ -31,6 +35,9 @@ export async function appointmentRoutes(app: FastifyInstance) {
   app.post('/appointments', async (request, reply) => {
     const data = appointmentSchema.parse(request.body);
     const salon = await getPublicSalon(request);
+    if (!hasSalonModule(salon, 'AGENDA')) {
+      return reply.status(403).send({ message: 'Agendamento online não está habilitado para este salão.', code: 'MODULE_DISABLED', module: 'AGENDA' });
+    }
 
     const [service, professional] = await Promise.all([
       prisma.service.findFirst({ where: { id: data.serviceId, salonId: salon.id, active: true } }),
@@ -58,7 +65,6 @@ export async function appointmentRoutes(app: FastifyInstance) {
 
     if (conflict) return reply.status(409).send({ message: 'Este profissional já possui agendamento neste horário.' });
 
-    // CRM automático: todo cliente que agenda entra na base de relacionamento.
     const existingClient = await prisma.client.findFirst({ where: { salonId: salon.id, phone: data.clientPhone } });
     const client = existingClient || await prisma.client.create({
       data: { name: data.clientName, phone: data.clientPhone, email: data.clientEmail || null, notes: 'Criado automaticamente pelo agendamento público.', salonId: salon.id }
@@ -91,11 +97,6 @@ export async function appointmentRoutes(app: FastifyInstance) {
     });
   });
 
-  /**
-   * Reagendamento visual da Agenda Enterprise.
-   * Permite mover um atendimento por drag and drop no frontend com validação
-   * contra conflitos de horário do mesmo profissional.
-   */
   app.put('/admin/appointments/:id', adminAgendaAccess, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
