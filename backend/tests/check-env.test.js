@@ -18,5 +18,5 @@ test('check-env aceita JWT forte e DATABASE_URL', () => {
     encoding: 'utf8'
   });
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /Ambiente validado/);
+  assert.match(result.stdout, /Ambiente mínimo validado com sucesso/);
 });
