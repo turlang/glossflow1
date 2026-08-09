@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { appointmentSchema, appointmentUpdateSchema, objectIdSchema } from './schemas';
-import { getMainSalon, getTenant } from './helpers';
+import { getPublicSalon, getTenant } from './helpers';
 
 const adminAgendaAccess = {
   preHandler: [ensureAuthenticated, requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL'])]
@@ -15,8 +15,8 @@ export async function appointmentRoutes(app: FastifyInstance) {
    * A vitrine pública só recebe os intervalos ocupados necessários para
    * disponibilidade. Dados pessoais do cliente nunca saem por esta rota.
    */
-  app.get('/appointments', async () => {
-    const salon = await getMainSalon();
+  app.get('/appointments', async (request) => {
+    const salon = await getPublicSalon(request);
     return prisma.appointment.findMany({
       where: {
         salonId: salon.id,
@@ -30,7 +30,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
 
   app.post('/appointments', async (request, reply) => {
     const data = appointmentSchema.parse(request.body);
-    const salon = await getMainSalon();
+    const salon = await getPublicSalon(request);
 
     const [service, professional] = await Promise.all([
       prisma.service.findFirst({ where: { id: data.serviceId, salonId: salon.id, active: true } }),
