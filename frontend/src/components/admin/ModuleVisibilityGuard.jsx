@@ -16,6 +16,7 @@ const TITLE_TO_MODULE = {
 
 const PLATFORM_ONLY_TITLES = new Set([
   'Assinatura',
+  'Segurança',
   'Ecossistema',
   'Observabilidade',
   'UX Premium',
@@ -57,7 +58,7 @@ function restoreElement(element) {
 /**
  * Camada visual de entitlements do ADMIN do salão.
  * - módulos desativados pelo SUPER_ADMIN não aparecem;
- * - áreas de plataforma (planos, infraestrutura e produto) nunca aparecem;
+ * - áreas de plataforma nunca aparecem no tenant;
  * - cards do dashboard respeitam os módulos contratados.
  * O backend continua sendo a fonte final de autorização.
  */
