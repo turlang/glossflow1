@@ -36,9 +36,11 @@ export async function adminCrudRoutes(app: FastifyInstance) {
   app.post('/admin/users', adminOnly, async (request, reply) => {
     const tenant = getTenant(request);
     const data = userSchema.parse(request.body);
-    const password = data.password || '123456';
+    if (!data.password) {
+      return reply.status(400).send({ message: 'Defina uma senha temporária segura para o novo usuário.' });
+    }
     const user = await prisma.user.create({
-      data: { name: data.name, email: data.email, role: data.role, active: data.active, password: await bcrypt.hash(password, 10), salonId: tenant.salonId }
+      data: { name: data.name, email: data.email, role: data.role, active: data.active, password: await bcrypt.hash(data.password, 10), salonId: tenant.salonId }
     });
     return reply.status(201).send({ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active });
   });
