@@ -1,26 +1,26 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
-import { getMainSalon } from './helpers';
+import { getPublicSalon } from './helpers';
 
 /** Rotas públicas usadas pela vitrine e pelo fluxo de agendamento do cliente. */
 export async function publicRoutes(app: FastifyInstance) {
   // A rota GET /health fica centralizada em platform.routes.ts.
   // Não declare health check aqui para evitar FST_ERR_DUPLICATED_ROUTE no Fastify.
 
-  app.get('/public/salon', async () => getMainSalon());
+  app.get('/public/salon', async (request) => getPublicSalon(request));
 
-  app.get('/services', async () => {
-    const salon = await getMainSalon();
+  app.get('/services', async (request) => {
+    const salon = await getPublicSalon(request);
     return prisma.service.findMany({ where: { salonId: salon.id, active: true }, orderBy: { name: 'asc' } });
   });
 
-  app.get('/professionals', async () => {
-    const salon = await getMainSalon();
+  app.get('/professionals', async (request) => {
+    const salon = await getPublicSalon(request);
     return prisma.professional.findMany({ where: { salonId: salon.id, active: true }, orderBy: { name: 'asc' } });
   });
 
-  app.get('/portfolio', async () => {
-    const salon = await getMainSalon();
+  app.get('/portfolio', async (request) => {
+    const salon = await getPublicSalon(request);
     return prisma.portfolioItem.findMany({ where: { salonId: salon.id }, orderBy: { createdAt: 'desc' } });
   });
 
