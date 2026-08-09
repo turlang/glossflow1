@@ -307,6 +307,7 @@ model AiSuggestion {
   content   String
   category  String   @default("GENERAL")
   priority  String   @default("MEDIUM")
+  resolved  Boolean  @default(false)
   salonId   String   @db.ObjectId
   salon     Salon    @relation(fields: [salonId], references: [id])
   createdAt DateTime @default(now())
