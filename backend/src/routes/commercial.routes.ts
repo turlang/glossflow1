@@ -36,7 +36,7 @@ async function persistCommercialEvent(kind: string, payload: Record<string, unkn
       resource: 'CommercialFunnel',
       method: 'POST',
       path: `/commercial/${kind.toLowerCase()}`,
-      metadata: payload,
+      metadata: JSON.parse(JSON.stringify(payload)),
       salonId: String(process.env.DEFAULT_SALON_ID || '000000000000000000000000')
     }
   }).catch(() => null);
