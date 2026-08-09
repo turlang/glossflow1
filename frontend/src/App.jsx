@@ -8,10 +8,9 @@ import { CommercialLanding } from './components/commercial/CommercialLanding.jsx
 /**
  * GlossFlow Frontend
  *
- * Aplicação React em Vite organizada em três áreas principais:
- * 1. Vitrine pública do salão;
- * 2. Fluxo de agendamento do cliente;
- * 3. Painel administrativo com autenticação simples via JWT.
+ * Uma única aplicação atende vários salões. O contexto público é resolvido em
+ * runtime pelo hostname, domínio próprio ou ?salon=slug; o painel continua
+ * isolado pelo salonId contido no JWT.
  */
 export default function App() {
   const [page, setPage] = useState('public');
@@ -36,28 +35,26 @@ export default function App() {
 
   const isAuthenticated = Boolean(authToken);
 
-  /**
-   * Atalhos do PWA.
-   * Quando o usuário abre o app pelo ícone ou por um atalho do manifesto,
-   * a query string decide se ele cai direto na vitrine, agendamento ou painel.
-   */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const action = params.get('action');
     if (action === 'booking') setPage('booking');
     if (action === 'admin') setPage(authToken ? 'admin' : 'login');
+    if (action === 'commercial') setPage('commercial');
     localStorage.setItem('glossflow.pwa.query-action', action || 'public');
   }, []);
 
-  /**
-   * Preferência visual persistente.
-   * O atributo data-theme permite alternar entre tema dark premium e light premium
-   * sem duplicar componentes, seguindo boas práticas de design tokens.
-   */
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('glossflow.theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!salon) return;
+    document.title = page === 'admin' || page === 'login'
+      ? `GlossFlow • ${salon.name}`
+      : salon.name;
+  }, [salon, page]);
 
   function toggleTheme() {
     setTheme((current) => current === 'dark' ? 'light' : 'dark');
@@ -68,11 +65,6 @@ export default function App() {
     setError('');
 
     try {
-      /**
-       * A vitrine pública recebe somente dados que podem ser expostos ao cliente.
-       * Agenda completa, estoque e módulos de gestão são carregados apenas após
-       * a autenticação administrativa.
-       */
       const [salonData, servicesData, professionalsData, portfolioData] = await Promise.all([
         request('/public/salon'),
         request('/services'),
@@ -98,11 +90,6 @@ export default function App() {
         setInsights({ saved: [], suggestions: [] });
       }
 
-      /**
-       * Carrega módulos administrativos apenas quando há sessão ativa.
-       * Caso o token esteja ausente, expirado ou seja de uma versão antiga,
-       * limpamos a sessão sem derrubar a vitrine pública.
-       */
       if (authToken) {
         try {
           const [appointmentsData, inventoryData, usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
@@ -149,7 +136,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} />
+      <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={salon} />
 
       {loading && <SkeletonPage />}
       {!loading && error && <StateMessage title="Não foi possível conectar à API." text={error} danger />}
@@ -167,7 +154,7 @@ export default function App() {
       {!loading && !error && page === 'commercial' && <CommercialLanding />}
 
       {!loading && !error && page === 'booking' && (
-        <BookingPage services={services} professionals={professionals} onCreated={loadPublicData} />
+        <BookingPage services={services} professionals={professionals} onCreated={loadPublicData} salon={salon} />
       )}
 
       {!loading && !error && page === 'login' && (
