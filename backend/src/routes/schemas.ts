@@ -8,6 +8,8 @@ export const loginSchema = z.object({
   password: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres.')
 });
 
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida. Use formato hexadecimal, por exemplo #C49A6C.');
+
 export const salonSchema = z.object({
   name: z.string().min(2),
   description: z.string().min(10),
@@ -16,7 +18,14 @@ export const salonSchema = z.object({
   address: z.string().min(5),
   openingHours: z.string().min(3),
   instagram: z.string().optional().default(''),
-  heroImage: z.string().optional().default('')
+  heroImage: z.string().optional().default(''),
+  heroTitle: z.string().max(160).optional(),
+  logoUrl: z.string().max(500).optional(),
+  primaryColor: hexColorSchema.optional(),
+  secondaryColor: hexColorSchema.optional(),
+  accentColor: hexColorSchema.optional(),
+  siteTemplate: z.enum(['ELEGANCE', 'LUXURY', 'MINIMAL', 'URBAN']).optional(),
+  customDomain: z.string().max(253).optional()
 });
 
 export const userSchema = z.object({
