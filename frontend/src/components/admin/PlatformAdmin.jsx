@@ -13,7 +13,7 @@ function StatusBadge({ status }) {
 /**
  * Painel global da plataforma.
  * Este componente nunca consome rotas operacionais de um salão. Todos os dados
- * vêm exclusivamente de /admin/saas/*, protegido no backend por SUPER_ADMIN.
+ * vêm exclusivamente de /platform-admin/*, protegido no backend por SUPER_ADMIN.
  */
 export function PlatformAdmin({ setPage }) {
   const [overview, setOverview] = useState(null);
@@ -26,8 +26,8 @@ export function PlatformAdmin({ setPage }) {
     setError('');
     try {
       const [overviewData, salonsData] = await Promise.all([
-        request('/admin/saas/overview'),
-        request('/admin/saas/salons')
+        request('/platform-admin/overview'),
+        request('/platform-admin/salons')
       ]);
       setOverview(overviewData);
       setSalons(salonsData);
