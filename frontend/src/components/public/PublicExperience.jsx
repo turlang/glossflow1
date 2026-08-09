@@ -18,7 +18,7 @@ function tenantStyle(salon) {
  * GlossFlow continua aparecendo apenas no backoffice/login da plataforma.
  */
 export function Header({ page, setPage, isAuthenticated, theme, toggleTheme, salon }) {
-  const backoffice = ['admin', 'login', 'commercial', 'site-settings', 'agent-test'].includes(page);
+  const backoffice = ['admin', 'login', 'commercial', 'agent-test'].includes(page);
   const brandName = backoffice ? 'GlossFlow' : (salon?.name || 'Salão');
   const initial = brandName.trim().charAt(0).toUpperCase() || 'G';
 
@@ -36,7 +36,6 @@ export function Header({ page, setPage, isAuthenticated, theme, toggleTheme, sal
           <>
             <button onClick={() => setPage('public')}>Ver site</button>
             {isAuthenticated && <button className={page === 'admin' ? 'active' : ''} onClick={() => setPage('admin')}>Painel</button>}
-            {isAuthenticated && <button className={page === 'site-settings' ? 'active' : ''} onClick={() => setPage('site-settings')}>Site & Marca</button>}
             {isAuthenticated && <button className={page === 'agent-test' ? 'active' : ''} onClick={() => setPage('agent-test')}>Testar IA</button>}
           </>
         ) : (
