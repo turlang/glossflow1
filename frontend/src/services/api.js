@@ -1,12 +1,25 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3333').replace(/\/+$/, '');
 
+function publicTenantHeaders() {
+  if (typeof window === 'undefined') return {};
+
+  const params = new URLSearchParams(window.location.search);
+  const explicitSlug = (params.get('salon') || import.meta.env.VITE_SALON_SLUG || '').trim().toLowerCase();
+  const hostname = window.location.hostname.toLowerCase().replace(/^www\./, '');
+
+  return {
+    ...(explicitSlug ? { 'X-Salon-Slug': explicitSlug } : {}),
+    ...(hostname ? { 'X-Salon-Host': hostname } : {})
+  };
+}
+
 async function refreshAccessToken() {
   const refreshToken = localStorage.getItem('glossflow.refreshToken');
   if (!refreshToken) return null;
 
   const response = await fetch(`${API_URL}/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...publicTenantHeaders() },
     body: JSON.stringify({ refreshToken })
   });
 
@@ -17,8 +30,9 @@ async function refreshAccessToken() {
 }
 
 /**
- * Cliente HTTP centralizado com refresh token.
- * Se o access token expirar, tenta renovar a sessão automaticamente uma vez.
+ * Cliente HTTP centralizado com refresh token e contexto público multi-tenant.
+ * A mesma aplicação pode servir vários salões por ?salon=slug, subdomínio ou
+ * domínio próprio sem duplicar o projeto.
  */
 export async function request(path, options = {}, retry = true) {
   const token = localStorage.getItem('glossflow.token');
@@ -26,6 +40,7 @@ export async function request(path, options = {}, retry = true) {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...publicTenantHeaders(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     }
