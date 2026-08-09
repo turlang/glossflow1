@@ -68,21 +68,35 @@ export default function App() {
     setError('');
 
     try {
-      const [salonData, servicesData, professionalsData, portfolioData, appointmentsData, inventoryData] = await Promise.all([
+      /**
+       * A vitrine pública recebe somente dados que podem ser expostos ao cliente.
+       * Agenda completa, estoque e módulos de gestão são carregados apenas após
+       * a autenticação administrativa.
+       */
+      const [salonData, servicesData, professionalsData, portfolioData] = await Promise.all([
         request('/public/salon'),
         request('/services'),
         request('/professionals'),
-        request('/portfolio'),
-        request('/appointments'),
-        request('/inventory/summary')
+        request('/portfolio')
       ]);
 
       setSalon(salonData);
       setServices(servicesData);
       setProfessionals(professionalsData);
       setPortfolio(portfolioData);
-      setAppointments(appointmentsData);
-      setInventory(inventoryData.products || []);
+
+      if (!authToken) {
+        setAppointments([]);
+        setInventory([]);
+        setUsers([]);
+        setClients([]);
+        setFinancialEntries([]);
+        setCommissions({ rules: [], projections: [] });
+        setLoyalty({ program: null, entries: [] });
+        setSubscription({ plans: [], subscription: null });
+        setWhatsappTemplates([]);
+        setInsights({ saved: [], suggestions: [] });
+      }
 
       /**
        * Carrega módulos administrativos apenas quando há sessão ativa.
@@ -91,7 +105,9 @@ export default function App() {
        */
       if (authToken) {
         try {
-          const [usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
+          const [appointmentsData, inventoryData, usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
+            request('/admin/appointments'),
+            request('/admin/inventory'),
             request('/admin/users'),
             request('/admin/clients'),
             request('/admin/financial'),
@@ -101,6 +117,8 @@ export default function App() {
             request('/admin/whatsapp/templates'),
             request('/admin/insights')
           ]);
+          setAppointments(appointmentsData);
+          setInventory(inventoryData);
           setUsers(usersData);
           setClients(clientsData);
           setFinancialEntries(financialData);
@@ -112,7 +130,10 @@ export default function App() {
         } catch (adminError) {
           console.warn('Sessão administrativa inválida ou expirada:', adminError.message);
           localStorage.removeItem('glossflow.token');
+          localStorage.removeItem('glossflow.refreshToken');
           setAuthToken('');
+          setAppointments([]);
+          setInventory([]);
         }
       }
     } catch (err) {
