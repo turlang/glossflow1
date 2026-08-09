@@ -43,6 +43,9 @@ export function Header({ page, setPage, isAuthenticated, theme, toggleTheme, sal
           <>
             <button className={page === 'public' ? 'active' : ''} onClick={() => setPage('public')}>Início</button>
             <button className={page === 'booking' ? 'active' : ''} onClick={() => setPage('booking')}>Agendar</button>
+            {!isAuthenticated
+              ? <button className="nav-admin-access" type="button" onClick={() => setPage('login')}>Entrar</button>
+              : <button className="nav-admin-access" type="button" onClick={() => setPage('admin')}>Painel</button>}
           </>
         )}
         <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label="Alternar tema visual">{theme === 'dark' ? '☀️ Claro' : '🌙 Escuro'}</button>
@@ -177,7 +180,7 @@ export function LoginPage({ setPage, onLogin }) {
       localStorage.setItem('glossflow.token', data.token);
       if (data.refreshToken) localStorage.setItem('glossflow.refreshToken', data.refreshToken);
       onLogin(data.token);
-      setPage('admin');
+      setPage(data.user?.role === 'SUPER_ADMIN' ? 'platform-admin' : 'admin');
     } catch (err) {
       setMessage(err.message);
     }
