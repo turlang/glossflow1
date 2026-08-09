@@ -4,6 +4,7 @@ import { publicRoutes } from './public.routes';
 import { appointmentRoutes } from './appointments.routes';
 import { dashboardRoutes } from './dashboard.routes';
 import { adminCrudRoutes } from './admin-crud.routes';
+import { tenantRoutes } from './tenant.routes';
 import { businessRoutes } from './business.routes';
 import { securityRoutes } from './security.routes';
 import { observabilityRoutes } from './observability.routes';
@@ -38,6 +39,7 @@ export async function appRoutes(app: FastifyInstance) {
     operational.addHook('onResponse', writeAuditLog);
     operational.register(dashboardRoutes);
     operational.register(adminCrudRoutes);
+    operational.register(tenantRoutes);
   });
 
   /**
