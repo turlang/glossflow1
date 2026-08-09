@@ -1,0 +1,238 @@
+/* GlossFlow — Admin Mobile Icon Rail
+   -------------------------------------------------------------
+   Em telas pequenas o backoffice deixa de empilhar a sidebar acima
+   do conteúdo. A navegação vira um rail lateral compacto, apenas com
+   ícones, preservando praticamente toda a largura para a área ativa.
+   Vale tanto para ADMIN do salão quanto para SUPER_ADMIN. */
+
+@media (max-width: 900px) {
+  .admin-pro-shell,
+  .admin-pro-shell.sidebar-collapsed {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 8px 8px 24px 0 !important;
+    display: grid !important;
+    grid-template-columns: 66px minmax(0, 1fr) !important;
+    gap: 8px !important;
+    align-items: start !important;
+  }
+
+  .admin-pro-sidebar,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-sidebar {
+    position: sticky !important;
+    top: 8px !important;
+    width: 66px !important;
+    height: calc(100dvh - 16px) !important;
+    min-height: 0 !important;
+    padding: 8px 6px !important;
+    gap: 8px !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    border-radius: 0 18px 18px 0 !important;
+    z-index: 45 !important;
+  }
+
+  /* Marca compacta */
+  .admin-pro-brand,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-brand {
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 48px !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    flex: 0 0 48px !important;
+  }
+
+  .admin-pro-brand .brand-mark {
+    width: 38px !important;
+    height: 38px !important;
+    flex: 0 0 38px !important;
+    border-radius: 13px !important;
+  }
+
+  .admin-pro-brand > span:last-child,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-brand > span:last-child,
+  .salon-card-mini,
+  .admin-pro-shell.sidebar-collapsed .salon-card-mini,
+  .global-command,
+  .admin-pro-shell.sidebar-collapsed .global-command,
+  .sidebar-collapse,
+  .admin-pro-shell.sidebar-collapsed .sidebar-collapse,
+  .collapse-label {
+    display: none !important;
+  }
+
+  /* Rail de navegação: somente ícones */
+  .admin-pro-nav,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-nav {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding: 2px 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .admin-pro-nav::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-pro-nav button,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-nav button {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    place-items: center !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 15px !important;
+    flex: 0 0 48px !important;
+  }
+
+  .admin-pro-nav button > span:last-child,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-nav button > span:last-child,
+  .admin-pro-nav button strong,
+  .admin-pro-nav button small {
+    display: none !important;
+  }
+
+  .admin-pro-nav .menu-icon,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-nav .menu-icon {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    font-size: .9rem !important;
+  }
+
+  .admin-pro-nav button.active {
+    background: rgba(255,255,255,.09) !important;
+    box-shadow: inset 3px 0 0 var(--gold), 0 8px 24px rgba(0,0,0,.18) !important;
+  }
+
+  /* Logout continua acessível, mas também vira ícone. */
+  .admin-logout,
+  .admin-pro-shell.sidebar-collapsed .admin-logout {
+    display: grid !important;
+    place-items: center !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    margin-top: auto !important;
+    border-radius: 15px !important;
+    font-size: 0 !important;
+    flex: 0 0 48px !important;
+  }
+
+  .admin-logout::before {
+    content: '↪';
+    font-size: 1.15rem !important;
+    line-height: 1 !important;
+    color: #fecdd3;
+  }
+
+  /* Conteúdo usa todo o espaço restante. */
+  .admin-pro-main {
+    min-width: 0 !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+
+  .admin-pro-topbar {
+    min-width: 0 !important;
+    padding: 12px !important;
+    gap: 10px !important;
+    border-radius: 17px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .admin-pro-topbar h1 {
+    margin: 5px 0 0 !important;
+    font-size: clamp(1.35rem, 7vw, 1.9rem) !important;
+    letter-spacing: -.045em !important;
+  }
+
+  .admin-pro-topbar p {
+    display: none !important;
+  }
+
+  .topbar-actions {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    gap: 6px !important;
+  }
+
+  .topbar-actions button {
+    min-height: 36px !important;
+    padding: 0 11px !important;
+    font-size: .76rem !important;
+    flex: 0 1 auto !important;
+  }
+
+  .admin-pro-content,
+  .panel-card {
+    min-width: 0 !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-pro-shell,
+  .admin-pro-shell.sidebar-collapsed {
+    grid-template-columns: 58px minmax(0, 1fr) !important;
+    gap: 6px !important;
+    padding-right: 6px !important;
+  }
+
+  .admin-pro-sidebar,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-sidebar {
+    width: 58px !important;
+    padding-inline: 5px !important;
+    border-radius: 0 16px 16px 0 !important;
+  }
+
+  .admin-pro-brand,
+  .admin-pro-nav button,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-nav button,
+  .admin-logout,
+  .admin-pro-shell.sidebar-collapsed .admin-logout {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    flex-basis: 44px !important;
+  }
+
+  .admin-pro-nav .menu-icon,
+  .admin-pro-shell.sidebar-collapsed .admin-pro-nav .menu-icon {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+  }
+
+  .admin-pro-topbar {
+    padding: 10px !important;
+  }
+
+  .topbar-actions button {
+    min-height: 34px !important;
+    padding: 0 9px !important;
+    font-size: .72rem !important;
+  }
+}
