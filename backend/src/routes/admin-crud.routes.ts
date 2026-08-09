@@ -133,7 +133,7 @@ export async function adminCrudRoutes(app: FastifyInstance) {
 
   app.get('/admin/inventory', adminOrReception, async (request) => {
     const tenant = getTenant(request);
-    return prisma.inventoryProduct.findMany({ where: { salonId: tenant.salonId }, include: { movements: { orderBy: { createdAt: 'desc' }, take: 6 } }, orderBy: { name: 'asc' } });
+    return prisma.inventoryProduct.findMany({ where: { salonId: tenant.salonId }, include: { movements: { orderBy: { createdAt: 'desc' }, take: 20 } }, orderBy: { name: 'asc' } });
   });
 
   app.post('/admin/inventory', adminOrReception, async (request, reply) => {
@@ -149,15 +149,42 @@ export async function adminCrudRoutes(app: FastifyInstance) {
   app.put('/admin/inventory/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
-    const result = await prisma.inventoryProduct.updateMany({ where: { id, salonId: tenant.salonId }, data: inventoryProductSchema.parse(request.body) });
-    if (result.count === 0) return reply.status(404).send({ message: 'Produto não encontrado neste salão.' });
-    return prisma.inventoryProduct.findFirst({ where: { id, salonId: tenant.salonId } });
+    const data = inventoryProductSchema.parse(request.body);
+    const current = await prisma.inventoryProduct.findFirst({ where: { id, salonId: tenant.salonId } });
+    if (!current) return reply.status(404).send({ message: 'Produto não encontrado neste salão.' });
+
+    const quantityChanged = data.quantity !== current.quantity;
+    const operations = [
+      prisma.inventoryProduct.updateMany({
+        where: { id, salonId: tenant.salonId },
+        data
+      })
+    ];
+
+    if (quantityChanged) {
+      operations.push(prisma.inventoryMovement.create({
+        data: {
+          type: 'ADJUSTMENT',
+          quantity: data.quantity,
+          reason: `Ajuste pelo cadastro do produto. Saldo anterior: ${current.quantity}; novo saldo: ${data.quantity}.`,
+          productId: id,
+          salonId: tenant.salonId
+        }
+      }) as any);
+    }
+
+    await prisma.$transaction(operations as any);
+    return prisma.inventoryProduct.findFirst({ where: { id, salonId: tenant.salonId }, include: { movements: { orderBy: { createdAt: 'desc' }, take: 20 } } });
   });
 
+  /**
+   * Produtos não são apagados fisicamente porque as movimentações compõem o
+   * histórico operacional. DELETE funciona como desativação segura.
+   */
   app.delete('/admin/inventory/:id', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
-    const result = await prisma.inventoryProduct.deleteMany({ where: { id, salonId: tenant.salonId } });
+    const result = await prisma.inventoryProduct.updateMany({ where: { id, salonId: tenant.salonId }, data: { active: false } });
     if (result.count === 0) return reply.status(404).send({ message: 'Produto não encontrado neste salão.' });
     return reply.status(204).send();
   });
@@ -165,15 +192,26 @@ export async function adminCrudRoutes(app: FastifyInstance) {
   app.post('/admin/inventory/movements', adminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const data = inventoryMovementSchema.parse(request.body);
-    const product = await prisma.inventoryProduct.findFirst({ where: { id: data.productId, salonId: tenant.salonId } });
-    if (!product) return reply.status(404).send({ message: 'Produto não encontrado no estoque.' });
-    const nextQuantity = data.type === 'IN' ? product.quantity + data.quantity : data.type === 'OUT' ? product.quantity - data.quantity : data.quantity;
+    const product = await prisma.inventoryProduct.findFirst({ where: { id: data.productId, salonId: tenant.salonId, active: true } });
+    if (!product) return reply.status(404).send({ message: 'Produto ativo não encontrado no estoque.' });
+
+    const nextQuantity = data.type === 'IN'
+      ? product.quantity + data.quantity
+      : data.type === 'OUT'
+        ? product.quantity - data.quantity
+        : data.quantity;
+
     if (nextQuantity < 0) return reply.status(400).send({ message: 'Movimentação inválida: estoque não pode ficar negativo.' });
+
+    const movementData = data.type === 'ADJUSTMENT'
+      ? { ...data, quantity: nextQuantity, salonId: tenant.salonId }
+      : { ...data, salonId: tenant.salonId };
+
     const [movement] = await prisma.$transaction([
-      prisma.inventoryMovement.create({ data: { ...data, salonId: tenant.salonId } }),
+      prisma.inventoryMovement.create({ data: movementData }),
       prisma.inventoryProduct.updateMany({ where: { id: product.id, salonId: tenant.salonId }, data: { quantity: nextQuantity } })
     ]);
-    const updatedProduct = await prisma.inventoryProduct.findFirst({ where: { id: product.id, salonId: tenant.salonId } });
+    const updatedProduct = await prisma.inventoryProduct.findFirst({ where: { id: product.id, salonId: tenant.salonId }, include: { movements: { orderBy: { createdAt: 'desc' }, take: 20 } } });
     return reply.status(201).send({ movement, product: updatedProduct });
   });
 }
