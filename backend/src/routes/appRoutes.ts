@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { authRoutes } from './auth.routes';
 import { publicRoutes } from './public.routes';
 import { appointmentRoutes } from './appointments.routes';
@@ -17,6 +17,29 @@ import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
+import { AuthContext } from './helpers';
+
+/**
+ * Separa explicitamente o administrador da plataforma do administrador de salão.
+ * - /admin/saas/*: somente SUPER_ADMIN do GlossFlow.
+ * - demais rotas deste bloco: somente ADMIN/RECEPTION do salão autenticado.
+ */
+async function requireBusinessScope(request: FastifyRequest, reply: FastifyReply) {
+  const user = (request as FastifyRequest & { user?: AuthContext }).user;
+  const path = request.url.split('?')[0];
+  const isPlatformRoute = path.startsWith('/admin/saas/');
+
+  if (isPlatformRoute) {
+    if (user?.role !== 'SUPER_ADMIN') {
+      return reply.status(403).send({ message: 'Acesso exclusivo do Super Admin da plataforma.' });
+    }
+    return;
+  }
+
+  if (!user || !['ADMIN', 'RECEPTION'].includes(user.role)) {
+    return reply.status(403).send({ message: 'Permissão insuficiente para esta operação.' });
+  }
+}
 
 /**
  * Composição central das rotas.
@@ -32,9 +55,8 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(whatsappWebhookRoutes);
 
   /**
-   * Rotas operacionais do salão.
-   * Profissionais podem acessar apenas o bloco operacional; as rotas internas
-   * ainda aplicam permissões específicas quando a ação é sensível.
+   * Rotas operacionais de cada salão.
+   * Todos os dados continuam isolados pelo salonId carregado no JWT.
    */
   app.register(async (operational) => {
     operational.addHook('preHandler', ensureAuthenticated);
@@ -46,12 +68,13 @@ export async function appRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Rotas comerciais, CRM e evolução SaaS.
-   * Financeiro, comissão, assinatura e Super Admin possuem proteção interna para ADMIN.
+   * Negócio do salão + administração global SaaS.
+   * O hook requireBusinessScope impede qualquer ADMIN de salão de consultar
+   * métricas globais, salões ou assinaturas da plataforma.
    */
   app.register(async (business) => {
     business.addHook('preHandler', ensureAuthenticated);
-    business.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION']));
+    business.addHook('preHandler', requireBusinessScope);
     business.addHook('onResponse', writeAuditLog);
     business.register(businessRoutes);
     business.register(analyticsRoutes);
@@ -60,8 +83,9 @@ export async function appRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Rotas críticas da plataforma.
-   * Segurança, observabilidade e integrações ficam restritas ao ADMIN.
+   * Rotas críticas de um salão.
+   * Segurança, observabilidade e integrações do tenant permanecem restritas
+   * ao ADMIN daquele salão; SUPER_ADMIN não herda acesso aos dados do cliente.
    */
   app.register(async (criticalAdmin) => {
     criticalAdmin.addHook('preHandler', ensureAuthenticated);
