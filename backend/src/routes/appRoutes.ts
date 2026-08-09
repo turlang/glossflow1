@@ -2,10 +2,12 @@ import { FastifyInstance } from 'fastify';
 import { authRoutes } from './auth.routes';
 import { publicRoutes } from './public.routes';
 import { appointmentRoutes } from './appointments.routes';
+import { whatsappWebhookRoutes } from './whatsapp-webhook.routes';
 import { dashboardRoutes } from './dashboard.routes';
 import { adminCrudRoutes } from './admin-crud.routes';
 import { tenantRoutes } from './tenant.routes';
 import { businessRoutes } from './business.routes';
+import { whatsappAgentRoutes } from './whatsapp-agent.routes';
 import { securityRoutes } from './security.routes';
 import { observabilityRoutes } from './observability.routes';
 import { integrationsRoutes } from './integrations.routes';
@@ -27,6 +29,7 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(authRoutes);
   app.register(publicRoutes);
   app.register(appointmentRoutes);
+  app.register(whatsappWebhookRoutes);
 
   /**
    * Rotas operacionais do salão.
@@ -53,6 +56,7 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(businessRoutes);
     business.register(analyticsRoutes);
     business.register(growthRoutes);
+    business.register(whatsappAgentRoutes);
   });
 
   /**
