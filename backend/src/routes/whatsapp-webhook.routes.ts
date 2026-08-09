@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
+import { hasSalonModule } from '../services/module-access.service';
 import {
   answerWhatsAppMessage,
   findSalonByWhatsApp,
@@ -45,6 +46,17 @@ async function fallbackSalon(phoneNumberId: string) {
   });
 }
 
+async function agentModulesEnabled(salonId: string) {
+  const entitlement = await prisma.salon.findUnique({
+    where: { id: salonId },
+    select: { modulesConfigured: true, enabledModules: true }
+  });
+  if (!entitlement) return false;
+  return hasSalonModule(entitlement, 'WHATSAPP')
+    && hasSalonModule(entitlement, 'IA')
+    && hasSalonModule(entitlement, 'AGENDA');
+}
+
 async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload) {
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
@@ -66,6 +78,11 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
           continue;
         }
 
+        if (!await agentModulesEnabled(salon.id)) {
+          app.log.info({ salonId: salon.id }, 'Webhook ignorado: agente WhatsApp/IA/Agenda não habilitado para este salão.');
+          continue;
+        }
+
         const text = message.type === 'text' ? String(message.text?.body || '').trim() : '';
         const inboundText = text || `[mensagem ${message.type || 'não suportada'}]`;
         await saveWhatsAppMessage({ salonId: salon.id, providerMessageId: messageId, phone: from, direction: 'IN', text: inboundText });
@@ -77,7 +94,7 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
           : 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
 
         const result = await sendWhatsAppMessage({ to: from, message: replyText, phoneNumberId });
-        const providerData = result as { data?: { messages?: Array<{ id?: string }> } };
+        const providerData = result as { data?: { messages?: Array<{ id?: string }> };
         const outboundId = providerData.data?.messages?.[0]?.id;
         await saveWhatsAppMessage({ salonId: salon.id, providerMessageId: outboundId, phone: from, direction: 'OUT', text: replyText });
 
