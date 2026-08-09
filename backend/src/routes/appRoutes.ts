@@ -11,6 +11,7 @@ import { whatsappAgentRoutes } from './whatsapp-agent.routes';
 import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
 import { platformAdminRoutes } from './platform-admin.routes';
+import { platformSiteRoutes } from './platform-site.routes';
 import { commercialRoutes } from './commercial.routes';
 import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
@@ -31,18 +32,28 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(appointmentRoutes);
   app.register(whatsappWebhookRoutes);
 
-  /** Administração global: clientes, planos, módulos, MRR e infraestrutura. */
+  /** Administração global: clientes, planos, módulos, MRR, Site & Marca e infraestrutura. */
   app.register(async (platformAdmin) => {
     platformAdmin.addHook('preHandler', ensureAuthenticated);
     platformAdmin.addHook('preHandler', requireRoles(['SUPER_ADMIN']));
     platformAdmin.addHook('onResponse', writeAuditLog);
     platformAdmin.register(platformAdminRoutes);
+    platformAdmin.register(platformSiteRoutes);
   });
 
   /** Operação do salão, sempre isolada pelo salonId e pelos módulos contratados. */
   app.register(async (operational) => {
     operational.addHook('preHandler', ensureAuthenticated);
     operational.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']));
+    operational.addHook('preHandler', async (request, reply) => {
+      const path = request.url.split('?')[0];
+      if (request.method === 'PUT' && path === '/admin/salon') {
+        return reply.status(403).send({
+          code: 'PLATFORM_MANAGED_SETTING',
+          message: 'Site & Marca é configurado exclusivamente pelo Super Admin da plataforma.'
+        });
+      }
+    });
     operational.addHook('preHandler', enforceSalonModuleAccess);
     operational.addHook('onResponse', writeAuditLog);
     operational.register(dashboardRoutes);
