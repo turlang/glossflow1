@@ -4,6 +4,7 @@ import { Header, PublicShowcase, BookingPage, LoginPage } from './components/pub
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.jsx';
 import { SiteSettings } from './components/admin/SiteSettings.jsx';
+import { WhatsAppAgentTester } from './components/admin/WhatsAppAgentTester.jsx';
 import { CommercialLanding } from './components/commercial/CommercialLanding.jsx';
 
 /**
@@ -37,6 +38,7 @@ export default function App() {
 
   const isAuthenticated = Boolean(authToken);
   const backofficeSalon = adminSalon || salon;
+  const backofficePages = ['admin', 'login', 'site-settings', 'agent-test'];
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -44,6 +46,7 @@ export default function App() {
     if (action === 'booking') setPage('booking');
     if (action === 'admin') setPage(authToken ? 'admin' : 'login');
     if (action === 'site-settings') setPage(authToken ? 'site-settings' : 'login');
+    if (action === 'agent-test') setPage(authToken ? 'agent-test' : 'login');
     if (action === 'commercial') setPage('commercial');
     localStorage.setItem('glossflow.pwa.query-action', action || 'public');
   }, []);
@@ -54,9 +57,9 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const currentSalon = ['admin', 'login', 'site-settings'].includes(page) ? backofficeSalon : salon;
+    const currentSalon = backofficePages.includes(page) ? backofficeSalon : salon;
     if (!currentSalon) return;
-    document.title = ['admin', 'login', 'site-settings'].includes(page)
+    document.title = backofficePages.includes(page)
       ? `GlossFlow • ${currentSalon.name}`
       : currentSalon.name;
   }, [salon, adminSalon, page]);
@@ -167,6 +170,12 @@ export default function App() {
       {!loading && !error && page === 'site-settings' && (
         isAuthenticated
           ? <SiteSettings salon={backofficeSalon} reload={loadPublicData} setPage={setPage} />
+          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+      )}
+
+      {!loading && !error && page === 'agent-test' && (
+        isAuthenticated
+          ? <WhatsAppAgentTester setPage={setPage} />
           : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
