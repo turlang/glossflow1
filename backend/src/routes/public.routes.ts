@@ -24,11 +24,14 @@ export async function publicRoutes(app: FastifyInstance) {
     return prisma.portfolioItem.findMany({ where: { salonId: salon.id }, orderBy: { createdAt: 'desc' } });
   });
 
-  app.get('/inventory/summary', async () => {
-    const salon = await getMainSalon();
-    const products = await prisma.inventoryProduct.findMany({ where: { salonId: salon.id, active: true }, orderBy: { name: 'asc' } });
-    const lowStock = products.filter((product: any) => product.quantity <= product.minimumQuantity);
-    const totalCostValue = products.reduce((sum: number, product: any) => sum + (product.quantity * product.costPrice), 0);
-    return { products, lowStock, totalCostValue };
-  });
+  /**
+   * Compatibilidade temporária com builds antigos do frontend.
+   * Dados de estoque são administrativos e nunca devem ser expostos na vitrine.
+   */
+  app.get('/inventory/summary', async () => ({
+    products: [],
+    lowStock: [],
+    totalCostValue: 0,
+    message: 'Estoque disponível somente no painel administrativo.'
+  }));
 }
