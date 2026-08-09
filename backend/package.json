@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:push": "prisma db push --schema prisma/schema.prisma",
     "seed": "node prisma/seed.js",
+    "admin:bootstrap": "node scripts/bootstrap-super-admin.js",
     "render:build": "npm ci && npx prisma generate --schema prisma/schema.prisma && npm run build",
     "render:start": "node dist/server.js",
     "check:env": "node scripts/check-env.js",
