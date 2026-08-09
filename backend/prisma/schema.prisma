@@ -25,6 +25,8 @@ model Salon {
   accentColor    String?
   siteTemplate   String?
   customDomain   String?
+  modulesConfigured Boolean          @default(false)
+  enabledModules String[]            @default([])
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   users          User[]
