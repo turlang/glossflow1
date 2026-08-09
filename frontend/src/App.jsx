@@ -6,7 +6,9 @@ import { AdminDashboard } from './components/admin/AdminDashboard.jsx';
 import { PlatformAdmin } from './components/admin/PlatformAdmin.jsx';
 import { SiteSettings } from './components/admin/SiteSettings.jsx';
 import { WhatsAppAgentTester } from './components/admin/WhatsAppAgentTester.jsx';
+import { ModuleVisibilityGuard } from './components/admin/ModuleVisibilityGuard.jsx';
 import { CommercialLanding } from './components/commercial/CommercialLanding.jsx';
+import { hasModule } from './utils/modules';
 
 function tokenRole(token) {
   if (!token) return '';
@@ -25,8 +27,9 @@ function tokenRole(token) {
  * GlossFlow Frontend
  *
  * Existem dois backoffices independentes:
- * - SUPER_ADMIN: visão global do SaaS, clientes, planos e MRR.
- * - ADMIN/RECEPTION/PROFESSIONAL: operação isolada do salão via salonId.
+ * - SUPER_ADMIN: visão global do SaaS, clientes, planos, MRR e módulos.
+ * - ADMIN/RECEPTION/PROFESSIONAL: operação isolada do salão conforme os
+ *   módulos habilitados para aquele tenant.
  */
 export default function App() {
   const [page, setPage] = useState('public');
@@ -130,30 +133,32 @@ export default function App() {
         clearTenantAdminData();
       }
 
-      /** SUPER_ADMIN nunca carrega dados operacionais de um salão. */
       if (authToken && isSuperAdmin) return;
 
       if (authToken) {
         try {
-          /**
-           * Primeiro valida a sessão e o tenant. Só depois carrega os módulos.
-           * Isso evita uma cascata de 401/404/500 quando existe token antigo,
-           * sessão expirada ou backend ainda não atualizado.
-           */
           const adminSalonData = await request('/admin/salon-info');
           setAdminSalon(adminSalonData);
 
+          const agendaEnabled = hasModule(adminSalonData, 'AGENDA');
+          const inventoryEnabled = hasModule(adminSalonData, 'ESTOQUE');
+          const crmEnabled = hasModule(adminSalonData, 'CRM');
+          const financialEnabled = hasModule(adminSalonData, 'FINANCEIRO');
+          const loyaltyEnabled = hasModule(adminSalonData, 'FIDELIDADE');
+          const whatsappEnabled = hasModule(adminSalonData, 'WHATSAPP');
+          const aiEnabled = hasModule(adminSalonData, 'IA');
+
           const [appointmentsData, inventoryData, usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
-            request('/admin/appointments'),
-            request('/admin/inventory'),
+            agendaEnabled ? request('/admin/appointments') : Promise.resolve([]),
+            inventoryEnabled ? request('/admin/inventory') : Promise.resolve([]),
             request('/admin/users'),
-            request('/admin/clients'),
-            request('/admin/financial'),
-            request('/admin/commissions'),
-            request('/admin/loyalty'),
+            crmEnabled ? request('/admin/clients') : Promise.resolve([]),
+            financialEnabled ? request('/admin/financial') : Promise.resolve([]),
+            financialEnabled ? request('/admin/commissions') : Promise.resolve({ rules: [], projections: [] }),
+            loyaltyEnabled ? request('/admin/loyalty') : Promise.resolve({ program: null, entries: [] }),
             request('/admin/subscription'),
-            request('/admin/whatsapp/templates'),
-            request('/admin/insights')
+            whatsappEnabled ? request('/admin/whatsapp/templates') : Promise.resolve([]),
+            aiEnabled ? request('/admin/insights') : Promise.resolve({ saved: [], suggestions: [] })
           ]);
 
           setAppointments(appointmentsData);
@@ -186,8 +191,14 @@ export default function App() {
     loadPublicData();
   }, [authToken, authRole]);
 
+  const canUseSiteEditor = backofficeSalon ? hasModule(backofficeSalon, 'SITE') : true;
+  const canUseAgent = backofficeSalon ? hasModule(backofficeSalon, 'IA') && hasModule(backofficeSalon, 'WHATSAPP') : true;
+  const canUseBooking = salon ? hasModule(salon, 'AGENDA') : true;
+
   return (
     <div className="app-shell">
+      {isAuthenticated && !isSuperAdmin && backofficeSalon && <ModuleVisibilityGuard salon={backofficeSalon} />}
+
       {page !== 'platform-admin' && (
         <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={page === 'public' || page === 'booking' ? salon : backofficeSalon} />
       )}
@@ -202,7 +213,9 @@ export default function App() {
       {!loading && !error && page === 'commercial' && <CommercialLanding />}
 
       {!loading && !error && page === 'booking' && (
-        <BookingPage services={services} professionals={professionals} onCreated={loadPublicData} salon={salon} />
+        canUseBooking
+          ? <BookingPage services={services} professionals={professionals} onCreated={loadPublicData} salon={salon} />
+          : <StateMessage title="Agendamento online indisponível" text="Este salão não possui o módulo Agenda habilitado." danger />
       )}
 
       {!loading && !error && page === 'login' && (
@@ -216,15 +229,19 @@ export default function App() {
       )}
 
       {!loading && !error && page === 'site-settings' && (
-        isAuthenticated && !isSuperAdmin
+        isAuthenticated && !isSuperAdmin && canUseSiteEditor
           ? <SiteSettings salon={backofficeSalon} services={services} professionals={professionals} reload={loadPublicData} setPage={setPage} />
-          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+          : isAuthenticated && !isSuperAdmin
+            ? <StateMessage title="Módulo não habilitado" text="Site & Marca está desativado para este salão. Solicite a ativação ao administrador da plataforma." danger />
+            : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
       {!loading && !error && page === 'agent-test' && (
-        isAuthenticated && !isSuperAdmin
+        isAuthenticated && !isSuperAdmin && canUseAgent
           ? <WhatsAppAgentTester setPage={setPage} />
-          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+          : isAuthenticated && !isSuperAdmin
+            ? <StateMessage title="Módulo não habilitado" text="O agente precisa dos módulos WhatsApp e Inteligência Artificial habilitados." danger />
+            : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
       {!loading && !error && page === 'admin' && (
