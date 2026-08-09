@@ -18,6 +18,7 @@ import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
+import { enforceSalonModuleAccess } from '../services/module-access.service';
 
 /**
  * Composição central das rotas.
@@ -43,11 +44,13 @@ export async function appRoutes(app: FastifyInstance) {
 
   /**
    * Rotas operacionais de cada salão.
-   * Todos os dados são filtrados pelo salonId carregado no JWT.
+   * Todos os dados são filtrados pelo salonId carregado no JWT e os módulos
+   * contratados são validados também no backend.
    */
   app.register(async (operational) => {
     operational.addHook('preHandler', ensureAuthenticated);
     operational.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']));
+    operational.addHook('preHandler', enforceSalonModuleAccess);
     operational.addHook('onResponse', writeAuditLog);
     operational.register(dashboardRoutes);
     operational.register(adminCrudRoutes);
@@ -67,6 +70,7 @@ export async function appRoutes(app: FastifyInstance) {
       }
     });
     business.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION']));
+    business.addHook('preHandler', enforceSalonModuleAccess);
     business.addHook('onResponse', writeAuditLog);
     business.register(businessRoutes);
     business.register(analyticsRoutes);
@@ -78,6 +82,7 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(async (criticalAdmin) => {
     criticalAdmin.addHook('preHandler', ensureAuthenticated);
     criticalAdmin.addHook('preHandler', requireRoles(['ADMIN']));
+    criticalAdmin.addHook('preHandler', enforceSalonModuleAccess);
     criticalAdmin.addHook('onResponse', writeAuditLog);
     criticalAdmin.register(securityRoutes);
     criticalAdmin.register(observabilityRoutes);
