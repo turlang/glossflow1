@@ -23,6 +23,15 @@ const PLATFORM_ONLY_TITLES = new Set([
   'App/PWA'
 ]);
 
+const PLATFORM_ONLY_TEXT = [
+  'Assinatura Planos do SaaS',
+  'Segurança Auditoria, sessões e LGPD',
+  'Ecossistema WhatsApp, pagamentos e marketing',
+  'Observabilidade Métricas, saúde e alertas',
+  'UX Premium Tour, busca e atalhos',
+  'App/PWA Instalação, offline e mobile'
+];
+
 const STAT_TO_MODULE = {
   'Vitrine': 'SITE',
   'Agenda': 'AGENDA',
@@ -31,11 +40,23 @@ const STAT_TO_MODULE = {
   'Receita': 'FINANCEIRO'
 };
 
+function normalizedText(element) {
+  return (element?.textContent || '').trim().replace(/\s+/g, ' ');
+}
+
+function isPlatformOnlyButton(button) {
+  const title = button.getAttribute('title') || '';
+  if (PLATFORM_ONLY_TITLES.has(title)) return true;
+
+  const text = normalizedText(button);
+  return PLATFORM_ONLY_TEXT.some((platformText) => text === platformText || text.startsWith(`${platformText} `));
+}
+
 function moduleForButton(button) {
   const title = button.getAttribute('title') || '';
   if (TITLE_TO_MODULE[title]) return TITLE_TO_MODULE[title];
 
-  const text = (button.textContent || '').trim().replace(/\s+/g, ' ');
+  const text = normalizedText(button);
   if (text === 'Site & Marca') return 'SITE';
   if (text === 'Testar IA') return 'IA';
   if (text === 'Agendar') return 'AGENDA';
@@ -45,12 +66,16 @@ function moduleForButton(button) {
 function hideElement(element) {
   if (!element) return;
   element.dataset.moduleHidden = 'true';
-  element.style.display = 'none';
+  element.hidden = true;
+  element.setAttribute('aria-hidden', 'true');
+  element.style.setProperty('display', 'none', 'important');
 }
 
 function restoreElement(element) {
   if (element?.dataset.moduleHidden === 'true') {
     delete element.dataset.moduleHidden;
+    element.hidden = false;
+    element.removeAttribute('aria-hidden');
     element.style.removeProperty('display');
   }
 }
@@ -58,7 +83,7 @@ function restoreElement(element) {
 /**
  * Camada visual de entitlements do ADMIN do salão.
  * - módulos desativados pelo SUPER_ADMIN não aparecem;
- * - áreas de plataforma nunca aparecem no tenant;
+ * - áreas exclusivas da plataforma nunca são renderizadas visualmente no tenant;
  * - cards do dashboard respeitam os módulos contratados.
  * O backend continua sendo a fonte final de autorização.
  */
@@ -68,8 +93,7 @@ export function ModuleVisibilityGuard({ salon }) {
 
     function apply() {
       document.querySelectorAll('button').forEach((button) => {
-        const title = button.getAttribute('title') || '';
-        if (PLATFORM_ONLY_TITLES.has(title)) {
+        if (isPlatformOnlyButton(button)) {
           hideElement(button);
           return;
         }
@@ -77,12 +101,12 @@ export function ModuleVisibilityGuard({ salon }) {
         const module = moduleForButton(button);
         if (!module) return;
         const allowed = hasModule(salon, module)
-          && (button.textContent?.trim() !== 'Testar IA' || hasModule(salon, 'WHATSAPP'));
+          && (normalizedText(button) !== 'Testar IA' || hasModule(salon, 'WHATSAPP'));
         if (!allowed) hideElement(button); else restoreElement(button);
       });
 
       document.querySelectorAll('.pro-stat-card').forEach((card) => {
-        const labels = [...card.querySelectorAll('span')].map((item) => (item.textContent || '').trim());
+        const labels = [...card.querySelectorAll('span')].map((item) => normalizedText(item));
         const moduleEntry = Object.entries(STAT_TO_MODULE).find(([label]) => labels.includes(label));
         if (!moduleEntry) return;
         const [, module] = moduleEntry;
@@ -92,7 +116,7 @@ export function ModuleVisibilityGuard({ salon }) {
 
     apply();
     const observer = new MutationObserver(apply);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['title'] });
 
     return () => {
       observer.disconnect();
