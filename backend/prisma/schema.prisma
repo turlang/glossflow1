@@ -18,13 +18,13 @@ model Salon {
   openingHours   String              @default("")
   instagram      String              @default("")
   heroImage      String              @default("")
-  heroTitle      String              @default("")
-  logoUrl        String              @default("")
-  primaryColor   String              @default("#C49A6C")
-  secondaryColor String              @default("#171311")
-  accentColor    String              @default("#F7F1EA")
-  siteTemplate   String              @default("ELEGANCE")
-  customDomain   String              @default("")
+  heroTitle      String?
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  accentColor    String?
+  siteTemplate   String?
+  customDomain   String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   users          User[]
