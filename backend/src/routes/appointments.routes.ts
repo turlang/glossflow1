@@ -1,16 +1,29 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { appointmentSchema, appointmentUpdateSchema, objectIdSchema } from './schemas';
 import { getMainSalon, getTenant } from './helpers';
 
+const adminAgendaAccess = {
+  preHandler: [ensureAuthenticated, requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL'])]
+};
+
 /** Rotas de agenda. A rota POST pública permite ao cliente criar reserva. */
 export async function appointmentRoutes(app: FastifyInstance) {
+  /**
+   * A vitrine pública só recebe os intervalos ocupados necessários para
+   * disponibilidade. Dados pessoais do cliente nunca saem por esta rota.
+   */
   app.get('/appointments', async () => {
     const salon = await getMainSalon();
     return prisma.appointment.findMany({
-      where: { salonId: salon.id },
-      include: { service: true, professional: true },
+      where: {
+        salonId: salon.id,
+        status: 'CONFIRMED',
+        endTime: { gte: new Date() }
+      },
+      select: { professionalId: true, startTime: true, endTime: true },
       orderBy: { startTime: 'asc' }
     });
   });
@@ -18,15 +31,29 @@ export async function appointmentRoutes(app: FastifyInstance) {
   app.post('/appointments', async (request, reply) => {
     const data = appointmentSchema.parse(request.body);
     const salon = await getMainSalon();
-    const service = await prisma.service.findFirst({ where: { id: data.serviceId, salonId: salon.id, active: true } });
+
+    const [service, professional] = await Promise.all([
+      prisma.service.findFirst({ where: { id: data.serviceId, salonId: salon.id, active: true } }),
+      prisma.professional.findFirst({ where: { id: data.professionalId, salonId: salon.id, active: true } })
+    ]);
 
     if (!service) return reply.status(404).send({ message: 'Serviço não encontrado.' });
+    if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
 
     const start = new Date(data.startTime);
+    if (start.getTime() <= Date.now()) {
+      return reply.status(400).send({ message: 'Escolha um horário futuro para o agendamento.' });
+    }
+
     const end = new Date(start.getTime() + service.durationMin * 60_000);
 
     const conflict = await prisma.appointment.findFirst({
-      where: { professionalId: data.professionalId, status: 'CONFIRMED', OR: [{ startTime: { lt: end }, endTime: { gt: start } }] }
+      where: {
+        salonId: salon.id,
+        professionalId: professional.id,
+        status: 'CONFIRMED',
+        OR: [{ startTime: { lt: end }, endTime: { gt: start } }]
+      }
     });
 
     if (conflict) return reply.status(409).send({ message: 'Este profissional já possui agendamento neste horário.' });
@@ -38,15 +65,30 @@ export async function appointmentRoutes(app: FastifyInstance) {
     });
 
     const appointment = await prisma.appointment.create({
-      data: { clientName: data.clientName, clientPhone: data.clientPhone, clientEmail: data.clientEmail || null, clientId: client.id, startTime: start, endTime: end, notes: data.notes, salonId: salon.id, serviceId: data.serviceId, professionalId: data.professionalId }
+      data: {
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        clientEmail: data.clientEmail || null,
+        clientId: client.id,
+        startTime: start,
+        endTime: end,
+        notes: data.notes,
+        salonId: salon.id,
+        serviceId: service.id,
+        professionalId: professional.id
+      }
     });
 
     return reply.status(201).send(appointment);
   });
 
-  app.get('/admin/appointments', async (request) => {
+  app.get('/admin/appointments', adminAgendaAccess, async (request) => {
     const tenant = getTenant(request);
-    return prisma.appointment.findMany({ where: { salonId: tenant.salonId }, include: { service: true, professional: true }, orderBy: { startTime: 'asc' } });
+    return prisma.appointment.findMany({
+      where: { salonId: tenant.salonId },
+      include: { service: true, professional: true },
+      orderBy: { startTime: 'asc' }
+    });
   });
 
   /**
@@ -54,7 +96,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
    * Permite mover um atendimento por drag and drop no frontend com validação
    * contra conflitos de horário do mesmo profissional.
    */
-  app.put('/admin/appointments/:id', async (request, reply) => {
+  app.put('/admin/appointments/:id', adminAgendaAccess, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = appointmentUpdateSchema.parse(request.body);
@@ -63,6 +105,13 @@ export async function appointmentRoutes(app: FastifyInstance) {
     if (!current) return reply.status(404).send({ message: 'Agendamento não encontrado.' });
 
     const professionalId = data.professionalId || current.professionalId;
+    if (data.professionalId) {
+      const professional = await prisma.professional.findFirst({
+        where: { id: data.professionalId, salonId: tenant.salonId, active: true }
+      });
+      if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
+    }
+
     const start = data.startTime ? new Date(data.startTime) : current.startTime;
     const end = new Date(start.getTime() + current.service.durationMin * 60_000);
 
@@ -85,4 +134,3 @@ export async function appointmentRoutes(app: FastifyInstance) {
     });
   });
 }
-
