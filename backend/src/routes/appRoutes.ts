@@ -9,8 +9,6 @@ import { tenantRoutes } from './tenant.routes';
 import { businessRoutes } from './business.routes';
 import { whatsappAgentRoutes } from './whatsapp-agent.routes';
 import { securityRoutes } from './security.routes';
-import { observabilityRoutes } from './observability.routes';
-import { integrationsRoutes } from './integrations.routes';
 import { platformRoutes } from './platform.routes';
 import { platformAdminRoutes } from './platform-admin.routes';
 import { commercialRoutes } from './commercial.routes';
@@ -22,9 +20,8 @@ import { enforceSalonModuleAccess } from '../services/module-access.service';
 
 /**
  * Composição central das rotas.
- * Existem dois contextos administrativos separados:
- * - SUPER_ADMIN: administração global da plataforma.
- * - ADMIN/RECEPTION/PROFESSIONAL: operação isolada de um salão.
+ * SUPER_ADMIN administra a plataforma e os tenants; ADMIN/RECEPTION/PROFESSIONAL
+ * operam exclusivamente o salão presente no salonId do JWT.
  */
 export async function appRoutes(app: FastifyInstance) {
   app.register(platformRoutes);
@@ -34,7 +31,7 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(appointmentRoutes);
   app.register(whatsappWebhookRoutes);
 
-  /** Rotas globais do SaaS: somente SUPER_ADMIN. */
+  /** Administração global: clientes, planos, módulos, MRR e infraestrutura. */
   app.register(async (platformAdmin) => {
     platformAdmin.addHook('preHandler', ensureAuthenticated);
     platformAdmin.addHook('preHandler', requireRoles(['SUPER_ADMIN']));
@@ -42,11 +39,7 @@ export async function appRoutes(app: FastifyInstance) {
     platformAdmin.register(platformAdminRoutes);
   });
 
-  /**
-   * Rotas operacionais de cada salão.
-   * Todos os dados são filtrados pelo salonId carregado no JWT e os módulos
-   * contratados são validados também no backend.
-   */
+  /** Operação do salão, sempre isolada pelo salonId e pelos módulos contratados. */
   app.register(async (operational) => {
     operational.addHook('preHandler', ensureAuthenticated);
     operational.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']));
@@ -57,16 +50,16 @@ export async function appRoutes(app: FastifyInstance) {
     operational.register(tenantRoutes);
   });
 
-  /**
-   * Negócio, CRM, analytics e agente do salão.
-   * As antigas rotas /admin/saas/* ficam explicitamente desativadas para evitar
-   * qualquer vazamento entre tenants; a visão global vive em /platform-admin/*.
-   */
   app.register(async (business) => {
     business.addHook('preHandler', ensureAuthenticated);
     business.addHook('preHandler', async (request, reply) => {
-      if (request.url.split('?')[0].startsWith('/admin/saas/')) {
+      const path = request.url.split('?')[0];
+      if (path.startsWith('/admin/saas/')) {
         return reply.status(410).send({ message: 'Rota administrativa global migrada para o Super Admin da plataforma.' });
+      }
+      /** Plano/assinatura são controlados pelo SUPER_ADMIN. O salão pode apenas consultar seu plano atual. */
+      if ((request.method === 'POST' && path === '/admin/subscription/plans') || (request.method === 'PUT' && path === '/admin/subscription')) {
+        return reply.status(403).send({ message: 'Planos e assinaturas são gerenciados exclusivamente pelo Super Admin.' });
       }
     });
     business.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION']));
@@ -78,14 +71,12 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(whatsappAgentRoutes);
   });
 
-  /** Rotas críticas de um salão: somente ADMIN daquele tenant. */
+  /** Segurança do próprio tenant continua disponível apenas ao ADMIN do salão. */
   app.register(async (criticalAdmin) => {
     criticalAdmin.addHook('preHandler', ensureAuthenticated);
     criticalAdmin.addHook('preHandler', requireRoles(['ADMIN']));
     criticalAdmin.addHook('preHandler', enforceSalonModuleAccess);
     criticalAdmin.addHook('onResponse', writeAuditLog);
     criticalAdmin.register(securityRoutes);
-    criticalAdmin.register(observabilityRoutes);
-    criticalAdmin.register(integrationsRoutes);
   });
 }
