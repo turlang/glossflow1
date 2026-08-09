@@ -3,16 +3,30 @@ import { request } from './services/api';
 import { Header, PublicShowcase, BookingPage, LoginPage } from './components/public/PublicExperience.jsx';
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.jsx';
+import { PlatformAdmin } from './components/admin/PlatformAdmin.jsx';
 import { SiteSettings } from './components/admin/SiteSettings.jsx';
 import { WhatsAppAgentTester } from './components/admin/WhatsAppAgentTester.jsx';
 import { CommercialLanding } from './components/commercial/CommercialLanding.jsx';
 
+function tokenRole(token) {
+  if (!token) return '';
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return '';
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return JSON.parse(atob(padded))?.role || '';
+  } catch {
+    return '';
+  }
+}
+
 /**
  * GlossFlow Frontend
  *
- * Uma única aplicação atende vários salões. O contexto público é resolvido em
- * runtime pelo hostname/domínio; o contexto administrativo vem exclusivamente
- * do salonId contido no JWT.
+ * Existem dois backoffices independentes:
+ * - SUPER_ADMIN: visão global do SaaS, clientes, planos e MRR.
+ * - ADMIN/RECEPTION/PROFESSIONAL: operação isolada do salão via salonId.
  */
 export default function App() {
   const [page, setPage] = useState('public');
@@ -37,6 +51,8 @@ export default function App() {
   const [error, setError] = useState('');
 
   const isAuthenticated = Boolean(authToken);
+  const authRole = tokenRole(authToken);
+  const isSuperAdmin = authRole === 'SUPER_ADMIN';
   const backofficeSalon = adminSalon || salon;
   const backofficePages = ['admin', 'login', 'site-settings', 'agent-test'];
 
@@ -44,12 +60,19 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const action = params.get('action');
     if (action === 'booking') setPage('booking');
-    if (action === 'admin') setPage(authToken ? 'admin' : 'login');
-    if (action === 'site-settings') setPage(authToken ? 'site-settings' : 'login');
-    if (action === 'agent-test') setPage(authToken ? 'agent-test' : 'login');
+    if (action === 'admin') setPage(authToken ? (tokenRole(authToken) === 'SUPER_ADMIN' ? 'platform-admin' : 'admin') : 'login');
+    if (action === 'platform-admin') setPage(authToken && tokenRole(authToken) === 'SUPER_ADMIN' ? 'platform-admin' : 'login');
+    if (action === 'site-settings') setPage(authToken && tokenRole(authToken) !== 'SUPER_ADMIN' ? 'site-settings' : 'login');
+    if (action === 'agent-test') setPage(authToken && tokenRole(authToken) !== 'SUPER_ADMIN' ? 'agent-test' : 'login');
     if (action === 'commercial') setPage('commercial');
     localStorage.setItem('glossflow.pwa.query-action', action || 'public');
   }, []);
+
+  useEffect(() => {
+    if (!authToken) return;
+    if (isSuperAdmin && ['admin', 'site-settings', 'agent-test'].includes(page)) setPage('platform-admin');
+    if (!isSuperAdmin && page === 'platform-admin') setPage('admin');
+  }, [authToken, authRole, page]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -57,6 +80,10 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (page === 'platform-admin') {
+      document.title = 'GlossFlow • Super Admin';
+      return;
+    }
     const currentSalon = backofficePages.includes(page) ? backofficeSalon : salon;
     if (!currentSalon) return;
     document.title = backofficePages.includes(page)
@@ -66,6 +93,20 @@ export default function App() {
 
   function toggleTheme() {
     setTheme((current) => current === 'dark' ? 'light' : 'dark');
+  }
+
+  function clearTenantAdminData() {
+    setAdminSalon(null);
+    setAppointments([]);
+    setInventory([]);
+    setUsers([]);
+    setClients([]);
+    setFinancialEntries([]);
+    setCommissions({ rules: [], projections: [] });
+    setLoyalty({ program: null, entries: [] });
+    setSubscription({ plans: [], subscription: null });
+    setWhatsappTemplates([]);
+    setInsights({ saved: [], suggestions: [] });
   }
 
   async function loadPublicData() {
@@ -85,19 +126,12 @@ export default function App() {
       setProfessionals(professionalsData);
       setPortfolio(portfolioData);
 
-      if (!authToken) {
-        setAdminSalon(null);
-        setAppointments([]);
-        setInventory([]);
-        setUsers([]);
-        setClients([]);
-        setFinancialEntries([]);
-        setCommissions({ rules: [], projections: [] });
-        setLoyalty({ program: null, entries: [] });
-        setSubscription({ plans: [], subscription: null });
-        setWhatsappTemplates([]);
-        setInsights({ saved: [], suggestions: [] });
+      if (!authToken || isSuperAdmin) {
+        clearTenantAdminData();
       }
+
+      /** SUPER_ADMIN nunca carrega dados operacionais de um salão. */
+      if (authToken && isSuperAdmin) return;
 
       if (authToken) {
         try {
@@ -130,9 +164,7 @@ export default function App() {
           localStorage.removeItem('glossflow.token');
           localStorage.removeItem('glossflow.refreshToken');
           setAuthToken('');
-          setAdminSalon(null);
-          setAppointments([]);
-          setInventory([]);
+          clearTenantAdminData();
         }
       }
     } catch (err) {
@@ -144,11 +176,13 @@ export default function App() {
 
   useEffect(() => {
     loadPublicData();
-  }, [authToken]);
+  }, [authToken, authRole]);
 
   return (
     <div className="app-shell">
-      <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={page === 'public' || page === 'booking' ? salon : backofficeSalon} />
+      {page !== 'platform-admin' && (
+        <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={page === 'public' || page === 'booking' ? salon : backofficeSalon} />
+      )}
 
       {loading && <SkeletonPage />}
       {!loading && error && <StateMessage title="Não foi possível conectar à API." text={error} danger />}
@@ -167,20 +201,26 @@ export default function App() {
         <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
+      {!loading && !error && page === 'platform-admin' && (
+        isAuthenticated && isSuperAdmin
+          ? <PlatformAdmin setPage={setPage} />
+          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+      )}
+
       {!loading && !error && page === 'site-settings' && (
-        isAuthenticated
+        isAuthenticated && !isSuperAdmin
           ? <SiteSettings salon={backofficeSalon} reload={loadPublicData} setPage={setPage} />
           : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
       {!loading && !error && page === 'agent-test' && (
-        isAuthenticated
+        isAuthenticated && !isSuperAdmin
           ? <WhatsAppAgentTester setPage={setPage} />
           : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
       {!loading && !error && page === 'admin' && (
-        isAuthenticated
+        isAuthenticated && !isSuperAdmin
           ? <AdminDashboard
               salon={backofficeSalon}
               services={services}
