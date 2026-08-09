@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
 import {
   answerWhatsAppMessage,
@@ -10,13 +11,30 @@ import {
   saveWhatsAppMessage
 } from '../services/whatsapp-agent.service';
 
+async function getAgentEntitlements(salonId: string) {
+  const salon = await prisma.salon.findUnique({
+    where: { id: salonId },
+    select: { modulesConfigured: true, enabledModules: true }
+  });
+  return {
+    whatsapp: Boolean(salon && hasSalonModule(salon, 'WHATSAPP')),
+    ai: Boolean(salon && hasSalonModule(salon, 'IA')),
+    agenda: Boolean(salon && hasSalonModule(salon, 'AGENDA'))
+  };
+}
+
 /** Rotas administrativas para homologar e operar o agente sem depender do webhook real. */
 export async function whatsappAgentRoutes(app: FastifyInstance) {
   app.get('/admin/whatsapp/agent-status', async (request) => {
     const tenant = getTenant(request);
-    const salon = await prisma.salon.findUnique({ where: { id: tenant.salonId } });
+    const [salon, entitlements] = await Promise.all([
+      prisma.salon.findUnique({ where: { id: tenant.salonId } }),
+      getAgentEntitlements(tenant.salonId)
+    ]);
     return {
       salon: salon ? { id: salon.id, name: salon.name, whatsapp: salon.whatsapp } : null,
+      modules: entitlements,
+      agentEnabled: entitlements.whatsapp && entitlements.ai && entitlements.agenda,
       openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
       whatsappTokenConfigured: Boolean(process.env.WHATSAPP_ACCESS_TOKEN),
       phoneNumberIdConfigured: Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID),
@@ -29,6 +47,14 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
   app.post('/admin/whatsapp/agent-test', async (request, reply) => {
     const tenant = getTenant(request);
+    const entitlements = await getAgentEntitlements(tenant.salonId);
+    if (!entitlements.ai || !entitlements.agenda) {
+      return reply.status(403).send({
+        message: 'O agente WhatsApp exige os módulos WhatsApp, Inteligência Artificial e Agenda habilitados.',
+        code: 'MODULE_DEPENDENCY_DISABLED'
+      });
+    }
+
     const body = z.object({
       phone: z.string().min(10),
       clientName: z.string().min(2).optional().default('Cliente Teste'),
