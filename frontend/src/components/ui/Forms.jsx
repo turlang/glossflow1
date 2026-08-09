@@ -52,12 +52,30 @@ export function EditableList({ items, render, thumbnail, onEdit, onDelete }) {
 }
 
 export function ImageInput({ label, value, onChange, required = false }) {
+  const [fileError, setFileError] = useState('');
+
   function handleFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setFileError('');
+
+    if (!file.type.startsWith('image/')) {
+      setFileError('Selecione um arquivo de imagem válido.');
+      event.target.value = '';
+      return;
+    }
+
+    const maxBytes = 2 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setFileError('Imagem muito grande. O limite para upload direto é 2 MB. Use uma imagem menor ou cole uma URL externa.');
+      event.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => onChange(String(reader.result || ''));
+    reader.onerror = () => setFileError('Não foi possível ler esta imagem. Tente outro arquivo.');
     reader.readAsDataURL(file);
   }
 
@@ -65,11 +83,18 @@ export function ImageInput({ label, value, onChange, required = false }) {
     <label className="field image-field full-span">
       <span>{label}</span>
       <div className="image-input-grid">
-        <input type="url" value={value?.startsWith('data:') ? '' : value} placeholder="Cole uma URL de imagem ou envie um arquivo" required={required && !value} onChange={(e) => onChange(e.target.value)} />
+        <input
+          type="url"
+          value={value?.startsWith('data:') ? '' : value}
+          placeholder="Cole uma URL de imagem ou envie um arquivo"
+          required={required && !value}
+          onChange={(e) => { setFileError(''); onChange(e.target.value); }}
+        />
         <input type="file" accept="image/*" onChange={handleFile} />
       </div>
+      {fileError && <small style={{ color: 'var(--danger)' }}>{fileError}</small>}
       {value && <img className="image-preview" src={value} alt="Pré-visualização" />}
-      <small>Para apresentação local, o arquivo é convertido em base64. Em produção, o ideal é usar Cloudinary, S3 ou storage equivalente.</small>
+      <small>Upload direto: até 2 MB. Para produção em escala, prefira URL via Cloudinary, S3 ou storage equivalente.</small>
     </label>
   );
 }
