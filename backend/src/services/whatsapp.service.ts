@@ -5,15 +5,15 @@
  * 1. dry-run: retorna sucesso simulado sem chamar API externa.
  * 2. real: chama Meta WhatsApp Cloud API ou um provider personalizado.
  *
- * Esse desenho permite que outro dev teste fluxo, UI e rotas sem possuir
- * conta Meta Business configurada. Para produção, preencha as variáveis
- * WHATSAPP_* no .env e altere WHATSAPP_DRY_RUN para false.
+ * O phoneNumberId pode vir do webhook recebido, permitindo que um único
+ * GlossFlow atenda vários números/salões sem duplicar o backend.
  */
 type SendWhatsAppInput = {
   to?: string;
   phone?: string;
   message: string;
   dryRun?: boolean;
+  phoneNumberId?: string;
 };
 
 function normalizePhone(phone: string) {
@@ -27,18 +27,18 @@ export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
   }
 
   if (input.dryRun || process.env.WHATSAPP_DRY_RUN === 'true') {
-    return { ok: true, provider: 'dry-run', to, message: input.message, sentAt: new Date().toISOString() };
+    return { ok: true, provider: 'dry-run', to, phoneNumberId: input.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '', message: input.message, sentAt: new Date().toISOString() };
   }
 
   const provider = process.env.WHATSAPP_PROVIDER || 'meta';
 
   if (provider === 'meta') {
     const token = process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const phoneNumberId = input.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
     const apiVersion = process.env.WHATSAPP_API_VERSION || 'v20.0';
 
     if (!token || !phoneNumberId) {
-      return { ok: false, provider, message: 'WhatsApp não configurado. Preencha WHATSAPP_ACCESS_TOKEN e WHATSAPP_PHONE_NUMBER_ID.' };
+      return { ok: false, provider, message: 'WhatsApp não configurado. Preencha WHATSAPP_ACCESS_TOKEN e informe o Phone Number ID.' };
     }
 
     const response = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
@@ -53,7 +53,7 @@ export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
     });
 
     const data = await response.json().catch(() => ({}));
-    return { ok: response.ok, provider, statusCode: response.status, data };
+    return { ok: response.ok, provider, phoneNumberId, statusCode: response.status, data };
   }
 
   const url = process.env.WHATSAPP_API_URL;
@@ -65,7 +65,7 @@ export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ to, message: input.message })
+    body: JSON.stringify({ to, message: input.message, phoneNumberId: input.phoneNumberId })
   });
   const data = await response.json().catch(() => ({}));
   return { ok: response.ok, provider, statusCode: response.status, data };
