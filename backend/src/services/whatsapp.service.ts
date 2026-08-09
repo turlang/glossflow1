@@ -10,7 +10,8 @@
  * WHATSAPP_* no .env e altere WHATSAPP_DRY_RUN para false.
  */
 type SendWhatsAppInput = {
-  to: string;
+  to?: string;
+  phone?: string;
   message: string;
   dryRun?: boolean;
 };
@@ -20,7 +21,7 @@ function normalizePhone(phone: string) {
 }
 
 export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
-  const to = normalizePhone(input.to);
+  const to = normalizePhone(input.to || input.phone || '');
   if (!to || to.length < 10) {
     return { ok: false, provider: 'validation', message: 'Telefone inválido. Use DDI + DDD + número.' };
   }
