@@ -10,6 +10,19 @@ export const loginSchema = z.object({
 
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida. Use formato hexadecimal, por exemplo #C49A6C.');
 
+/**
+ * O editor Site & Marca aceita URL externa ou upload local convertido para
+ * data:image/*;base64. Um arquivo de até 2 MB cresce para cerca de 2,7 MB em
+ * base64, portanto o limite de 3 milhões de caracteres mantém o piloto seguro
+ * sem bloquear uploads legítimos.
+ */
+const imageAssetSchema = z.string()
+  .max(3_000_000, 'Imagem muito grande. Envie um arquivo de até 2 MB ou use uma URL externa.')
+  .refine(
+    (value) => !value || value.startsWith('data:image/') || /^https?:\/\//i.test(value),
+    'Imagem inválida. Use uma URL http/https ou envie um arquivo de imagem.'
+  );
+
 export const salonSchema = z.object({
   name: z.string().min(2),
   description: z.string().min(10),
@@ -18,9 +31,9 @@ export const salonSchema = z.object({
   address: z.string().min(5),
   openingHours: z.string().min(3),
   instagram: z.string().optional().default(''),
-  heroImage: z.string().optional().default(''),
+  heroImage: imageAssetSchema.optional().default(''),
   heroTitle: z.string().max(160).optional(),
-  logoUrl: z.string().max(500).optional(),
+  logoUrl: imageAssetSchema.optional().default(''),
   primaryColor: hexColorSchema.optional(),
   secondaryColor: hexColorSchema.optional(),
   accentColor: hexColorSchema.optional(),
