@@ -22,6 +22,14 @@ services:
       - key: FRONTEND_ORIGIN
         sync: false
 
+      # Super Admin da plataforma — provisionado automaticamente no startup
+      - key: SUPER_ADMIN_NAME
+        value: Super Admin GlossFlow
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+
       # White-label / multi-tenant
       - key: PUBLIC_ROOT_DOMAIN
         sync: false
