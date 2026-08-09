@@ -5,6 +5,7 @@ import { ZodError } from 'zod';
 import { appRoutes } from './routes/appRoutes';
 import { recordMetric } from './routes/metrics';
 import { captureOperationalError } from './services/sentry.service';
+import { ensureSuperAdminFromEnv } from './services/super-admin-bootstrap.service';
 import { prisma } from './lib/prisma';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -189,6 +190,17 @@ app.register(appRoutes);
 
 const start = async () => {
   const port = Number(process.env.PORT) || 3333;
+
+  /**
+   * O plano Free do Render não precisa de Shell para provisionar o Super Admin.
+   * Basta configurar SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD no Environment e
+   * disparar um novo deploy. A rotina é segura e idempotente.
+   */
+  await ensureSuperAdminFromEnv({
+    info: (message) => app.log.info(message),
+    warn: (message) => app.log.warn(message)
+  });
+
   await app.listen({ port, host: '0.0.0.0' });
   console.log(`🚀 GlossFlow API rodando em http://localhost:${port} • build ${buildId}`);
 };
