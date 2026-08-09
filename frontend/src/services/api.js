@@ -7,9 +7,21 @@ function publicTenantHeaders() {
   const explicitSlug = (params.get('salon') || import.meta.env.VITE_SALON_SLUG || '').trim().toLowerCase();
   const hostname = window.location.hostname.toLowerCase().replace(/^www\./, '');
 
+  /**
+   * Em domínios técnicos da Vercel o backend deve usar o salão padrão (ou o
+   * slug explícito). O hostname só precisa ser enviado quando ele representa
+   * um domínio/subdomínio white-label real do cliente.
+   *
+   * Além de evitar preflight CORS desnecessário, isso mantém compatibilidade
+   * com backends já publicados que ainda não reconhecem X-Salon-Host.
+   */
+  const isPlatformHost = hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname.endsWith('.vercel.app');
+
   return {
     ...(explicitSlug ? { 'X-Salon-Slug': explicitSlug } : {}),
-    ...(hostname ? { 'X-Salon-Host': hostname } : {})
+    ...(!isPlatformHost && hostname ? { 'X-Salon-Host': hostname } : {})
   };
 }
 
