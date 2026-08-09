@@ -135,8 +135,15 @@ export default function App() {
 
       if (authToken) {
         try {
-          const [adminSalonData, appointmentsData, inventoryData, usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
-            request('/admin/salon-info'),
+          /**
+           * Primeiro valida a sessão e o tenant. Só depois carrega os módulos.
+           * Isso evita uma cascata de 401/404/500 quando existe token antigo,
+           * sessão expirada ou backend ainda não atualizado.
+           */
+          const adminSalonData = await request('/admin/salon-info');
+          setAdminSalon(adminSalonData);
+
+          const [appointmentsData, inventoryData, usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
             request('/admin/appointments'),
             request('/admin/inventory'),
             request('/admin/users'),
@@ -148,7 +155,7 @@ export default function App() {
             request('/admin/whatsapp/templates'),
             request('/admin/insights')
           ]);
-          setAdminSalon(adminSalonData);
+
           setAppointments(appointmentsData);
           setInventory(inventoryData);
           setUsers(usersData);
@@ -160,11 +167,12 @@ export default function App() {
           setWhatsappTemplates(templatesData);
           setInsights(insightsData);
         } catch (adminError) {
-          console.warn('Sessão administrativa inválida ou expirada:', adminError.message);
+          console.warn('Sessão administrativa indisponível:', adminError.message);
           localStorage.removeItem('glossflow.token');
           localStorage.removeItem('glossflow.refreshToken');
           setAuthToken('');
           clearTenantAdminData();
+          setPage('login');
         }
       }
     } catch (err) {
