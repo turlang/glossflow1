@@ -10,14 +10,15 @@ import { CommercialLanding } from './components/commercial/CommercialLanding.jsx
  * GlossFlow Frontend
  *
  * Uma única aplicação atende vários salões. O contexto público é resolvido em
- * runtime pelo hostname, domínio próprio ou ?salon=slug; o painel continua
- * isolado pelo salonId contido no JWT.
+ * runtime pelo hostname/domínio; o contexto administrativo vem exclusivamente
+ * do salonId contido no JWT.
  */
 export default function App() {
   const [page, setPage] = useState('public');
   const [theme, setTheme] = useState(() => localStorage.getItem('glossflow.theme') || 'dark');
   const [authToken, setAuthToken] = useState(() => localStorage.getItem('glossflow.token') || '');
   const [salon, setSalon] = useState(null);
+  const [adminSalon, setAdminSalon] = useState(null);
   const [services, setServices] = useState([]);
   const [professionals, setProfessionals] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
@@ -35,6 +36,7 @@ export default function App() {
   const [error, setError] = useState('');
 
   const isAuthenticated = Boolean(authToken);
+  const backofficeSalon = adminSalon || salon;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -52,11 +54,12 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    if (!salon) return;
+    const currentSalon = ['admin', 'login', 'site-settings'].includes(page) ? backofficeSalon : salon;
+    if (!currentSalon) return;
     document.title = ['admin', 'login', 'site-settings'].includes(page)
-      ? `GlossFlow • ${salon.name}`
-      : salon.name;
-  }, [salon, page]);
+      ? `GlossFlow • ${currentSalon.name}`
+      : currentSalon.name;
+  }, [salon, adminSalon, page]);
 
   function toggleTheme() {
     setTheme((current) => current === 'dark' ? 'light' : 'dark');
@@ -80,6 +83,7 @@ export default function App() {
       setPortfolio(portfolioData);
 
       if (!authToken) {
+        setAdminSalon(null);
         setAppointments([]);
         setInventory([]);
         setUsers([]);
@@ -94,7 +98,8 @@ export default function App() {
 
       if (authToken) {
         try {
-          const [appointmentsData, inventoryData, usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
+          const [adminSalonData, appointmentsData, inventoryData, usersData, clientsData, financialData, commissionsData, loyaltyData, subscriptionData, templatesData, insightsData] = await Promise.all([
+            request('/admin/salon-info'),
             request('/admin/appointments'),
             request('/admin/inventory'),
             request('/admin/users'),
@@ -106,6 +111,7 @@ export default function App() {
             request('/admin/whatsapp/templates'),
             request('/admin/insights')
           ]);
+          setAdminSalon(adminSalonData);
           setAppointments(appointmentsData);
           setInventory(inventoryData);
           setUsers(usersData);
@@ -121,6 +127,7 @@ export default function App() {
           localStorage.removeItem('glossflow.token');
           localStorage.removeItem('glossflow.refreshToken');
           setAuthToken('');
+          setAdminSalon(null);
           setAppointments([]);
           setInventory([]);
         }
@@ -138,7 +145,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={salon} />
+      <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={page === 'public' || page === 'booking' ? salon : backofficeSalon} />
 
       {loading && <SkeletonPage />}
       {!loading && error && <StateMessage title="Não foi possível conectar à API." text={error} danger />}
@@ -159,14 +166,14 @@ export default function App() {
 
       {!loading && !error && page === 'site-settings' && (
         isAuthenticated
-          ? <SiteSettings salon={salon} reload={loadPublicData} setPage={setPage} />
+          ? <SiteSettings salon={backofficeSalon} reload={loadPublicData} setPage={setPage} />
           : <LoginPage setPage={setPage} onLogin={setAuthToken} />
       )}
 
       {!loading && !error && page === 'admin' && (
         isAuthenticated
           ? <AdminDashboard
-              salon={salon}
+              salon={backofficeSalon}
               services={services}
               professionals={professionals}
               portfolio={portfolio}
