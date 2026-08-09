@@ -6,7 +6,8 @@ import {
   answerWhatsAppMessage,
   closeHumanHandoff,
   hasOpenHumanHandoff,
-  normalizePhone
+  normalizePhone,
+  saveWhatsAppMessage
 } from '../services/whatsapp-agent.service';
 
 /** Rotas administrativas para homologar e operar o agente sem depender do webhook real. */
@@ -44,7 +45,9 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
       return reply.status(409).send({ message: 'Este telefone está em atendimento humano. Feche o handoff para retomar a IA.' });
     }
 
+    await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
     const answer = await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+    await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'OUT', text: answer });
     return { ok: true, dryRun: true, answer };
   });
 
