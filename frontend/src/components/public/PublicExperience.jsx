@@ -3,24 +3,46 @@ import { request } from '../../services/api';
 import { currency } from '../../utils/format';
 import { SectionTitle, Input, Select, Textarea } from '../ui/Forms.jsx';
 
-/**
- * Experiência pública do GlossFlow: vitrine, agendamento e login.
- * Separar esta camada do painel admin reduz acoplamento e facilita evolução.
- */
+function tenantStyle(salon) {
+  if (!salon) return undefined;
+  return {
+    '--gold': salon.primaryColor || '#C49A6C',
+    '--gold-2': salon.accentColor || '#F7F1EA',
+    '--primary': salon.primaryColor || '#C49A6C',
+    '--primary-2': salon.secondaryColor || '#171311'
+  };
+}
 
-export function Header({ page, setPage, isAuthenticated, theme, toggleTheme }) {
+/**
+ * A experiência pública é white-label: o cliente final vê a marca do salão.
+ * GlossFlow continua aparecendo apenas no backoffice/login da plataforma.
+ */
+export function Header({ page, setPage, isAuthenticated, theme, toggleTheme, salon }) {
+  const backoffice = page === 'admin' || page === 'login' || page === 'commercial';
+  const brandName = backoffice ? 'GlossFlow' : (salon?.name || 'Salão');
+  const initial = brandName.trim().charAt(0).toUpperCase() || 'G';
+
   return (
-    <header className="header">
-      <button className="brand" onClick={() => setPage('public')} aria-label="Ir para a vitrine">
-        <span className="brand-mark">G</span>
-        <span>GlossFlow</span>
+    <header className="header" style={backoffice ? undefined : tenantStyle(salon)}>
+      <button className="brand" onClick={() => setPage('public')} aria-label="Ir para o início">
+        {salon?.logoUrl && !backoffice
+          ? <img src={salon.logoUrl} alt={brandName} style={{ width: 42, height: 42, objectFit: 'contain', borderRadius: 14 }} />
+          : <span className="brand-mark">{initial}</span>}
+        <span>{brandName}</span>
       </button>
 
       <nav className="nav">
-        <button className={page === 'public' ? 'active' : ''} onClick={() => setPage('public')}>Vitrine</button>
-        <button className={page === 'booking' ? 'active' : ''} onClick={() => setPage('booking')}>Agendar</button>
-        <button className={page === 'commercial' ? 'active' : ''} onClick={() => setPage('commercial')}>SaaS</button>
-        <button className={page === 'admin' ? 'active' : ''} onClick={() => setPage(isAuthenticated ? 'admin' : 'login')}>Admin</button>
+        {backoffice ? (
+          <>
+            <button onClick={() => setPage('public')}>Ver site</button>
+            {isAuthenticated && <button className={page === 'admin' ? 'active' : ''} onClick={() => setPage('admin')}>Painel</button>}
+          </>
+        ) : (
+          <>
+            <button className={page === 'public' ? 'active' : ''} onClick={() => setPage('public')}>Início</button>
+            <button className={page === 'booking' ? 'active' : ''} onClick={() => setPage('booking')}>Agendar</button>
+          </>
+        )}
         <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label="Alternar tema visual">{theme === 'dark' ? '☀️ Claro' : '🌙 Escuro'}</button>
       </nav>
     </header>
@@ -29,11 +51,11 @@ export function Header({ page, setPage, isAuthenticated, theme, toggleTheme }) {
 
 export function PublicShowcase({ salon, services, professionals, portfolio, setPage }) {
   return (
-    <main>
+    <main style={tenantStyle(salon)} data-site-template={(salon.siteTemplate || 'ELEGANCE').toLowerCase()}>
       <section className="hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(14,12,23,.92), rgba(14,12,23,.55)), url(${salon.heroImage})` }}>
         <div className="hero-content">
-          <span className="eyebrow">Vitrine pública do salão</span>
-          <h1>{salon.name}</h1>
+          <span className="eyebrow">{salon.name}</span>
+          <h1>{salon.heroTitle || salon.name}</h1>
           <p>{salon.description}</p>
           <div className="hero-actions">
             <button className="primary" onClick={() => setPage('booking')}>Agendar agora</button>
@@ -46,8 +68,8 @@ export function PublicShowcase({ salon, services, professionals, portfolio, setP
         </div>
       </section>
 
-      <section className="container section-grid">
-        <SectionTitle label="Serviços" title="Escolha o procedimento ideal" text="Preços e duração são cadastrados pelo administrador, sem necessidade de alterar código." />
+      <section className="container section-grid" id="servicos">
+        <SectionTitle label="Serviços" title="Encontre o cuidado ideal para você" text="Consulte nossos serviços, duração e valores antes de reservar seu horário." />
         <div className="cards three">
           {services.map((service) => (
             <article className="card media-card" key={service.id}>
@@ -60,34 +82,47 @@ export function PublicShowcase({ salon, services, professionals, portfolio, setP
         </div>
       </section>
 
-      <section className="container section-grid">
-        <SectionTitle label="Portfólio" title="Resultados reais para inspirar clientes" text="A vitrine aumenta confiança, mostra autoridade visual e ajuda na conversão do agendamento." />
-        <div className="portfolio-grid">
-          {portfolio.map((item) => (
-            <article className="portfolio-card" key={item.id}>
-              <img src={item.imageUrl} alt={item.title} />
-              <div><span>{item.category}</span><h3>{item.title}</h3><p>{item.description}</p></div>
-            </article>
-          ))}
-        </div>
-      </section>
+      {portfolio.length > 0 && (
+        <section className="container section-grid" id="trabalhos">
+          <SectionTitle label="Galeria" title="Nosso trabalho" text="Conheça alguns resultados e experiências do salão." />
+          <div className="portfolio-grid">
+            {portfolio.map((item) => (
+              <article className="portfolio-card" key={item.id}>
+                <img src={item.imageUrl} alt={item.title} />
+                <div><span>{item.category}</span><h3>{item.title}</h3><p>{item.description}</p></div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="container section-grid">
-        <SectionTitle label="Equipe" title="Profissionais do salão" text="Cada profissional pode ter especialidade, biografia e foto para fortalecer a decisão do cliente." />
-        <div className="cards two">
-          {professionals.map((professional) => (
-            <article className="profile-card" key={professional.id}>
-              <img src={professional.photoUrl || 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=900&auto=format&fit=crop'} alt={professional.name} />
-              <div><h3>{professional.name}</h3><strong>{professional.specialty}</strong><p>{professional.bio}</p></div>
-            </article>
-          ))}
+      {professionals.length > 0 && (
+        <section className="container section-grid" id="equipe">
+          <SectionTitle label="Equipe" title="Quem vai cuidar de você" text="Conheça os profissionais e escolha quem combina melhor com o serviço que procura." />
+          <div className="cards two">
+            {professionals.map((professional) => (
+              <article className="profile-card" key={professional.id}>
+                <img src={professional.photoUrl || 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=900&auto=format&fit=crop'} alt={professional.name} />
+                <div><h3>{professional.name}</h3><strong>{professional.specialty}</strong><p>{professional.bio}</p></div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="container section-grid" id="contato">
+        <SectionTitle label="Contato" title="Pronto para reservar?" text={`${salon.openingHours} • ${salon.address}`} />
+        <div className="hero-actions">
+          <button className="primary" onClick={() => setPage('booking')}>Escolher horário</button>
+          <a className="secondary" href={`https://wa.me/${salon.whatsapp}`} target="_blank" rel="noreferrer">WhatsApp</a>
+          {salon.instagram && <a className="secondary" href={`https://instagram.com/${salon.instagram.replace('@', '')}`} target="_blank" rel="noreferrer">Instagram</a>}
         </div>
       </section>
     </main>
   );
 }
 
-export function BookingPage({ services, professionals, onCreated }) {
+export function BookingPage({ services, professionals, onCreated, salon }) {
   const [form, setForm] = useState({ clientName: '', clientPhone: '', clientEmail: '', serviceId: '', professionalId: '', startTime: '', notes: '' });
   const [message, setMessage] = useState('');
 
@@ -100,7 +135,7 @@ export function BookingPage({ services, professionals, onCreated }) {
         method: 'POST',
         body: JSON.stringify({ ...form, startTime: new Date(form.startTime).toISOString() })
       });
-      setMessage('Agendamento criado com sucesso. O salão já pode visualizar no painel administrativo.');
+      setMessage('Agendamento criado com sucesso. Seu horário já foi enviado para a agenda do salão.');
       setForm({ clientName: '', clientPhone: '', clientEmail: '', serviceId: '', professionalId: '', startTime: '', notes: '' });
       onCreated();
     } catch (err) {
@@ -109,10 +144,10 @@ export function BookingPage({ services, professionals, onCreated }) {
   }
 
   return (
-    <main className="container compact">
-      <SectionTitle label="Agendamento" title="Reserve seu horário" text="O cliente escolhe serviço, profissional, data e horário sem depender de atendimento manual." />
+    <main className="container compact" style={tenantStyle(salon)}>
+      <SectionTitle label="Agendamento" title={`Reserve seu horário${salon?.name ? ` no ${salon.name}` : ''}`} text="Escolha serviço, profissional, data e horário." />
       <form className="form-card" onSubmit={submit}>
-        <Input label="Nome do cliente" value={form.clientName} onChange={(clientName) => setForm({ ...form, clientName })} required />
+        <Input label="Seu nome" value={form.clientName} onChange={(clientName) => setForm({ ...form, clientName })} required />
         <Input label="WhatsApp" value={form.clientPhone} onChange={(clientPhone) => setForm({ ...form, clientPhone })} required />
         <Input label="E-mail opcional" type="email" value={form.clientEmail} onChange={(clientEmail) => setForm({ ...form, clientEmail })} />
         <Select label="Serviço" value={form.serviceId} onChange={(serviceId) => setForm({ ...form, serviceId })} options={services.map(s => ({ value: s.id, label: `${s.name} - ${currency(s.price)}` }))} required />
@@ -127,8 +162,8 @@ export function BookingPage({ services, professionals, onCreated }) {
 }
 
 export function LoginPage({ setPage, onLogin }) {
-  const [email, setEmail] = useState('admin@glossflow.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
 
   async function submit(event) {
@@ -148,7 +183,7 @@ export function LoginPage({ setPage, onLogin }) {
 
   return (
     <main className="container compact">
-      <SectionTitle label="Admin" title="Acesso administrativo" text="Entre para cadastrar serviços, profissionais e trabalhos da vitrine." />
+      <SectionTitle label="GlossFlow" title="Acesso administrativo" text="Entre com a conta cadastrada para gerenciar o salão." />
       <form className="form-card" onSubmit={submit}>
         <Input label="E-mail" type="email" value={email} onChange={setEmail} required />
         <Input label="Senha" type="password" value={password} onChange={setPassword} required />
