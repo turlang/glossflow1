@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
-import { availabilityClarification, unavailableServiceReply } from '../services/agent-intent.service';
+import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
 import { hasSalonModule } from '../services/module-access.service';
 import {
@@ -91,11 +91,26 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
 
         if (await hasOpenHumanHandoff(salon.id, from)) continue;
 
-        const unavailable = text ? await unavailableServiceReply(salon.id, text) : null;
-        const clarification = text && !unavailable ? await availabilityClarification(salon.id, text) : null;
-        const rawReplyText = text
-          ? (unavailable || clarification || await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text }))
-          : 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
+        const serviceDecision = text ? await unavailableServiceDecision(salon.id, text) : null;
+        const clarification = text && !serviceDecision ? await availabilityClarification(salon.id, text) : null;
+
+        let rawReplyText: string;
+        if (!text) {
+          rawReplyText = 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
+        } else if (serviceDecision?.continueWithAI) {
+          const availabilityAnswer = await answerWhatsAppMessage({
+            salon,
+            phone: from,
+            clientName: contactName,
+            text: serviceDecision.aiText || text
+          });
+          rawReplyText = `${serviceDecision.reply}\n\n${availabilityAnswer}`;
+        } else {
+          rawReplyText = serviceDecision?.reply
+            || clarification
+            || await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text });
+        }
+
         const guarded = await guardAgentReply({ salonId: salon.id, phone: from, userText: text, replyText: rawReplyText });
         const replyText = guarded.replyText;
 
