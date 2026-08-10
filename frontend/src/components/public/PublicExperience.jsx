@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { request } from '../../services/api';
 import { currency } from '../../utils/format';
-import { SectionTitle, Input, Select, Textarea } from '../ui/Forms.jsx';
+import { SectionTitle, Input } from '../ui/Forms.jsx';
+import { PublicBookingCalendar } from './PublicBookingCalendar.jsx';
 
 function tenantStyle(salon) {
   if (!salon) return undefined;
@@ -127,42 +128,7 @@ export function PublicShowcase({ salon, services, professionals, portfolio, setP
 }
 
 export function BookingPage({ services, professionals, onCreated, salon }) {
-  const [form, setForm] = useState({ clientName: '', clientPhone: '', clientEmail: '', serviceId: '', professionalId: '', startTime: '', notes: '' });
-  const [message, setMessage] = useState('');
-
-  async function submit(event) {
-    event.preventDefault();
-    setMessage('');
-
-    try {
-      await request('/appointments', {
-        method: 'POST',
-        body: JSON.stringify({ ...form, startTime: new Date(form.startTime).toISOString() })
-      });
-      setMessage('Agendamento criado com sucesso. Seu horário já foi enviado para a agenda do salão.');
-      setForm({ clientName: '', clientPhone: '', clientEmail: '', serviceId: '', professionalId: '', startTime: '', notes: '' });
-      onCreated();
-    } catch (err) {
-      setMessage(err.message);
-    }
-  }
-
-  return (
-    <main className="container compact" style={tenantStyle(salon)}>
-      <SectionTitle label="Agendamento" title={`Reserve seu horário${salon?.name ? ` no ${salon.name}` : ''}`} text="Escolha serviço, profissional, data e horário." />
-      <form className="form-card" onSubmit={submit}>
-        <Input label="Seu nome" value={form.clientName} onChange={(clientName) => setForm({ ...form, clientName })} required />
-        <Input label="WhatsApp" value={form.clientPhone} onChange={(clientPhone) => setForm({ ...form, clientPhone })} required />
-        <Input label="E-mail opcional" type="email" value={form.clientEmail} onChange={(clientEmail) => setForm({ ...form, clientEmail })} />
-        <Select label="Serviço" value={form.serviceId} onChange={(serviceId) => setForm({ ...form, serviceId })} options={services.map(s => ({ value: s.id, label: `${s.name} - ${currency(s.price)}` }))} required />
-        <Select label="Profissional" value={form.professionalId} onChange={(professionalId) => setForm({ ...form, professionalId })} options={professionals.map(p => ({ value: p.id, label: `${p.name} - ${p.specialty}` }))} required />
-        <Input label="Data e horário" type="datetime-local" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} required />
-        <Textarea label="Observações" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
-        <button className="primary full" type="submit">Confirmar agendamento</button>
-        {message && <p className="feedback">{message}</p>}
-      </form>
-    </main>
-  );
+  return <PublicBookingCalendar services={services} professionals={professionals} onCreated={onCreated} salon={salon} />;
 }
 
 export function LoginPage({ setPage, onLogin }) {
