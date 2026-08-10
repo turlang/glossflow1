@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { defaultWeeklySchedule, parseTimeBlocks } from '../services/professional-schedule.service';
@@ -43,9 +43,16 @@ const blockSchema = z.object({
 const idParams = z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/) });
 const blockParams = z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/), blockId: z.string().uuid() });
 
+function ensureManager(role: string, reply: FastifyReply) {
+  if (['ADMIN', 'RECEPTION'].includes(role)) return true;
+  reply.status(403).send({ message: 'Somente administração ou recepção podem alterar a jornada da equipe.' });
+  return false;
+}
+
 export async function professionalScheduleRoutes(app: FastifyInstance) {
-  app.get('/admin/appointments/team-schedules', async (request) => {
+  app.get('/admin/appointments/team-schedules', async (request, reply) => {
     const tenant = getTenant(request);
+    if (!ensureManager(tenant.role, reply)) return;
     const [salon, professionals] = await Promise.all([
       prisma.salon.findUnique({ where: { id: tenant.salonId }, select: { openingHours: true } }),
       prisma.professional.findMany({
@@ -71,6 +78,7 @@ export async function professionalScheduleRoutes(app: FastifyInstance) {
 
   app.put('/admin/appointments/team-schedules/:id', async (request, reply) => {
     const tenant = getTenant(request);
+    if (!ensureManager(tenant.role, reply)) return;
     const { id } = idParams.parse(request.params);
     const data = updateScheduleSchema.parse(request.body);
     const current = await prisma.professional.findFirst({ where: { id, salonId: tenant.salonId, active: true } });
@@ -87,29 +95,29 @@ export async function professionalScheduleRoutes(app: FastifyInstance) {
 
   app.post('/admin/appointments/team-schedules/:id/blocks', async (request, reply) => {
     const tenant = getTenant(request);
+    if (!ensureManager(tenant.role, reply)) return;
     const { id } = idParams.parse(request.params);
     const data = blockSchema.parse(request.body);
     const professional = await prisma.professional.findFirst({ where: { id, salonId: tenant.salonId, active: true } });
     if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
 
     const blocks = parseTimeBlocks(professional);
-    const next = [
-      ...blocks,
-      {
-        id: randomUUID(),
-        type: data.type,
-        startTime: new Date(data.startTime).toISOString(),
-        endTime: new Date(data.endTime).toISOString(),
-        reason: data.reason
-      }
-    ].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const created = {
+      id: randomUUID(),
+      type: data.type,
+      startTime: new Date(data.startTime).toISOString(),
+      endTime: new Date(data.endTime).toISOString(),
+      reason: data.reason
+    };
+    const next = [...blocks, created].sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     await prisma.professional.update({ where: { id }, data: { timeBlocks: next as any } });
-    return reply.status(201).send(next[next.length - 1]);
+    return reply.status(201).send(created);
   });
 
   app.delete('/admin/appointments/team-schedules/:id/blocks/:blockId', async (request, reply) => {
     const tenant = getTenant(request);
+    if (!ensureManager(tenant.role, reply)) return;
     const { id, blockId } = blockParams.parse(request.params);
     const professional = await prisma.professional.findFirst({ where: { id, salonId: tenant.salonId, active: true } });
     if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
