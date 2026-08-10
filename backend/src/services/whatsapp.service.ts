@@ -1,10 +1,14 @@
 /**
  * Serviço de WhatsApp do GlossFlow.
  *
- * - Mensagens de conversa/resposta continuam usando texto livre.
- * - Notificações iniciadas pelo salão (confirmação, lembrete, cancelamento)
- *   podem usar templates aprovados da Meta por meio de sendWhatsAppTemplateMessage.
- * - Falhas do provider nunca derrubam fluxos de negócio já persistidos.
+ * Providers suportados:
+ * - Meta WhatsApp Cloud API
+ * - Twilio WhatsApp
+ * - Provider HTTP personalizado legado
+ *
+ * Mensagens livres são usadas dentro da janela de atendimento.
+ * Notificações iniciadas pelo salão usam templates quando disponíveis.
+ * Falhas do provider nunca derrubam fluxos de negócio já persistidos.
  */
 type SendWhatsAppInput = {
   to?: string;
@@ -32,11 +36,27 @@ function normalizePhone(phone: string) {
 
 function providerConfig(phoneNumberId?: string) {
   return {
-    provider: process.env.WHATSAPP_PROVIDER || 'meta',
+    provider: String(process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase(),
     token: process.env.WHATSAPP_ACCESS_TOKEN || '',
     phoneNumberId: phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v20.0'
   };
+}
+
+function twilioConfig() {
+  const from = String(process.env.TWILIO_WHATSAPP_FROM || '').trim();
+  return {
+    accountSid: String(process.env.TWILIO_ACCOUNT_SID || '').trim(),
+    authToken: String(process.env.TWILIO_AUTH_TOKEN || '').trim(),
+    from: from.startsWith('whatsapp:') ? from : from ? `whatsapp:${from}` : '',
+    trialMode: process.env.TWILIO_TRIAL_MODE === 'true',
+    trialContentSid: String(process.env.TWILIO_TRIAL_CONTENT_SID || '').trim()
+  };
+}
+
+function whatsappAddress(phone: string) {
+  const normalized = normalizePhone(phone);
+  return normalized ? `whatsapp:+${normalized}` : '';
 }
 
 function metaErrorDetails(data: any) {
@@ -93,6 +113,80 @@ async function postMetaMessage(input: {
   }
 }
 
+async function postTwilioMessage(input: {
+  to: string;
+  body?: string;
+  contentSid?: string;
+  contentVariables?: Record<string, string>;
+}) {
+  const config = twilioConfig();
+  if (!config.accountSid || !config.authToken || !config.from) {
+    return {
+      ok: false,
+      provider: 'twilio',
+      code: 'TWILIO_NOT_CONFIGURED',
+      message: 'Twilio não configurado. Preencha TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN e TWILIO_WHATSAPP_FROM.'
+    };
+  }
+
+  const form = new URLSearchParams();
+  form.set('To', whatsappAddress(input.to));
+  form.set('From', config.from);
+  if (input.contentSid) {
+    form.set('ContentSid', input.contentSid);
+    if (input.contentVariables && Object.keys(input.contentVariables).length > 0) {
+      form.set('ContentVariables', JSON.stringify(input.contentVariables));
+    }
+  } else if (input.body) {
+    form.set('Body', input.body);
+  } else {
+    return {
+      ok: false,
+      provider: 'twilio',
+      code: 'TWILIO_EMPTY_MESSAGE',
+      message: 'Mensagem Twilio sem Body ou ContentSid.'
+    };
+  }
+
+  try {
+    const basicAuth = Buffer.from(`${config.accountSid}:${config.authToken}`).toString('base64');
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(config.accountSid)}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Basic ${basicAuth}`
+        },
+        body: form.toString()
+      }
+    );
+    const data = await response.json().catch(() => ({}));
+    const errorMessage = String(data?.message || data?.error_message || '');
+    return {
+      ok: response.ok,
+      provider: 'twilio',
+      statusCode: response.status,
+      messageId: String(data?.sid || ''),
+      data,
+      ...(response.ok
+        ? {}
+        : {
+            errorCode: data?.code || null,
+            errorMessage: errorMessage || 'Falha ao enviar mensagem pela Twilio.'
+          })
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      provider: 'twilio',
+      code: 'TWILIO_NETWORK_ERROR',
+      message: 'Não foi possível conectar à Twilio.',
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
   const to = normalizePhone(input.to || input.phone || '');
   if (!to || to.length < 10) {
@@ -110,7 +204,7 @@ export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
     };
   }
 
-  const provider = process.env.WHATSAPP_PROVIDER || 'meta';
+  const provider = providerConfig().provider;
   if (provider === 'meta') {
     return postMetaMessage({
       to,
@@ -120,6 +214,10 @@ export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
         text: { preview_url: false, body: input.message }
       }
     });
+  }
+
+  if (provider === 'twilio') {
+    return postTwilioMessage({ to, body: input.message });
   }
 
   try {
@@ -148,15 +246,26 @@ export async function sendWhatsAppMessage(input: SendWhatsAppInput) {
 }
 
 /**
- * Envia um template previamente aprovado no WhatsApp Manager.
- * Os parâmetros são enviados na ordem {{1}}, {{2}}, {{3}}... do corpo.
+ * Envia template aprovado/configurado no provider ativo.
+ *
+ * Meta: templateName é o nome aprovado no WhatsApp Manager.
+ * Twilio: templateName é o ContentSid HX... em produção. No Trial,
+ * TWILIO_TRIAL_CONTENT_SID prevalece e as variáveis são omitidas porque
+ * o template de demonstração é controlado pela própria Twilio.
  */
 export async function sendWhatsAppTemplateMessage(input: SendWhatsAppTemplateInput) {
   const to = normalizePhone(input.to || input.phone || '');
   if (!to || to.length < 10) {
     return { ok: false, provider: 'validation', code: 'INVALID_PHONE', message: 'Telefone inválido. Use DDI + DDD + número.' };
   }
-  if (!input.templateName?.trim()) {
+
+  const provider = providerConfig().provider;
+  const twilio = twilioConfig();
+  const effectiveTemplate = provider === 'twilio' && twilio.trialMode
+    ? twilio.trialContentSid || input.templateName?.trim()
+    : input.templateName?.trim();
+
+  if (!effectiveTemplate) {
     return { ok: false, provider: 'validation', code: 'TEMPLATE_NOT_CONFIGURED', message: 'Template de WhatsApp não configurado para esta notificação.' };
   }
 
@@ -165,20 +274,38 @@ export async function sendWhatsAppTemplateMessage(input: SendWhatsAppTemplateInp
       ok: true,
       provider: 'dry-run',
       to,
-      templateName: input.templateName,
+      templateName: effectiveTemplate,
       languageCode: input.languageCode || process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'pt_BR',
       bodyParameters: input.bodyParameters || [],
       sentAt: new Date().toISOString()
     };
   }
 
-  const provider = process.env.WHATSAPP_PROVIDER || 'meta';
+  if (provider === 'twilio') {
+    if (!effectiveTemplate.startsWith('HX')) {
+      return {
+        ok: false,
+        provider,
+        code: 'TWILIO_CONTENT_SID_INVALID',
+        message: 'Template Twilio inválido. Use um ContentSid iniciado por HX.'
+      };
+    }
+    const contentVariables = Object.fromEntries(
+      (input.bodyParameters || []).map((value, index) => [String(index + 1), String(value)])
+    );
+    return postTwilioMessage({
+      to,
+      contentSid: effectiveTemplate,
+      contentVariables: twilio.trialMode ? undefined : contentVariables
+    });
+  }
+
   if (provider !== 'meta') {
     return {
       ok: false,
       provider,
       code: 'TEMPLATE_PROVIDER_UNSUPPORTED',
-      message: 'Envio por template está disponível no provider Meta.'
+      message: `Envio por template não está implementado para o provider ${provider}.`
     };
   }
 
@@ -193,7 +320,7 @@ export async function sendWhatsAppTemplateMessage(input: SendWhatsAppTemplateInp
     payload: {
       type: 'template',
       template: {
-        name: input.templateName.trim(),
+        name: effectiveTemplate,
         language: { code: input.languageCode || process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'pt_BR' },
         ...(bodyParameters.length
           ? { components: [{ type: 'body', parameters: bodyParameters }] }
@@ -205,13 +332,23 @@ export async function sendWhatsAppTemplateMessage(input: SendWhatsAppTemplateInp
 
 export function whatsappRuntimeDiagnostics() {
   const config = providerConfig();
+  const twilio = twilioConfig();
   return {
     provider: config.provider,
     dryRun: process.env.WHATSAPP_DRY_RUN === 'true',
-    apiVersion: config.apiVersion,
-    accessTokenConfigured: Boolean(config.token),
-    phoneNumberIdConfigured: Boolean(config.phoneNumberId),
-    appSecretConfigured: Boolean(process.env.WHATSAPP_APP_SECRET),
+    apiVersion: config.provider === 'meta' ? config.apiVersion : undefined,
+    accessTokenConfigured: config.provider === 'meta' ? Boolean(config.token) : undefined,
+    phoneNumberIdConfigured: config.provider === 'meta' ? Boolean(config.phoneNumberId) : undefined,
+    appSecretConfigured: config.provider === 'meta' ? Boolean(process.env.WHATSAPP_APP_SECRET) : undefined,
+    twilio: config.provider === 'twilio'
+      ? {
+          accountSidConfigured: Boolean(twilio.accountSid),
+          authTokenConfigured: Boolean(twilio.authToken),
+          fromConfigured: Boolean(twilio.from),
+          trialMode: twilio.trialMode,
+          trialContentSidConfigured: Boolean(twilio.trialContentSid)
+        }
+      : undefined,
     templates: {
       appointmentConfirmed: process.env.WHATSAPP_TEMPLATE_APPOINTMENT_CONFIRMED || '',
       appointmentCancelled: process.env.WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED || '',
