@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { getAIRuntimeConfig } from '../services/ai-provider.service';
+import { availabilityClarification } from '../services/agent-intent.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
 import {
@@ -151,7 +152,8 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
     try {
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
-      const answer = await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+      const clarification = await availabilityClarification(salon.id, body.message);
+      const answer = clarification || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'OUT', text: answer });
       return {
         ok: true,
