@@ -34,6 +34,7 @@ model Salon {
   professionals  Professional[]
   portfolioItems PortfolioItem[]
   appointments   Appointment[]
+  waitlistEntries WaitlistEntry[]
   clients        Client[]
   inventoryProducts InventoryProduct[]
   financialEntries FinancialEntry[]
@@ -98,6 +99,7 @@ model Service {
   salonId     String   @db.ObjectId
   salon       Salon    @relation(fields: [salonId], references: [id])
   appointments Appointment[]
+  waitlistEntries WaitlistEntry[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -119,6 +121,7 @@ model Professional {
   salonId                String   @db.ObjectId
   salon                  Salon    @relation(fields: [salonId], references: [id])
   appointments           Appointment[]
+  waitlistEntries        WaitlistEntry[]
   commissionRules        CommissionRule[]
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
@@ -151,6 +154,7 @@ model Client {
   salonId     String   @db.ObjectId
   salon       Salon    @relation(fields: [salonId], references: [id])
   appointments Appointment[]
+  waitlistEntries WaitlistEntry[]
   loyaltyEntries LoyaltyEntry[]
   consents    LgpdConsent[]
   createdAt   DateTime @default(now())
@@ -184,6 +188,39 @@ model Appointment {
   @@index([salonId])
   @@index([professionalId])
   @@index([startTime])
+}
+
+model WaitlistEntry {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientName            String
+  clientPhone           String
+  clientEmail           String?
+  desiredDate           String
+  earliestTime          String   @default("00:00")
+  latestTime            String   @default("23:59")
+  status                String   @default("WAITING")
+  priority              Int      @default(0)
+  notes                 String   @default("")
+  offeredStartTime      DateTime?
+  offeredUntil          DateTime?
+  offeredProfessionalId String?  @db.ObjectId
+  declinedOfferKeys     String[] @default([])
+  salonId               String   @db.ObjectId
+  salon                 Salon    @relation(fields: [salonId], references: [id])
+  serviceId             String   @db.ObjectId
+  service               Service  @relation(fields: [serviceId], references: [id])
+  professionalId        String?  @db.ObjectId
+  professional          Professional? @relation(fields: [professionalId], references: [id])
+  clientId              String?  @db.ObjectId
+  client                Client?  @relation(fields: [clientId], references: [id])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([serviceId])
+  @@index([clientPhone])
+  @@index([desiredDate])
+  @@index([status])
 }
 
 model InventoryProduct {
