@@ -66,6 +66,13 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
   const [form, setForm] = useState({ clientName: '', clientPhone: '', clientEmail: '', notes: '' });
 
   const selectedService = services.find((service) => service.id === serviceId) || null;
+  const eligibleProfessionals = useMemo(() => {
+    if (!serviceId) return professionals;
+    return professionals.filter((professional) => {
+      if (!professional.servicesConfigured) return true;
+      return Array.isArray(professional.serviceIds) && professional.serviceIds.includes(serviceId);
+    });
+  }, [professionals, serviceId]);
 
   useEffect(() => {
     if (!serviceId) {
@@ -119,6 +126,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
 
   function chooseService(id) {
     setServiceId(id);
+    setProfessionalId('');
     setFeedback('');
   }
 
@@ -197,25 +205,27 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
           <section className="booking-step">
             <div className="booking-step-head">
               <span className="booking-step-number">2</span>
-              <div><strong>Profissional</strong><small>Você pode escolher alguém ou ver a melhor disponibilidade da equipe.</small></div>
+              <div><strong>Profissional</strong><small>Mostramos somente quem está habilitado para executar este serviço.</small></div>
             </div>
-            <div className="booking-professional-row">
-              <button type="button" className={`booking-pro-chip ${!professionalId ? 'is-selected' : ''}`} onClick={() => chooseProfessional('')}>
-                <span className="booking-pro-avatar">★</span><span><strong>Qualquer profissional</strong><small>Mostrar maior disponibilidade</small></span>
-              </button>
-              {professionals.map((professional) => (
-                <button key={professional.id} type="button" className={`booking-pro-chip ${professionalId === professional.id ? 'is-selected' : ''}`} onClick={() => chooseProfessional(professional.id)}>
-                  {professional.photoUrl
-                    ? <img className="booking-pro-avatar" src={professional.photoUrl} alt="" />
-                    : <span className="booking-pro-avatar">{professional.name.charAt(0)}</span>}
-                  <span><strong>{professional.name}</strong><small>{professional.specialty}</small></span>
+            {eligibleProfessionals.length > 0 ? (
+              <div className="booking-professional-row">
+                <button type="button" className={`booking-pro-chip ${!professionalId ? 'is-selected' : ''}`} onClick={() => chooseProfessional('')}>
+                  <span className="booking-pro-avatar">★</span><span><strong>Qualquer profissional</strong><small>Mostrar maior disponibilidade</small></span>
                 </button>
-              ))}
-            </div>
+                {eligibleProfessionals.map((professional) => (
+                  <button key={professional.id} type="button" className={`booking-pro-chip ${professionalId === professional.id ? 'is-selected' : ''}`} onClick={() => chooseProfessional(professional.id)}>
+                    {professional.photoUrl
+                      ? <img className="booking-pro-avatar" src={professional.photoUrl} alt="" />
+                      : <span className="booking-pro-avatar">{professional.name.charAt(0)}</span>}
+                    <span><strong>{professional.name}</strong><small>{professional.specialty}</small></span>
+                  </button>
+                ))}
+              </div>
+            ) : <p className="booking-empty-copy">Nenhum profissional está configurado para este serviço no momento.</p>}
           </section>
         )}
 
-        {selectedService && (
+        {selectedService && eligibleProfessionals.length > 0 && (
           <section className="booking-step">
             <div className="booking-step-head booking-calendar-heading">
               <div className="booking-step-head-copy">
