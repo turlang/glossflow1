@@ -67,10 +67,32 @@ export function getAIRuntimeConfig(): AIRuntimeConfig {
   };
 }
 
+function publicResponse(data: AIResponse): AIResponse {
+  // Nunca devolve itens de raciocínio para o agente de atendimento. Além de
+  // não terem utilidade para o cliente, reenviá-los no próximo round de tools
+  // pode fazer o modelo repetir texto interno na resposta final.
+  return {
+    ...data,
+    output: (data.output || []).filter((item) => item.type !== 'reasoning')
+  };
+}
+
 export async function requestAIResponse(payload: Record<string, unknown>): Promise<AIResponse> {
   const config = getAIRuntimeConfig();
   if (!config.configured) {
     throw new Error(`${config.providerLabel}: ${config.apiKeyEnv} não configurada.`);
+  }
+
+  const providerPayload: Record<string, unknown> = {
+    ...payload,
+    model: config.model
+  };
+
+  // GPT-OSS é um modelo de raciocínio. Para atendimento de salão, uma carga
+  // baixa é suficiente e reduz latência/custo. O raciocínio continua separado
+  // da resposta pública e é removido por publicResponse().
+  if (config.provider === 'groq' && config.model.startsWith('openai/gpt-oss-')) {
+    providerPayload.reasoning = { effort: 'low' };
   }
 
   const response = await fetch(config.endpoint, {
@@ -79,7 +101,7 @@ export async function requestAIResponse(payload: Record<string, unknown>): Promi
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.apiKey}`
     },
-    body: JSON.stringify({ ...payload, model: config.model })
+    body: JSON.stringify(providerPayload)
   });
 
   const data = await response.json().catch(() => ({})) as AIResponse & {
@@ -91,5 +113,5 @@ export async function requestAIResponse(payload: Record<string, unknown>): Promi
     throw new Error(`${config.providerLabel} respondeu HTTP ${response.status}: ${detail}`);
   }
 
-  return data;
+  return publicResponse(data);
 }
