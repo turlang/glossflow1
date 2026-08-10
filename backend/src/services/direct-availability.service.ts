@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { filterProfessionalsForService } from './professional-capability.service';
+import { publicBookingAvailability } from './public-booking-availability.service';
 
 type AvailabilitySalon = {
   id: string;
@@ -21,36 +21,6 @@ function normalize(value: string) {
     .replace(/[^a-z0-9\s/.-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function localOffset() {
-  const value = process.env.BUSINESS_TIMEZONE_OFFSET || '-03:00';
-  return /^[+-]\d{2}:\d{2}$/.test(value) ? value : '-03:00';
-}
-
-function parseOpeningHours(text: string) {
-  const hourMatches = [...String(text || '').matchAll(/\b([01]?\d|2[0-3])(?::([0-5]\d))?\s*h?\b/gi)]
-    .map((match) => Number(match[1]));
-  if (hourMatches.length >= 2 && hourMatches[0] < hourMatches[1]) {
-    return { startHour: hourMatches[0], endHour: hourMatches[1] };
-  }
-  return { startHour: 9, endHour: 19 };
-}
-
-function asDate(date: string, hour: number, minute = 0) {
-  const hh = String(hour).padStart(2, '0');
-  const mm = String(minute).padStart(2, '0');
-  return new Date(`${date}T${hh}:${mm}:00${localOffset()}`);
-}
-
-function formatLocal(date: Date) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    timeZone: process.env.BUSINESS_TIMEZONE || 'America/Sao_Paulo',
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date);
 }
 
 function dateLabel(date: string) {
@@ -146,56 +116,19 @@ async function slotsForService(input: {
   service: ServiceRecord;
   date: string;
 }) {
-  const allProfessionals = await prisma.professional.findMany({
-    where: { salonId: input.salon.id, active: true },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, servicesConfigured: true, serviceIds: true }
+  const availability = await publicBookingAvailability({
+    salon: input.salon,
+    serviceId: input.service.id,
+    date: input.date
   });
-  const professionals = filterProfessionalsForService(allProfessionals, input.service.id);
 
-  if (!professionals.length) {
+  if (!availability || availability.mode !== 'day') {
     return { service: input.service.name, slots: [] as Array<{ professional: string; displayTime: string }> };
   }
 
-  const weekday = new Date(`${input.date}T12:00:00Z`).getUTCDay();
-  if (weekday === 0) {
-    return { service: input.service.name, slots: [] as Array<{ professional: string; displayTime: string }> };
-  }
-
-  const { startHour, endHour } = parseOpeningHours(input.salon.openingHours);
-  const configuredInterval = Number(process.env.BOOKING_SLOT_INTERVAL_MINUTES || 30);
-  const intervalMin = Number.isFinite(configuredInterval) && configuredInterval >= 10 ? configuredInterval : 30;
-  const dayStart = asDate(input.date, 0, 0);
-  const nextDay = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      salonId: input.salon.id,
-      status: 'CONFIRMED',
-      startTime: { gte: dayStart, lt: nextDay },
-      professionalId: { in: professionals.map((professional) => professional.id) }
-    },
-    select: { professionalId: true, startTime: true, endTime: true }
-  });
-
-  const slots: Array<{ professional: string; displayTime: string }> = [];
-  for (const professional of professionals) {
-    for (let minutes = startHour * 60; minutes + input.service.durationMin <= endHour * 60; minutes += intervalMin) {
-      const start = asDate(input.date, Math.floor(minutes / 60), minutes % 60);
-      const end = new Date(start.getTime() + input.service.durationMin * 60_000);
-      if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now()) continue;
-
-      const conflict = appointments.some((appointment) =>
-        appointment.professionalId === professional.id
-        && appointment.startTime < end
-        && appointment.endTime > start
-      );
-
-      if (!conflict) slots.push({ professional: professional.name, displayTime: formatLocal(start) });
-      if (slots.length >= 8) break;
-    }
-    if (slots.length >= 8) break;
-  }
+  const slots = availability.professionals.flatMap((professional) =>
+    professional.slots.map((slot) => ({ professional: professional.name, displayTime: `${dateLabel(input.date).slice(0, 5)}, ${slot.label}` }))
+  ).slice(0, 8);
 
   return { service: input.service.name, slots };
 }
@@ -204,7 +137,7 @@ async function formatAvailability(salon: AvailabilitySalon, services: ServiceRec
   const results = await Promise.all(services.slice(0, 3).map((service) => slotsForService({ salon, service, date })));
   const blocks = results.map((result) => {
     if (!result.slots.length) {
-      return `Para ${result.service} em ${dateLabel(date)}, não encontrei profissionais habilitados com horários livres no momento.`;
+      return `Para ${result.service} em ${dateLabel(date)}, não encontrei profissionais habilitados com tempo livre suficiente na jornada.`;
     }
 
     const lines = result.slots.map((slot) => `• ${slot.displayTime} — ${slot.professional}`).join('\n');
@@ -214,7 +147,7 @@ async function formatAvailability(salon: AvailabilitySalon, services: ServiceRec
   return `${blocks.join('\n\n')}\n\nSe algum desses horários servir para você, me diga qual prefere e eu continuo o agendamento.`;
 }
 
-/** Consulta diretamente a agenda a partir da mensagem original do cliente. */
+/** Consulta diretamente a mesma agenda usada pelo site público, incluindo jornada, intervalos e ausências. */
 export async function directAvailabilityFromText(input: {
   salon: AvailabilitySalon;
   text: string;
@@ -233,7 +166,6 @@ export async function directAvailabilityFromText(input: {
   return formatAvailability(input.salon, targetServices, date);
 }
 
-/** Mantido para compatibilidade com decisões estruturadas já existentes. */
 export async function directAvailabilityFromDecision(input: {
   salon: AvailabilitySalon;
   decisionText: string;
