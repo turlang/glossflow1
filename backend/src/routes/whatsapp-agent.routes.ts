@@ -23,6 +23,65 @@ async function getAgentEntitlements(salonId: string) {
   };
 }
 
+function agentError(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error || 'Erro desconhecido.');
+  const text = raw.toLowerCase();
+
+  if (text.includes('incorrect api key') || text.includes('invalid_api_key') || text.includes('api key') && text.includes('invalid')) {
+    return {
+      status: 502,
+      code: 'OPENAI_INVALID_KEY',
+      message: 'A chave OPENAI_API_KEY configurada no Render não foi aceita pela OpenAI. Gere ou copie uma chave válida e salve novamente no Render.'
+    };
+  }
+
+  if (text.includes('insufficient_quota') || text.includes('quota') || text.includes('billing') || text.includes('credit balance')) {
+    return {
+      status: 402,
+      code: 'OPENAI_QUOTA',
+      message: 'A OpenAI recusou a chamada por limite de créditos/faturamento. Verifique o billing da conta da API usada pela OPENAI_API_KEY.'
+    };
+  }
+
+  if (text.includes('rate limit') || text.includes('http 429') || text.includes('too many requests')) {
+    return {
+      status: 429,
+      code: 'OPENAI_RATE_LIMIT',
+      message: 'A OpenAI aplicou limite temporário de requisições. Aguarde alguns instantes e teste novamente.'
+    };
+  }
+
+  if ((text.includes('model') && text.includes('not found')) || text.includes('model_not_found') || text.includes('does not exist') || text.includes('unsupported model')) {
+    return {
+      status: 502,
+      code: 'OPENAI_MODEL_ERROR',
+      message: `O modelo configurado (${process.env.OPENAI_MODEL || 'não informado'}) não está disponível para esta chave/projeto da OpenAI.`
+    };
+  }
+
+  if (text.includes('openai respondeu http 400')) {
+    return {
+      status: 502,
+      code: 'OPENAI_REQUEST_INVALID',
+      message: 'A OpenAI rejeitou o formato da solicitação do agente. O erro técnico foi registrado no backend para correção.'
+    };
+  }
+
+  if (text.includes('openai') || text.includes('api.openai.com')) {
+    return {
+      status: 502,
+      code: 'OPENAI_UPSTREAM_ERROR',
+      message: 'A chamada à OpenAI falhou. Verifique a chave, o modelo e o faturamento da API; o detalhe técnico foi registrado no backend.'
+    };
+  }
+
+  return {
+    status: 500,
+    code: 'AGENT_INTERNAL_ERROR',
+    message: 'O agente encontrou uma falha interna ao preparar a resposta. O detalhe técnico foi registrado no backend.'
+  };
+}
+
 /** Rotas administrativas para homologar e operar o agente sem depender do webhook real. */
 export async function whatsappAgentRoutes(app: FastifyInstance) {
   app.get('/admin/whatsapp/agent-status', async (request) => {
@@ -36,6 +95,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
       modules: entitlements,
       agentEnabled: entitlements.whatsapp && entitlements.ai && entitlements.agenda,
       openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
+      openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       whatsappTokenConfigured: Boolean(process.env.WHATSAPP_ACCESS_TOKEN),
       phoneNumberIdConfigured: Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID),
       webhookVerifyTokenConfigured: Boolean(process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
@@ -48,7 +108,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
   app.post('/admin/whatsapp/agent-test', async (request, reply) => {
     const tenant = getTenant(request);
     const entitlements = await getAgentEntitlements(tenant.salonId);
-    if (!entitlements.ai || !entitlements.agenda) {
+    if (!entitlements.whatsapp || !entitlements.ai || !entitlements.agenda) {
       return reply.status(403).send({
         message: 'O agente WhatsApp exige os módulos WhatsApp, Inteligência Artificial e Agenda habilitados.',
         code: 'MODULE_DEPENDENCY_DISABLED'
@@ -71,10 +131,30 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
       return reply.status(409).send({ message: 'Este telefone está em atendimento humano. Feche o handoff para retomar a IA.' });
     }
 
-    await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
-    const answer = await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
-    await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'OUT', text: answer });
-    return { ok: true, dryRun: true, answer };
+    try {
+      await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
+      const answer = await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+      await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'OUT', text: answer });
+      return {
+        ok: true,
+        dryRun: true,
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        answer
+      };
+    } catch (error) {
+      const diagnostic = agentError(error);
+      request.log.error({
+        err: error,
+        salonId: salon.id,
+        diagnosticCode: diagnostic.code,
+        openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini'
+      }, 'Falha no teste do agente de WhatsApp/IA');
+      return reply.status(diagnostic.status).send({
+        message: diagnostic.message,
+        code: diagnostic.code,
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini'
+      });
+    }
   });
 
   app.get('/admin/whatsapp/handoffs', async (request) => {
