@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceSalonModuleAccess, hasSalonModule } from '../services/module-access.service';
 import { professionalCanPerform } from '../services/professional-capability.service';
+import { bookingFitsProfessionalSchedule } from '../services/professional-schedule.service';
 import { bookingFitsBusinessWindow, publicBookingAvailability } from '../services/public-booking-availability.service';
 import { appointmentSchema, appointmentUpdateSchema, objectIdSchema } from './schemas';
 import { getPublicSalon, getTenant } from './helpers';
@@ -24,9 +25,8 @@ const availabilityQuerySchema = z.object({
 /** Rotas de agenda. A rota POST pública permite ao cliente criar reserva. */
 export async function appointmentRoutes(app: FastifyInstance) {
   /**
-   * Calendário público orientado pela duração real do serviço.
-   * "capacity" representa quantos atendimentos completos ainda cabem nos blocos
-   * livres do profissional — e não quantos horários de início podem ser clicados.
+   * Calendário público orientado pela duração real do serviço e pela jornada do profissional.
+   * "capacity" representa quantos atendimentos completos ainda cabem nos blocos livres.
    */
   app.get('/appointments/availability', async (request, reply) => {
     const query = availabilityQuerySchema.parse(request.query);
@@ -47,10 +47,6 @@ export async function appointmentRoutes(app: FastifyInstance) {
     return availability;
   });
 
-  /**
-   * A vitrine pública só recebe os intervalos ocupados necessários para
-   * disponibilidade. Dados pessoais do cliente nunca saem por esta rota.
-   */
   app.get('/appointments', async (request, reply) => {
     const salon = await getPublicSalon(request);
     if (!hasSalonModule(salon, 'AGENDA')) {
@@ -95,6 +91,9 @@ export async function appointmentRoutes(app: FastifyInstance) {
     }
 
     const end = new Date(start.getTime() + service.durationMin * 60_000);
+    if (!bookingFitsProfessionalSchedule({ professional, openingHours: salon.openingHours, start, end })) {
+      return reply.status(409).send({ message: `${professional.name} não está disponível durante todo o período necessário para este serviço. Escolha outro horário.` });
+    }
 
     const conflict = await prisma.appointment.findFirst({
       where: {
@@ -144,22 +143,29 @@ export async function appointmentRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = appointmentUpdateSchema.parse(request.body);
 
-    const current = await prisma.appointment.findFirst({ where: { id, salonId: tenant.salonId }, include: { service: true } });
+    const [current, salon] = await Promise.all([
+      prisma.appointment.findFirst({ where: { id, salonId: tenant.salonId }, include: { service: true } }),
+      prisma.salon.findUnique({ where: { id: tenant.salonId }, select: { openingHours: true } })
+    ]);
     if (!current) return reply.status(404).send({ message: 'Agendamento não encontrado.' });
+    if (!salon) return reply.status(404).send({ message: 'Salão não encontrado.' });
 
     const professionalId = data.professionalId || current.professionalId;
-    if (data.professionalId) {
-      const professional = await prisma.professional.findFirst({
-        where: { id: data.professionalId, salonId: tenant.salonId, active: true }
-      });
-      if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
-      if (!professionalCanPerform(professional, current.service.id)) {
-        return reply.status(409).send({ message: `${professional.name} não está configurado para executar ${current.service.name}.` });
-      }
+    const professional = await prisma.professional.findFirst({
+      where: { id: professionalId, salonId: tenant.salonId, active: true }
+    });
+    if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
+    if (!professionalCanPerform(professional, current.service.id)) {
+      return reply.status(409).send({ message: `${professional.name} não está configurado para executar ${current.service.name}.` });
     }
 
     const start = data.startTime ? new Date(data.startTime) : current.startTime;
     const end = new Date(start.getTime() + current.service.durationMin * 60_000);
+
+    if (!bookingFitsBusinessWindow(salon.openingHours, start, current.service.durationMin)
+      || !bookingFitsProfessionalSchedule({ professional, openingHours: salon.openingHours, start, end })) {
+      return reply.status(409).send({ message: 'O novo horário fica fora da jornada disponível deste profissional.' });
+    }
 
     const conflict = await prisma.appointment.findFirst({
       where: {
