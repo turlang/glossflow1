@@ -34,7 +34,18 @@ export function WhatsAppAgentTester({ setPage }) {
         method: 'POST',
         body: JSON.stringify({ phone, clientName, message: text })
       });
-      setChat((items) => [...items, { role: 'agent', text: result.answer }]);
+      setChat((items) => [...items, {
+        role: 'agent',
+        text: result.answer,
+        provider: result.providerLabel || result.provider,
+        model: result.model
+      }]);
+      setStatus((current) => current ? {
+        ...current,
+        aiProvider: result.provider || current.aiProvider,
+        aiProviderLabel: result.providerLabel || current.aiProviderLabel,
+        aiModel: result.model || current.aiModel
+      } : current);
     } catch (error) {
       setFeedback(error.message);
     } finally {
@@ -52,8 +63,12 @@ export function WhatsAppAgentTester({ setPage }) {
     }
   }
 
+  const providerLabel = status?.aiProviderLabel || (status?.aiProvider === 'groq' ? 'Groq' : 'OpenAI');
   const checks = status ? [
-    ['OpenAI', status.openaiConfigured],
+    [`IA · ${providerLabel}`, status.aiConfigured ?? status.openaiConfigured],
+    ['Módulo WhatsApp', status.modules?.whatsapp],
+    ['Módulo IA', status.modules?.ai],
+    ['Módulo Agenda', status.modules?.agenda],
     ['Token WhatsApp', status.whatsappTokenConfigured],
     ['Phone Number ID', status.phoneNumberIdConfigured],
     ['Verify Token', status.webhookVerifyTokenConfigured],
@@ -76,6 +91,13 @@ export function WhatsAppAgentTester({ setPage }) {
           </div>
           <button className="secondary" type="button" onClick={() => setPage('admin')}>Voltar ao painel</button>
         </div>
+
+        {status && (
+          <div className="panel-help" style={{ marginTop: 16, padding: 14, borderRadius: 14 }}>
+            <strong>Motor de IA:</strong> {providerLabel} &nbsp;•&nbsp; <strong>Modelo:</strong> <code>{status.aiModel || 'não informado'}</code>
+          </div>
+        )}
+
         <div className="mini-stats full-span" style={{ marginTop: 18 }}>
           {checks.map(([label, ok]) => (
             <div key={label}><span>{label}</span><strong>{ok ? '✓ OK' : '○ pendente'}</strong></div>
@@ -112,7 +134,9 @@ export function WhatsAppAgentTester({ setPage }) {
             {chat.map((item, index) => (
               <div key={`${item.role}-${index}`} style={{ justifySelf: item.role === 'client' ? 'end' : 'start', maxWidth: '88%' }}>
                 <div className={item.role === 'client' ? 'feedback' : 'panel-help'} style={{ padding: 14, borderRadius: 16, margin: 0, whiteSpace: 'pre-wrap' }}>
-                  <strong>{item.role === 'client' ? 'Cliente' : 'Agente'}</strong><br />{item.text}
+                  <strong>{item.role === 'client' ? 'Cliente' : 'Agente'}</strong>
+                  {item.role === 'agent' && item.provider && <small style={{ display: 'block', opacity: .75, marginTop: 2 }}>{item.provider}{item.model ? ` · ${item.model}` : ''}</small>}
+                  <br />{item.text}
                 </div>
               </div>
             ))}
