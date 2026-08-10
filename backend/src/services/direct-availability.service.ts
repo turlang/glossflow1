@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { filterProfessionalsForService } from './professional-capability.service';
 
 type AvailabilitySalon = {
   id: string;
@@ -145,11 +146,12 @@ async function slotsForService(input: {
   service: ServiceRecord;
   date: string;
 }) {
-  const professionals = await prisma.professional.findMany({
+  const allProfessionals = await prisma.professional.findMany({
     where: { salonId: input.salon.id, active: true },
     orderBy: { name: 'asc' },
-    select: { id: true, name: true }
+    select: { id: true, name: true, servicesConfigured: true, serviceIds: true }
   });
+  const professionals = filterProfessionalsForService(allProfessionals, input.service.id);
 
   if (!professionals.length) {
     return { service: input.service.name, slots: [] as Array<{ professional: string; displayTime: string }> };
@@ -202,7 +204,7 @@ async function formatAvailability(salon: AvailabilitySalon, services: ServiceRec
   const results = await Promise.all(services.slice(0, 3).map((service) => slotsForService({ salon, service, date })));
   const blocks = results.map((result) => {
     if (!result.slots.length) {
-      return `Para ${result.service} em ${dateLabel(date)}, não encontrei horários livres no momento.`;
+      return `Para ${result.service} em ${dateLabel(date)}, não encontrei profissionais habilitados com horários livres no momento.`;
     }
 
     const lines = result.slots.map((slot) => `• ${slot.displayTime} — ${slot.professional}`).join('\n');
