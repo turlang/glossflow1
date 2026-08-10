@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { normalizePhone, saveWhatsAppMessage } from './whatsapp-agent.service';
-import { sendWhatsAppMessage } from './whatsapp.service';
+import { sendWhatsAppMessage, sendWhatsAppTemplateMessage } from './whatsapp.service';
 
 const MANAGEMENT_RESOURCE = 'AppointmentManageToken';
 const NOTIFICATION_RESOURCE = 'OperationalNotification';
@@ -233,8 +233,17 @@ async function registerWhatsAppDelivery(input: {
   message: string;
   appointmentId: string;
   contextTitle: string;
+  templateName?: string;
+  templateParameters?: Array<string | number>;
 }) {
-  const result = await sendWhatsAppMessage({ phone: input.clientPhone, message: input.message });
+  const result = input.templateName
+    ? await sendWhatsAppTemplateMessage({
+        phone: input.clientPhone,
+        templateName: input.templateName,
+        bodyParameters: input.templateParameters || []
+      })
+    : await sendWhatsAppMessage({ phone: input.clientPhone, message: input.message });
+
   const providerData = result as { data?: { messages?: Array<{ id?: string }> } };
   if (result.ok) {
     await saveWhatsAppMessage({
@@ -247,11 +256,13 @@ async function registerWhatsAppDelivery(input: {
     return { ok: true as const, provider: result.provider || 'whatsapp' };
   }
 
+  const detail = result as Record<string, unknown>;
+  const providerReason = String(detail.errorMessage || detail.message || detail.code || '').trim();
   await createOperationalNotification({
     salonId: input.salonId,
     type: 'WHATSAPP_DELIVERY_FAILED',
     title: 'Falha ao enviar WhatsApp',
-    message: `${input.contextTitle}. O agendamento continua válido, mas a mensagem automática para o cliente não foi entregue.`,
+    message: `${input.contextTitle}. O agendamento continua válido, mas a mensagem automática para o cliente não foi entregue.${providerReason ? ` Meta/provider: ${providerReason}` : ''}`,
     appointmentId: input.appointmentId,
     severity: 'WARNING'
   });
@@ -289,7 +300,17 @@ export async function notifyAppointmentCreated(input: {
     clientPhone: normalizePhone(input.clientPhone),
     message,
     appointmentId: input.appointmentId,
-    contextTitle: `Confirmação de ${input.clientName}`
+    contextTitle: `Confirmação de ${input.clientName}`,
+    templateName: process.env.WHATSAPP_TEMPLATE_APPOINTMENT_CONFIRMED || undefined,
+    templateParameters: [
+      input.clientName,
+      input.serviceName,
+      when,
+      input.professionalName,
+      hours,
+      input.managementUrl,
+      input.salonName
+    ]
   });
 }
 
@@ -323,6 +344,14 @@ export async function notifyAppointmentCancelled(input: {
     clientPhone: normalizePhone(input.clientPhone),
     message,
     appointmentId: input.appointmentId,
-    contextTitle: `Confirmação de cancelamento de ${input.clientName}`
+    contextTitle: `Confirmação de cancelamento de ${input.clientName}`,
+    templateName: process.env.WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED || undefined,
+    templateParameters: [
+      input.clientName,
+      input.serviceName,
+      when,
+      input.professionalName,
+      input.salonName
+    ]
   });
 }
