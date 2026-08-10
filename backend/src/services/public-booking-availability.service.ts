@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { filterProfessionalsForService } from './professional-capability.service';
+import { professionalWorkWindows, salonOpeningWindow, subtractBusyFromWindows } from './professional-schedule.service';
 
 type SalonWindow = {
   id: string;
@@ -28,19 +29,6 @@ function localOffset() {
 function intervalMinutes() {
   const value = Number(process.env.BOOKING_SLOT_INTERVAL_MINUTES || 30);
   return Number.isFinite(value) && value >= 10 && value <= 120 ? value : 30;
-}
-
-function parseOpeningHours(text: string) {
-  const matches = [...String(text || '').matchAll(/\b([01]?\d|2[0-3])(?::([0-5]\d))?\s*h?\b/gi)]
-    .map((match) => ({ hour: Number(match[1]), minute: Number(match[2] || 0) }));
-
-  if (matches.length >= 2) {
-    const startMin = matches[0].hour * 60 + matches[0].minute;
-    const endMin = matches[1].hour * 60 + matches[1].minute;
-    if (startMin < endMin) return { startMin, endMin };
-  }
-
-  return { startMin: 9 * 60, endMin: 19 * 60 };
 }
 
 function asDate(date: string, minutes: number) {
@@ -82,44 +70,6 @@ function datesInMonth(month: string) {
   return dates;
 }
 
-function closedByDefault(date: string) {
-  return new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
-}
-
-function mergeBusy(intervals: Array<{ start: Date; end: Date }>, dayStart: Date, dayEnd: Date) {
-  const normalized = intervals
-    .map(({ start, end }) => ({
-      start: new Date(Math.max(start.getTime(), dayStart.getTime())),
-      end: new Date(Math.min(end.getTime(), dayEnd.getTime()))
-    }))
-    .filter(({ start, end }) => start < end)
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-
-  const merged: Array<{ start: Date; end: Date }> = [];
-  for (const interval of normalized) {
-    const last = merged[merged.length - 1];
-    if (!last || interval.start > last.end) merged.push(interval);
-    else if (interval.end > last.end) last.end = interval.end;
-  }
-  return merged;
-}
-
-function freeBlocks(date: string, busy: Array<{ start: Date; end: Date }>, opening: { startMin: number; endMin: number }) {
-  if (closedByDefault(date)) return [];
-  const dayStart = asDate(date, opening.startMin);
-  const dayEnd = asDate(date, opening.endMin);
-  const merged = mergeBusy(busy, dayStart, dayEnd);
-  const blocks: Array<{ start: Date; end: Date }> = [];
-  let cursor = dayStart;
-
-  for (const interval of merged) {
-    if (cursor < interval.start) blocks.push({ start: cursor, end: interval.start });
-    if (interval.end > cursor) cursor = interval.end;
-  }
-  if (cursor < dayEnd) blocks.push({ start: cursor, end: dayEnd });
-  return blocks;
-}
-
 function capacityForBlocks(blocks: Array<{ start: Date; end: Date }>, durationMin: number) {
   const durationMs = durationMin * 60_000;
   return blocks.reduce((total, block) => total + Math.floor((block.end.getTime() - block.start.getTime()) / durationMs), 0);
@@ -152,9 +102,7 @@ function slotOptions(date: string, blocks: Array<{ start: Date; end: Date }>, du
         continue;
       }
       if (end > block.end) break;
-      if (candidate > new Date()) {
-        options.push({ startTime: candidate.toISOString(), label: format.format(candidate) });
-      }
+      if (candidate > new Date()) options.push({ startTime: candidate.toISOString(), label: format.format(candidate) });
       candidateMin += interval;
     }
   }
@@ -168,6 +116,15 @@ function busyForProfessional(appointments: BusyInterval[], professionalId: strin
   return appointments
     .filter((appointment) => appointment.professionalId === professionalId && appointment.startTime < dayEnd && appointment.endTime > dayStart)
     .map((appointment) => ({ start: appointment.startTime, end: appointment.endTime }));
+}
+
+function publicProfessional(professional: any) {
+  return {
+    id: professional.id,
+    name: professional.name,
+    specialty: professional.specialty,
+    photoUrl: professional.photoUrl
+  };
 }
 
 export async function publicBookingAvailability(input: AvailabilityInput) {
@@ -186,13 +143,15 @@ export async function publicBookingAvailability(input: AvailabilityInput) {
       specialty: true,
       photoUrl: true,
       servicesConfigured: true,
-      serviceIds: true
+      serviceIds: true,
+      workScheduleConfigured: true,
+      weeklySchedule: true,
+      timeBlocks: true
     }
   });
 
   const professionals = filterProfessionalsForService(allProfessionals, service.id)
-    .filter((professional) => !input.professionalId || professional.id === input.professionalId)
-    .map(({ serviceIds: _serviceIds, servicesConfigured: _servicesConfigured, ...professional }) => professional);
+    .filter((professional) => !input.professionalId || professional.id === input.professionalId);
 
   const referenceMonth = input.month || input.date?.slice(0, 7) || todayBusinessDate().slice(0, 7);
   const { start, endExclusive } = monthBounds(referenceMonth);
@@ -209,16 +168,20 @@ export async function publicBookingAvailability(input: AvailabilityInput) {
       })
     : [];
 
-  const opening = parseOpeningHours(input.salon.openingHours);
   const today = todayBusinessDate();
+  const freeFor = (professional: typeof professionals[number], date: string) => {
+    if (date < today) return [];
+    const workWindows = professionalWorkWindows(professional, input.salon.openingHours, date);
+    return subtractBusyFromWindows(workWindows, busyForProfessional(appointments, professional.id, date));
+  };
 
   if (input.date) {
     const date = input.date;
     const detail = professionals.map((professional) => {
-      const blocks = date < today ? [] : freeBlocks(date, busyForProfessional(appointments, professional.id, date), opening);
+      const blocks = freeFor(professional, date);
       const capacity = capacityForBlocks(blocks, service.durationMin);
       return {
-        ...professional,
+        ...publicProfessional(professional),
         capacity,
         slots: slotOptions(date, blocks, service.durationMin)
       };
@@ -236,7 +199,7 @@ export async function publicBookingAvailability(input: AvailabilityInput) {
 
   const days = datesInMonth(referenceMonth).map((date) => {
     const professionalCapacity = professionals.map((professional) => {
-      const blocks = date < today ? [] : freeBlocks(date, busyForProfessional(appointments, professional.id, date), opening);
+      const blocks = freeFor(professional, date);
       return {
         professionalId: professional.id,
         professionalName: professional.name,
@@ -256,7 +219,7 @@ export async function publicBookingAvailability(input: AvailabilityInput) {
     month: referenceMonth,
     service,
     intervalMin: intervalMinutes(),
-    professionals,
+    professionals: professionals.map(publicProfessional),
     days
   };
 }
@@ -272,6 +235,10 @@ export function bookingFitsBusinessWindow(openingHours: string, start: Date, dur
   const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
   const minute = Number(parts.find((part) => part.type === 'minute')?.value || 0);
   const startMin = hour * 60 + minute;
-  const opening = parseOpeningHours(openingHours);
-  return startMin >= opening.startMin && startMin + durationMin <= opening.endMin;
+  const opening = salonOpeningWindow(openingHours);
+  const [openingHour, openingMinute] = opening.start.split(':').map(Number);
+  const [closingHour, closingMinute] = opening.end.split(':').map(Number);
+  const openingMin = openingHour * 60 + openingMinute;
+  const closingMin = closingHour * 60 + closingMinute;
+  return startMin >= openingMin && startMin + durationMin <= closingMin;
 }
