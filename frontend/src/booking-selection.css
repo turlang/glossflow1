@@ -2,6 +2,7 @@
  * Feedback visual forte para o fluxo de agendamento público.
  * O componente já mantém os estados `.is-selected`; este arquivo torna a
  * escolha inequívoca em qualquer tema/identidade white-label.
+ * Redeploy marker: Vercel build limit liberado.
  */
 .booking-experience .booking-service,
 .booking-experience .booking-pro-chip,
