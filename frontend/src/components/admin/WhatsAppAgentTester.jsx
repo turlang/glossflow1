@@ -50,7 +50,6 @@ export function WhatsAppAgentTester({ setPage }) {
         aiModel: result.model || current.aiModel
       } : current);
     } catch (error) {
-      // Não deixa uma tentativa que falhou parecendo mensagem enviada com sucesso.
       setChat((items) => items.filter((item) => item.id !== pendingId));
       setMessage(text);
       setFeedback(error.message);
@@ -103,6 +102,7 @@ export function WhatsAppAgentTester({ setPage }) {
         {status && (
           <div className="panel-help" style={{ marginTop: 16, padding: 14, borderRadius: 14 }}>
             <strong>Motor de IA:</strong> {providerLabel} &nbsp;•&nbsp; <strong>Modelo:</strong> <code>{status.aiModel || 'não informado'}</code>
+            {status.backendRevision && <>&nbsp;•&nbsp; <strong>Backend:</strong> <code>{status.backendRevision}</code></>}
           </div>
         )}
 
