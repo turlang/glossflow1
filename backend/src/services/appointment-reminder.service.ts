@@ -14,6 +14,12 @@ function reminderAction(kind: ReminderKind) {
   return `REMINDER_${kind}_SENT`;
 }
 
+function twilioTrialContentSid() {
+  const isTwilioTrial = String(process.env.WHATSAPP_PROVIDER || '').toLowerCase() === 'twilio'
+    && process.env.TWILIO_TRIAL_MODE === 'true';
+  return isTwilioTrial ? String(process.env.TWILIO_TRIAL_CONTENT_SID || '').trim() : '';
+}
+
 async function alreadySent(appointmentId: string, salonId: string, kind: ReminderKind) {
   const record = await prisma.auditLog.findFirst({
     where: {
@@ -82,26 +88,27 @@ async function deliverReminder(input: {
     ? `Lembrete de agendamento ✨\n\nOlá, ${input.clientName}! Seu horário no ${input.salonName} está reservado:\n${input.serviceName}\n📅 ${when}\nProfissional: ${input.professionalName}\n\nResponda CONFIRMAR para confirmar sua presença ou CANCELAR para cancelar. Cancelamentos online são permitidos com no mínimo ${minHours} horas de antecedência.`
     : `Seu horário está chegando ⏰\n\n${input.serviceName}\n📅 ${when}\nProfissional: ${input.professionalName}\n\nSe precisar de ajuda, fale com o ${input.salonName}.`;
 
-  const templateName = input.kind === '24H'
+  const configuredTemplateName = input.kind === '24H'
     ? process.env.WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER_24H
     : process.env.WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER_2H;
+  const effectiveTemplateName = configuredTemplateName || twilioTrialContentSid() || undefined;
   const templateParameters = input.kind === '24H'
     ? [input.clientName, input.salonName, input.serviceName, when, input.professionalName, minHours]
     : [input.clientName, input.serviceName, when, input.professionalName, input.salonName];
 
-  const result = templateName
+  const result = effectiveTemplateName
     ? await sendWhatsAppTemplateMessage({
         phone: normalizePhone(input.clientPhone),
-        templateName,
+        templateName: effectiveTemplateName,
         bodyParameters: templateParameters
       })
     : await sendWhatsAppMessage({ phone: normalizePhone(input.clientPhone), message });
 
-  const providerData = result as { data?: { messages?: Array<{ id?: string }> } };
+  const providerData = result as { messageId?: string; data?: { messages?: Array<{ id?: string }>; sid?: string } };
   if (result.ok) {
     await saveWhatsAppMessage({
       salonId: input.salonId,
-      providerMessageId: providerData.data?.messages?.[0]?.id,
+      providerMessageId: providerData.messageId || providerData.data?.messages?.[0]?.id || providerData.data?.sid,
       phone: input.clientPhone,
       direction: 'OUT',
       text: message
@@ -113,7 +120,7 @@ async function deliverReminder(input: {
       salonId: input.salonId,
       type: 'WHATSAPP_DELIVERY_FAILED',
       title: 'Lembrete não entregue',
-      message: `Não consegui entregar o lembrete de ${input.clientName} para ${when}. O agendamento continua confirmado.${providerReason ? ` Meta/provider: ${providerReason}` : ''}`,
+      message: `Não consegui entregar o lembrete de ${input.clientName} para ${when}. O agendamento continua confirmado.${providerReason ? ` Provider: ${providerReason}` : ''}`,
       appointmentId: input.appointmentId,
       clientName: input.clientName,
       severity: 'WARNING'
