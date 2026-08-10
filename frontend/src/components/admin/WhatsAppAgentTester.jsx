@@ -25,20 +25,23 @@ export function WhatsAppAgentTester({ setPage }) {
     event.preventDefault();
     const text = message.trim();
     if (!text || sending) return;
+
+    const pendingId = `client-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setMessage('');
     setFeedback('');
-    setChat((items) => [...items, { role: 'client', text }]);
+    setChat((items) => [...items, { id: pendingId, role: 'client', text }]);
     setSending(true);
+
     try {
       const result = await request('/admin/whatsapp/agent-test', {
         method: 'POST',
         body: JSON.stringify({ phone, clientName, message: text })
       });
       setChat((items) => [...items, {
-        role: 'agent',
+        id: `salon-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        role: 'salon',
         text: result.answer,
-        provider: result.providerLabel || result.provider,
-        model: result.model
+        salonName: result.salonName || status?.salon?.name || 'Salão'
       }]);
       setStatus((current) => current ? {
         ...current,
@@ -47,6 +50,9 @@ export function WhatsAppAgentTester({ setPage }) {
         aiModel: result.model || current.aiModel
       } : current);
     } catch (error) {
+      // Não deixa uma tentativa que falhou parecendo mensagem enviada com sucesso.
+      setChat((items) => items.filter((item) => item.id !== pendingId));
+      setMessage(text);
       setFeedback(error.message);
     } finally {
       setSending(false);
@@ -57,7 +63,7 @@ export function WhatsAppAgentTester({ setPage }) {
     setFeedback('');
     try {
       await request(`/admin/whatsapp/handoffs/${encodeURIComponent(phone)}/close`, { method: 'POST' });
-      setFeedback('Handoff encerrado. A IA pode voltar a responder este telefone.');
+      setFeedback('Atendimento humano encerrado. O salão pode voltar a responder automaticamente este telefone.');
     } catch (error) {
       setFeedback(error.message);
     }
@@ -75,12 +81,14 @@ export function WhatsAppAgentTester({ setPage }) {
     ['Assinatura Meta', status.webhookSignatureConfigured]
   ] : [];
 
+  const salonName = status?.salon?.name || 'Salão';
+
   return (
     <main className="container" style={{ maxWidth: 1120 }}>
       <SectionTitle
-        label="WhatsApp Agent Lab"
-        title="Teste o atendente antes de colocar no número real"
-        text="Este playground usa o mesmo motor de IA e as mesmas regras de agenda do webhook. Nenhuma mensagem é enviada para a Meta nesta tela."
+        label="WhatsApp · Homologação"
+        title={`Teste o atendimento do ${salonName}`}
+        text="Esta prévia simula como o salão responderá no WhatsApp usando os dados reais de serviços e agenda. Nenhuma mensagem é enviada para a Meta nesta tela."
       />
 
       <section className="panel-card" style={{ marginBottom: 24 }}>
@@ -121,8 +129,8 @@ export function WhatsAppAgentTester({ setPage }) {
               required
             />
           </label>
-          <button className="primary full" type="submit" disabled={sending}>{sending ? 'Consultando agente...' : 'Enviar para o agente'}</button>
-          <button className="secondary full" type="button" onClick={closeHandoff}>Encerrar handoff deste telefone</button>
+          <button className="primary full" type="submit" disabled={sending}>{sending ? 'Consultando o salão...' : 'Enviar mensagem'}</button>
+          <button className="secondary full" type="button" onClick={closeHandoff}>Encerrar atendimento humano deste telefone</button>
           {feedback && <p className="feedback full">{feedback}</p>}
         </form>
 
@@ -132,10 +140,9 @@ export function WhatsAppAgentTester({ setPage }) {
           <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
             {chat.length === 0 && <p className="panel-help">Comece perguntando por um serviço, preço ou horário.</p>}
             {chat.map((item, index) => (
-              <div key={`${item.role}-${index}`} style={{ justifySelf: item.role === 'client' ? 'end' : 'start', maxWidth: '88%' }}>
+              <div key={item.id || `${item.role}-${index}`} style={{ justifySelf: item.role === 'client' ? 'end' : 'start', maxWidth: '88%' }}>
                 <div className={item.role === 'client' ? 'feedback' : 'panel-help'} style={{ padding: 14, borderRadius: 16, margin: 0, whiteSpace: 'pre-wrap' }}>
-                  <strong>{item.role === 'client' ? 'Cliente' : 'Agente'}</strong>
-                  {item.role === 'agent' && item.provider && <small style={{ display: 'block', opacity: .75, marginTop: 2 }}>{item.provider}{item.model ? ` · ${item.model}` : ''}</small>}
+                  <strong>{item.role === 'client' ? 'Cliente' : (item.salonName || salonName)}</strong>
                   <br />{item.text}
                 </div>
               </div>
