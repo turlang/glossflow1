@@ -49,6 +49,80 @@ function serviceMentioned(text: string, serviceNames: string[]) {
   });
 }
 
+const SERVICE_GROUPS = [
+  { label: 'corte de cabelo', request: ['corte', 'cortar', 'cabelo'], catalog: ['corte'] },
+  { label: 'unhas/manicure', request: ['unha', 'unhas', 'manicure', 'pedicure'], catalog: ['unha', 'manicure', 'pedicure'] },
+  { label: 'escova', request: ['escova', 'escovar'], catalog: ['escova'] },
+  { label: 'coloração', request: ['coloracao', 'colorir', 'pintar'], catalog: ['coloracao', 'color'] },
+  { label: 'hidratação', request: ['hidratacao', 'hidratar'], catalog: ['hidratacao'] },
+  { label: 'mechas', request: ['mecha', 'mechas', 'luzes'], catalog: ['mecha', 'luzes'] },
+  { label: 'progressiva', request: ['progressiva', 'alisamento', 'alisar'], catalog: ['progressiva', 'alisamento'] },
+  { label: 'sobrancelhas', request: ['sobrancelha', 'sobrancelhas', 'design de sobrancelha'], catalog: ['sobrancelha'] },
+  { label: 'cílios', request: ['cilio', 'cilios', 'extensao de cilios'], catalog: ['cilio'] },
+  { label: 'maquiagem', request: ['maquiagem', 'maquiar'], catalog: ['maquiagem'] },
+  { label: 'depilação', request: ['depilacao', 'depilar'], catalog: ['depilacao'] },
+  { label: 'massagem', request: ['massagem', 'massagear'], catalog: ['massagem'] }
+];
+
+function containsAny(value: string, terms: string[]) {
+  return terms.some((term) => {
+    const escaped = normalize(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`).test(value);
+  });
+}
+
+function looksLikeServiceRequest(text: string) {
+  const value = normalize(text);
+  return /\b(quero|queria|gostaria|preciso|agendar|marcar|fazer|faz|fazem|tem|oferece|oferecem|trabalha|trabalham|cortar|pintar|hidratar|escovar|alisar)\b/.test(value);
+}
+
+function formatMoney(value: number) {
+  return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/**
+ * Quando o cliente pede explicitamente um serviço que o salão não oferece,
+ * responde com o catálogo real em vez de abrir handoff ou deixar o modelo
+ * improvisar. Retorna null quando todos os serviços reconhecidos existem.
+ */
+export async function unavailableServiceReply(salonId: string, text: string): Promise<string | null> {
+  if (!looksLikeServiceRequest(text)) return null;
+
+  const value = normalize(text);
+  const requestedGroups = SERVICE_GROUPS.filter((group) => containsAny(value, group.request));
+  if (!requestedGroups.length) return null;
+
+  const services = await prisma.service.findMany({
+    where: { salonId, active: true },
+    select: { name: true, price: true, durationMin: true },
+    orderBy: { name: 'asc' }
+  });
+
+  if (!services.length) {
+    return 'No momento ainda não há serviços ativos cadastrados para atendimento. Assim que o catálogo for configurado, consigo informar valores e horários por aqui.';
+  }
+
+  const catalogNames = services.map((service) => normalize(service.name));
+  const unavailable = requestedGroups.filter((group) =>
+    !catalogNames.some((name) => containsAny(name, group.catalog))
+  );
+
+  if (!unavailable.length) return null;
+
+  const unavailableLabel = unavailable.map((group) => group.label).join(', ');
+  const availableRequested = requestedGroups.filter((group) => !unavailable.includes(group));
+  const availablePrefix = availableRequested.length
+    ? `Consigo te atender com ${availableRequested.map((group) => group.label).join(', ')}, mas não encontrei ${unavailableLabel} entre os serviços disponíveis.\n\n`
+    : `No momento não encontrei ${unavailableLabel} entre os serviços disponíveis.\n\n`;
+
+  const catalog = services
+    .slice(0, 10)
+    .map((service) => `• ${service.name} — ${formatMoney(service.price)} · ${service.durationMin} min`)
+    .join('\n');
+
+  return `${availablePrefix}Hoje o salão atende:\n${catalog}\n\nSe quiser, me diga qual deles você prefere e eu verifico os horários disponíveis.`;
+}
+
 /**
  * Intercepta apenas perguntas genéricas sobre disponibilidade.
  * A consulta real da agenda exige serviço + data porque a duração do serviço
