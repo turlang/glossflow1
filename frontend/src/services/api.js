@@ -1,6 +1,7 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3333').replace(/\/+$/, '');
 
 const AUTH_EXPIRED_EVENT = 'glossflow:auth-expired';
+const BOOKING_CONFIRMED_EVENT = 'glossflow:booking-confirmed';
 
 function publicTenantHeaders() {
   if (typeof window === 'undefined') return {};
@@ -8,15 +9,6 @@ function publicTenantHeaders() {
   const params = new URLSearchParams(window.location.search);
   const explicitSlug = (params.get('salon') || import.meta.env.VITE_SALON_SLUG || '').trim().toLowerCase();
   const hostname = window.location.hostname.toLowerCase().replace(/^www\./, '');
-
-  /**
-   * Em domínios técnicos da Vercel o backend deve usar o salão padrão (ou o
-   * slug explícito). O hostname só precisa ser enviado quando ele representa
-   * um domínio/subdomínio white-label real do cliente.
-   *
-   * Além de evitar preflight CORS desnecessário, isso mantém compatibilidade
-   * com backends já publicados que ainda não reconhecem X-Salon-Host.
-   */
   const isPlatformHost = hostname === 'localhost'
     || hostname === '127.0.0.1'
     || hostname.endsWith('.vercel.app');
@@ -67,16 +59,27 @@ function isAuthBootstrapPath(path) {
   return path === '/auth/login' || path === '/auth/refresh';
 }
 
-/**
- * Cliente HTTP centralizado com refresh token e contexto público multi-tenant.
- * A mesma aplicação pode servir vários salões por ?salon=slug, subdomínio ou
- * domínio próprio sem duplicar o projeto.
- */
+function persistBookingConfirmation(path, options, data) {
+  const method = String(options?.method || 'GET').toUpperCase();
+  if (path !== '/appointments' || method !== 'POST' || !data?.confirmation?.confirmed) return;
+  const receipt = {
+    appointmentId: data.id,
+    startTime: data.startTime,
+    protocol: data.confirmation.protocol,
+    cancellationMinHours: data.confirmation.cancellationMinHours,
+    managementUrl: data.confirmation.managementUrl,
+    managementToken: data.confirmation.managementToken,
+    clientNotification: data.confirmation.clientNotification,
+    savedAt: new Date().toISOString()
+  };
+  localStorage.setItem('glossflow.lastBooking', JSON.stringify(receipt));
+  window.dispatchEvent(new CustomEvent(BOOKING_CONFIRMED_EVENT, { detail: receipt }));
+}
+
+/** Cliente HTTP centralizado com refresh token e contexto público multi-tenant. */
 export async function request(path, options = {}, retry = true) {
   let token = localStorage.getItem('glossflow.token');
 
-  // Se o access token sumiu, mas ainda existe refresh token, tenta restaurar a
-  // sessão antes de disparar uma rota administrativa sem Authorization.
   if (!token && retry && !isAuthBootstrapPath(path) && localStorage.getItem('glossflow.refreshToken')) {
     token = await refreshAccessToken();
     if (!token) clearSession();
@@ -107,6 +110,7 @@ export async function request(path, options = {}, retry = true) {
     throw new Error(apiErrorMessage(data));
   }
 
+  if (typeof window !== 'undefined') persistBookingConfirmation(path, options, data);
   return data;
 }
 
