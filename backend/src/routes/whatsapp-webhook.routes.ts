@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
-import { availabilityClarification } from '../services/agent-intent.service';
+import { availabilityClarification, unavailableServiceReply } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
 import { hasSalonModule } from '../services/module-access.service';
 import {
@@ -81,7 +81,7 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
         }
 
         if (!await agentModulesEnabled(salon.id)) {
-          app.log.info({ salonId: salon.id }, 'Webhook ignorado: agente WhatsApp/IA/Agenda não habilitado para este salão.');
+          app.log.info({ salonId: salon.id }, 'Webhook ignorado: atendimento WhatsApp/IA/Agenda não habilitado para este salão.');
           continue;
         }
 
@@ -91,9 +91,10 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
 
         if (await hasOpenHumanHandoff(salon.id, from)) continue;
 
-        const clarification = text ? await availabilityClarification(salon.id, text) : null;
+        const unavailable = text ? await unavailableServiceReply(salon.id, text) : null;
+        const clarification = text && !unavailable ? await availabilityClarification(salon.id, text) : null;
         const rawReplyText = text
-          ? (clarification || await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text }))
+          ? (unavailable || clarification || await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text }))
           : 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
         const guarded = await guardAgentReply({ salonId: salon.id, phone: from, userText: text, replyText: rawReplyText });
         const replyText = guarded.replyText;
@@ -104,7 +105,7 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
         await saveWhatsAppMessage({ salonId: salon.id, providerMessageId: outboundId, phone: from, direction: 'OUT', text: replyText });
 
         if (!result.ok) {
-          app.log.error({ salonId: salon.id, phone: from, result }, 'Falha ao responder mensagem do agente WhatsApp.');
+          app.log.error({ salonId: salon.id, phone: from, result }, 'Falha ao responder mensagem do atendimento WhatsApp.');
         }
       }
     }
