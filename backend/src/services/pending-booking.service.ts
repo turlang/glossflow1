@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { professionalCanPerform } from './professional-capability.service';
 
 function norm(v: string) {
   return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -71,6 +72,9 @@ export async function confirmPendingBooking(input: { salonId: string; salonName:
   const service = services.find((x) => norm(x.name) === norm(summary.service));
   const professional = professionals.find((x) => norm(x.name) === norm(summary.professional));
   if (!service || !professional) return { handled: true, replyText: 'Não consegui validar esse resumo. Escolha o horário novamente, por favor.' };
+  if (!professionalCanPerform(professional, service.id)) {
+    return { handled: true, replyText: `${professional.name} não está mais habilitado para executar ${service.name}. Posso consultar outro profissional para você.` };
+  }
 
   const start = summary.start;
   if (start.getTime() <= Date.now()) return { handled: true, replyText: 'Esse horário já passou ou não é mais válido. Posso consultar novos horários para você.' };
