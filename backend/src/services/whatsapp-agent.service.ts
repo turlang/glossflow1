@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { AIResponse, getAIRuntimeConfig, requestAIResponse } from './ai-provider.service';
 
 type AgentSalon = {
   id: string;
@@ -18,17 +19,6 @@ type ResponseFunctionCall = {
   call_id: string;
   name: string;
   arguments: string;
-};
-
-type OpenAIResponse = {
-  id: string;
-  output?: Array<{
-    type: string;
-    call_id?: string;
-    name?: string;
-    arguments?: string;
-    content?: Array<{ type: string; text?: string }>;
-  }>;
 };
 
 export function normalizePhone(value: string) {
@@ -463,21 +453,7 @@ async function runTool(name: string, args: Record<string, unknown>, salon: Agent
   }
 }
 
-async function openAIRequest(payload: Record<string, unknown>): Promise<OpenAIResponse> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error('OPENAI_API_KEY não configurada.');
-
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json() as OpenAIResponse & { error?: { message?: string } };
-  if (!response.ok) throw new Error(data.error?.message || `OpenAI respondeu HTTP ${response.status}.`);
-  return data;
-}
-
-function responseText(response: OpenAIResponse) {
+function responseText(response: AIResponse) {
   const parts: string[] = [];
   for (const item of response.output || []) {
     if (item.type !== 'message') continue;
@@ -488,7 +464,7 @@ function responseText(response: OpenAIResponse) {
   return parts.join('\n').trim();
 }
 
-function functionCalls(response: OpenAIResponse): ResponseFunctionCall[] {
+function functionCalls(response: AIResponse): ResponseFunctionCall[] {
   return (response.output || [])
     .filter((item) => item.type === 'function_call' && item.call_id && item.name)
     .map((item) => ({ type: 'function_call', call_id: String(item.call_id), name: String(item.name), arguments: String(item.arguments || '{}') }));
@@ -512,15 +488,23 @@ export async function answerWhatsAppMessage(input: {
   clientName?: string;
   text: string;
 }) {
+  const runtime = getAIRuntimeConfig();
   const history = await conversationHistory(input.salon.id, input.phone);
   const services = await listServices(input.salon.id);
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!runtime.configured) {
     if (/\b(humano|atendente|pessoa)\b/i.test(input.text)) {
       await openHumanHandoff(input.salon.id, input.phone, 'Solicitação direta sem IA configurada.');
     }
     return fallbackReply(input.salon, input.text, services);
   }
+
+  // O webhook/testador registra a mensagem recebida antes de chamar a IA.
+  // Remove a última cópia quando ela corresponde ao texto atual para não enviar
+  // a mesma pergunta duas vezes ao modelo.
+  const cleanHistory = [...history];
+  const last = cleanHistory[cleanHistory.length - 1];
+  if (last?.direction === 'IN' && last.text.trim() === input.text.trim()) cleanHistory.pop();
 
   const instructions = [
     `Você é o atendente virtual do salão ${input.salon.name}. Responda sempre em português do Brasil, de forma curta, cordial e natural para WhatsApp.`,
@@ -532,16 +516,15 @@ export async function answerWhatsAppMessage(input: {
     `Cliente atual: ${input.clientName || 'nome ainda não informado'}; telefone: ${normalizePhone(input.phone)}.`
   ].join('\n');
 
-  const inputMessages = history.map((message) => ({
+  const contextItems: Array<Record<string, unknown>> = cleanHistory.map((message) => ({
     role: message.direction === 'IN' ? 'user' : 'assistant',
     content: message.text
   }));
-  inputMessages.push({ role: 'user', content: input.text });
+  contextItems.push({ role: 'user', content: input.text });
 
-  let response = await openAIRequest({
-    model: process.env.OPENAI_MODEL || 'gpt-5',
+  let response = await requestAIResponse({
     instructions,
-    input: inputMessages,
+    input: contextItems,
     tools,
     tool_choice: 'auto',
     parallel_tool_calls: false
@@ -551,19 +534,23 @@ export async function answerWhatsAppMessage(input: {
     const calls = functionCalls(response);
     if (!calls.length) break;
 
-    const outputs = [];
+    // A Groq Responses API ainda não suporta previous_response_id. Conforme a
+    // documentação oficial, preservamos o estado reenviando o histórico e os
+    // itens de output da resposta anterior, seguido dos resultados das tools.
+    contextItems.push(...(response.output || []).map((item) => ({ ...item })));
+
+    const outputs: Array<Record<string, unknown>> = [];
     for (const call of calls) {
       let args: Record<string, unknown> = {};
       try { args = JSON.parse(call.arguments) as Record<string, unknown>; } catch { args = {}; }
       const result = await runTool(call.name, args, input.salon, input.phone);
       outputs.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result) });
     }
+    contextItems.push(...outputs);
 
-    response = await openAIRequest({
-      model: process.env.OPENAI_MODEL || 'gpt-5',
+    response = await requestAIResponse({
       instructions,
-      previous_response_id: response.id,
-      input: outputs,
+      input: contextItems,
       tools,
       tool_choice: 'auto',
       parallel_tool_calls: false
