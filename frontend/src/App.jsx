@@ -109,8 +109,12 @@ export default function App() {
 
   function toggleTheme() { setTheme((current) => current === 'dark' ? 'light' : 'dark'); }
 
-  async function loadPublicData() {
-    setLoading(true); setError('');
+  async function loadPublicData(options = {}) {
+    const silent = Boolean(options?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const [salonData, servicesData, professionalsData, portfolioData] = await Promise.all([
         request('/public/salon'), request('/services'), request('/professionals'), request('/portfolio')
@@ -150,10 +154,18 @@ export default function App() {
         } catch (adminError) {
           console.warn('Sessão administrativa indisponível:', adminError.message);
           localStorage.removeItem('glossflow.token'); localStorage.removeItem('glossflow.refreshToken'); setAuthToken(''); clearTenantAdminData(); setPage('login');
+          if (silent) throw adminError;
         }
       }
-    } catch (err) { setError(err.message || 'Não foi possível conectar à API.'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      if (!silent) setError(err.message || 'Não foi possível conectar à API.');
+      else throw err;
+    }
+    finally { if (!silent) setLoading(false); }
+  }
+
+  async function reloadBackofficeData() {
+    return loadPublicData({ silent: true });
   }
 
   useEffect(() => { loadPublicData(); }, [authToken, authRole]);
@@ -174,12 +186,12 @@ export default function App() {
       {!loading && !error && page === 'login' && <LoginPage setPage={setPage} onLogin={setAuthToken} />}
       {!loading && !error && page === 'platform-admin' && (isAuthenticated && isSuperAdmin ? <PlatformAdmin setPage={setPage} /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
       {!loading && !error && page === 'agent-test' && (isAuthenticated && !isSuperAdmin && canUseAgent ? <WhatsAppAgentTester setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="O agente precisa dos módulos WhatsApp e Inteligência Artificial habilitados." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
-      {!loading && !error && page === 'professional-services' && (isAuthenticated && !isSuperAdmin ? <ProfessionalCapabilitiesAdmin salon={backofficeSalon} services={services} professionals={professionals} reload={loadPublicData} setPage={setPage} /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
+      {!loading && !error && page === 'professional-services' && (isAuthenticated && !isSuperAdmin ? <ProfessionalCapabilitiesAdmin salon={backofficeSalon} services={services} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
       {!loading && !error && page === 'professional-schedule' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <ProfessionalScheduleAdmin setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="A jornada da equipe faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
-      {!loading && !error && page === 'operational-agenda' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <OperationalAgendaBoard appointments={appointments} professionals={professionals} reload={loadPublicData} setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="A agenda operacional faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
+      {!loading && !error && page === 'operational-agenda' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <OperationalAgendaBoard appointments={appointments} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="A agenda operacional faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
       {!loading && !error && page === 'smart-fit' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <SmartFitAdmin services={services} professionals={professionals} setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="O encaixe inteligente faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
       {!loading && !error && page === 'waitlist' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <WaitlistAdmin setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="A lista de espera faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
-      {!loading && !error && page === 'admin' && (isAuthenticated && !isSuperAdmin ? <AdminDashboard salon={backofficeSalon} services={services} professionals={professionals} portfolio={portfolio} appointments={appointments} inventory={inventory} users={users} clients={clients} financialEntries={financialEntries} commissions={commissions} loyalty={loyalty} subscription={subscription} whatsappTemplates={whatsappTemplates} insights={insights} reload={loadPublicData} setPage={setPage} theme={theme} toggleTheme={toggleTheme} /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
+      {!loading && !error && page === 'admin' && (isAuthenticated && !isSuperAdmin ? <AdminDashboard salon={backofficeSalon} services={services} professionals={professionals} portfolio={portfolio} appointments={appointments} inventory={inventory} users={users} clients={clients} financialEntries={financialEntries} commissions={commissions} loyalty={loyalty} subscription={subscription} whatsappTemplates={whatsappTemplates} insights={insights} reload={reloadBackofficeData} setPage={setPage} theme={theme} toggleTheme={toggleTheme} /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
     </div>
   );
 }
