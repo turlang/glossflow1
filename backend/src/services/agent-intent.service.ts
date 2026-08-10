@@ -187,7 +187,9 @@ export async function unavailableServiceDecision(salonId: string, text: string):
     .join('\n');
 
   const date = resolveDateReference(text);
-  const canContinue = availableServiceNames.length > 0 && isAvailabilityIntent(text) && Boolean(date);
+  // Serviço válido + data já informada = intenção suficiente de agendamento,
+  // mesmo que o cliente não use as palavras "agenda", "vaga" ou "horário".
+  const canContinue = availableServiceNames.length > 0 && Boolean(date);
   const intro = availableRequested.length
     ? `Consigo te atender com ${availableLabel}, mas não encontrei ${unavailableLabel} entre os serviços disponíveis.`
     : `No momento não encontrei ${unavailableLabel} entre os serviços disponíveis.`;
