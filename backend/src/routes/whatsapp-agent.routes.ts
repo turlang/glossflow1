@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { getAIRuntimeConfig } from '../services/ai-provider.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
 import {
@@ -24,54 +25,56 @@ async function getAgentEntitlements(salonId: string) {
 }
 
 function agentError(error: unknown) {
+  const runtime = getAIRuntimeConfig();
   const raw = error instanceof Error ? error.message : String(error || 'Erro desconhecido.');
   const text = raw.toLowerCase();
+  const label = runtime.providerLabel;
 
-  if (text.includes('incorrect api key') || text.includes('invalid_api_key') || text.includes('api key') && text.includes('invalid')) {
+  if (text.includes('incorrect api key') || text.includes('invalid_api_key') || (text.includes('api key') && text.includes('invalid'))) {
     return {
       status: 502,
-      code: 'OPENAI_INVALID_KEY',
-      message: 'A chave OPENAI_API_KEY configurada no Render não foi aceita pela OpenAI. Gere ou copie uma chave válida e salve novamente no Render.'
+      code: 'AI_INVALID_KEY',
+      message: `A chave ${runtime.apiKeyEnv} configurada no Render não foi aceita pela ${label}. Confira a chave e salve novamente.`
     };
   }
 
   if (text.includes('insufficient_quota') || text.includes('quota') || text.includes('billing') || text.includes('credit balance')) {
     return {
       status: 402,
-      code: 'OPENAI_QUOTA',
-      message: 'A OpenAI recusou a chamada por limite de créditos/faturamento. Verifique o billing da conta da API usada pela OPENAI_API_KEY.'
+      code: 'AI_QUOTA',
+      message: `${label} recusou a chamada por limite de créditos/cota do provedor. Verifique a conta associada à ${runtime.apiKeyEnv}.`
     };
   }
 
   if (text.includes('rate limit') || text.includes('http 429') || text.includes('too many requests')) {
     return {
       status: 429,
-      code: 'OPENAI_RATE_LIMIT',
-      message: 'A OpenAI aplicou limite temporário de requisições. Aguarde alguns instantes e teste novamente.'
+      code: 'AI_RATE_LIMIT',
+      message: `${label} aplicou um limite temporário de requisições. Aguarde alguns instantes e teste novamente.`
     };
   }
 
-  if ((text.includes('model') && text.includes('not found')) || text.includes('model_not_found') || text.includes('does not exist') || text.includes('unsupported model')) {
+  if ((text.includes('model') && text.includes('not found')) || text.includes('model_not_found') || text.includes('does not exist') || text.includes('unsupported model') || text.includes('decommissioned')) {
     return {
       status: 502,
-      code: 'OPENAI_MODEL_ERROR',
-      message: `O modelo configurado (${process.env.OPENAI_MODEL || 'não informado'}) não está disponível para esta chave/projeto da OpenAI.`
+      code: 'AI_MODEL_ERROR',
+      message: `O modelo configurado (${runtime.model}) não está disponível no provedor ${label}.`
     };
   }
 
-  if (text.includes('openai respondeu http 400')) {
+  if (text.includes('http 400') || text.includes('bad request')) {
     return {
       status: 502,
-      code: 'OPENAI_REQUEST_INVALID',
-      message: 'A OpenAI rejeitou o formato da solicitação do agente. O erro técnico foi registrado no backend para correção.'
+      code: 'AI_REQUEST_INVALID',
+      message: `${label} rejeitou o formato da solicitação do agente. O erro técnico foi registrado no backend para correção.`
     };
   }
 
-  if (text.includes('openai') || text.includes('api.openai.com')) {
+  if (text.includes('groq') || text.includes('openai') || text.includes('api.groq.com') || text.includes('api.openai.com')) {
     return {
       status: 502,
-      code: 'OPENAI_UPSTREAM_ERROR',
-      message: 'A chamada à OpenAI falhou. Verifique a chave, o modelo e o faturamento da API; o detalhe técnico foi registrado no backend.'
+      code: 'AI_UPSTREAM_ERROR',
+      message: `A chamada ao provedor ${label} falhou. Verifique a chave, o modelo e os limites da conta.`
     };
   }
 
@@ -86,6 +89,7 @@ function agentError(error: unknown) {
 export async function whatsappAgentRoutes(app: FastifyInstance) {
   app.get('/admin/whatsapp/agent-status', async (request) => {
     const tenant = getTenant(request);
+    const runtime = getAIRuntimeConfig();
     const [salon, entitlements] = await Promise.all([
       prisma.salon.findUnique({ where: { id: tenant.salonId } }),
       getAgentEntitlements(tenant.salonId)
@@ -94,8 +98,12 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
       salon: salon ? { id: salon.id, name: salon.name, whatsapp: salon.whatsapp } : null,
       modules: entitlements,
       agentEnabled: entitlements.whatsapp && entitlements.ai && entitlements.agenda,
+      aiProvider: runtime.provider,
+      aiProviderLabel: runtime.providerLabel,
+      aiConfigured: runtime.configured,
+      aiModel: runtime.model,
       openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
-      openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      groqConfigured: Boolean(process.env.GROQ_API_KEY),
       whatsappTokenConfigured: Boolean(process.env.WHATSAPP_ACCESS_TOKEN),
       phoneNumberIdConfigured: Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID),
       webhookVerifyTokenConfigured: Boolean(process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
@@ -107,11 +115,21 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
   app.post('/admin/whatsapp/agent-test', async (request, reply) => {
     const tenant = getTenant(request);
+    const runtime = getAIRuntimeConfig();
     const entitlements = await getAgentEntitlements(tenant.salonId);
     if (!entitlements.whatsapp || !entitlements.ai || !entitlements.agenda) {
       return reply.status(403).send({
         message: 'O agente WhatsApp exige os módulos WhatsApp, Inteligência Artificial e Agenda habilitados.',
         code: 'MODULE_DEPENDENCY_DISABLED'
+      });
+    }
+
+    if (!runtime.configured) {
+      return reply.status(503).send({
+        message: `O provedor ${runtime.providerLabel} está selecionado, mas ${runtime.apiKeyEnv} não está configurada.`,
+        code: 'AI_PROVIDER_NOT_CONFIGURED',
+        provider: runtime.provider,
+        model: runtime.model
       });
     }
 
@@ -138,7 +156,9 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
       return {
         ok: true,
         dryRun: true,
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        provider: runtime.provider,
+        providerLabel: runtime.providerLabel,
+        model: runtime.model,
         answer
       };
     } catch (error) {
@@ -147,12 +167,14 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
         err: error,
         salonId: salon.id,
         diagnosticCode: diagnostic.code,
-        openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini'
+        aiProvider: runtime.provider,
+        aiModel: runtime.model
       }, 'Falha no teste do agente de WhatsApp/IA');
       return reply.status(diagnostic.status).send({
         message: diagnostic.message,
         code: diagnostic.code,
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini'
+        provider: runtime.provider,
+        model: runtime.model
       });
     }
   });
