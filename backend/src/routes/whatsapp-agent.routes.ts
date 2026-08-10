@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { getAIRuntimeConfig } from '../services/ai-provider.service';
-import { availabilityClarification, unavailableServiceReply } from '../services/agent-intent.service';
+import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
@@ -166,9 +166,24 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
     try {
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
-      const unavailable = await unavailableServiceReply(salon.id, body.message);
-      const clarification = unavailable ? null : await availabilityClarification(salon.id, body.message);
-      const rawAnswer = unavailable || clarification || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+      const serviceDecision = await unavailableServiceDecision(salon.id, body.message);
+      const clarification = serviceDecision ? null : await availabilityClarification(salon.id, body.message);
+
+      let rawAnswer: string;
+      if (serviceDecision?.continueWithAI) {
+        const availabilityAnswer = await answerWhatsAppMessage({
+          salon,
+          phone: body.phone,
+          clientName: body.clientName,
+          text: serviceDecision.aiText || body.message
+        });
+        rawAnswer = `${serviceDecision.reply}\n\n${availabilityAnswer}`;
+      } else {
+        rawAnswer = serviceDecision?.reply
+          || clarification
+          || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+      }
+
       const guarded = await guardAgentReply({ salonId: salon.id, phone: body.phone, userText: body.message, replyText: rawAnswer });
       const answer = guarded.replyText;
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'OUT', text: answer });
