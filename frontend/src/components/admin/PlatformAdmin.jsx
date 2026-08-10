@@ -4,6 +4,7 @@ import { MODULE_CATALOG } from '../../utils/modules';
 import { NewClientWizard } from './NewClientWizard.jsx';
 import { PlatformPlans } from './PlatformPlans.jsx';
 import { PlatformSiteManager } from './PlatformSiteManager.jsx';
+import { ExternalCostControl } from './ExternalCostControl.jsx';
 
 function money(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -367,6 +368,8 @@ export function PlatformAdmin({ setPage }) {
                               </div>
                             )) : <p>Carregando métricas...</p>}
                           </div>
+
+                          <ExternalCostControl salon={salon} />
 
                           <div style={box()}>
                             <strong>Módulos contratados</strong>
