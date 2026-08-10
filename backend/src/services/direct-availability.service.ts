@@ -123,12 +123,19 @@ async function slotsForService(input: {
   });
 
   if (!availability || availability.mode !== 'day') {
-    return { service: input.service.name, slots: [] as Array<{ professional: string; displayTime: string }> };
+    return { service: input.service.name, slots: [] as Array<{ professional: string; displayTime: string; fitScore: number; recommended: boolean }> };
   }
 
-  const slots = availability.professionals.flatMap((professional) =>
-    professional.slots.map((slot) => ({ professional: professional.name, displayTime: `${dateLabel(input.date).slice(0, 5)}, ${slot.label}` }))
-  ).slice(0, 8);
+  const slots = availability.professionals
+    .flatMap((professional) => professional.slots.map((slot) => ({
+      professional: professional.name,
+      displayTime: `${dateLabel(input.date).slice(0, 5)}, ${slot.label}`,
+      fitScore: slot.fitScore || 0,
+      recommended: Boolean(slot.recommended)
+    })))
+    .sort((a, b) => b.fitScore - a.fitScore || a.displayTime.localeCompare(b.displayTime))
+    .slice(0, 8)
+    .map((slot, index) => ({ ...slot, recommended: index < 3 }));
 
   return { service: input.service.name, slots };
 }
@@ -140,14 +147,14 @@ async function formatAvailability(salon: AvailabilitySalon, services: ServiceRec
       return `Para ${result.service} em ${dateLabel(date)}, não encontrei profissionais habilitados com tempo livre suficiente na jornada.`;
     }
 
-    const lines = result.slots.map((slot) => `• ${slot.displayTime} — ${slot.professional}`).join('\n');
+    const lines = result.slots.map((slot) => `${slot.recommended ? '★' : '•'} ${slot.displayTime} — ${slot.professional}${slot.recommended ? ' · melhor encaixe' : ''}`).join('\n');
     return `Para ${result.service} em ${dateLabel(date)}, encontrei estes horários:\n${lines}`;
   });
 
-  return `${blocks.join('\n\n')}\n\nSe algum desses horários servir para você, me diga qual prefere e eu continuo o agendamento.`;
+  return `${blocks.join('\n\n')}\n\nOs horários marcados com ★ aproveitam melhor a agenda sem criar pequenos intervalos ociosos. Se algum servir para você, me diga qual prefere e eu continuo o agendamento.`;
 }
 
-/** Consulta diretamente a mesma agenda usada pelo site público, incluindo jornada, intervalos e ausências. */
+/** Consulta diretamente a mesma agenda usada pelo site público, incluindo jornada, intervalos, ausências e encaixe inteligente. */
 export async function directAvailabilityFromText(input: {
   salon: AvailabilitySalon;
   text: string;
