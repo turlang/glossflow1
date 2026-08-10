@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import { createOperationalNotification, cancellationMinHours, formatAppointmentDate } from './appointment-notification.service';
 import { hasSalonModule } from './module-access.service';
 import { normalizePhone, saveWhatsAppMessage } from './whatsapp-agent.service';
-import { sendWhatsAppMessage } from './whatsapp.service';
+import { sendWhatsAppMessage, sendWhatsAppTemplateMessage } from './whatsapp.service';
 
 const REMINDER_RESOURCE = 'AppointmentReminder';
 const CONFIRMATION_RESOURCE = 'AppointmentClientConfirmation';
@@ -82,7 +82,21 @@ async function deliverReminder(input: {
     ? `Lembrete de agendamento ✨\n\nOlá, ${input.clientName}! Seu horário no ${input.salonName} está reservado:\n${input.serviceName}\n📅 ${when}\nProfissional: ${input.professionalName}\n\nResponda CONFIRMAR para confirmar sua presença ou CANCELAR para cancelar. Cancelamentos online são permitidos com no mínimo ${minHours} horas de antecedência.`
     : `Seu horário está chegando ⏰\n\n${input.serviceName}\n📅 ${when}\nProfissional: ${input.professionalName}\n\nSe precisar de ajuda, fale com o ${input.salonName}.`;
 
-  const result = await sendWhatsAppMessage({ phone: normalizePhone(input.clientPhone), message });
+  const templateName = input.kind === '24H'
+    ? process.env.WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER_24H
+    : process.env.WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER_2H;
+  const templateParameters = input.kind === '24H'
+    ? [input.clientName, input.salonName, input.serviceName, when, input.professionalName, minHours]
+    : [input.clientName, input.serviceName, when, input.professionalName, input.salonName];
+
+  const result = templateName
+    ? await sendWhatsAppTemplateMessage({
+        phone: normalizePhone(input.clientPhone),
+        templateName,
+        bodyParameters: templateParameters
+      })
+    : await sendWhatsAppMessage({ phone: normalizePhone(input.clientPhone), message });
+
   const providerData = result as { data?: { messages?: Array<{ id?: string }> } };
   if (result.ok) {
     await saveWhatsAppMessage({
@@ -93,11 +107,13 @@ async function deliverReminder(input: {
       text: message
     });
   } else if (!await recentFailedAttempt(input.appointmentId, input.salonId, input.kind)) {
+    const detail = result as Record<string, unknown>;
+    const providerReason = String(detail.errorMessage || detail.message || detail.code || '').trim();
     await createOperationalNotification({
       salonId: input.salonId,
       type: 'WHATSAPP_DELIVERY_FAILED',
       title: 'Lembrete não entregue',
-      message: `Não consegui entregar o lembrete de ${input.clientName} para ${when}. O agendamento continua confirmado.`,
+      message: `Não consegui entregar o lembrete de ${input.clientName} para ${when}. O agendamento continua confirmado.${providerReason ? ` Meta/provider: ${providerReason}` : ''}`,
       appointmentId: input.appointmentId,
       clientName: input.clientName,
       severity: 'WARNING'
