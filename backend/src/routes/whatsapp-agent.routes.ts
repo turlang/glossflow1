@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { getAIRuntimeConfig } from '../services/ai-provider.service';
 import { availabilityClarification } from '../services/agent-intent.service';
+import { guardAgentReply } from '../services/agent-response-guard.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
 import {
@@ -153,7 +154,9 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
     try {
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
       const clarification = await availabilityClarification(salon.id, body.message);
-      const answer = clarification || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+      const rawAnswer = clarification || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+      const guarded = await guardAgentReply({ salonId: salon.id, phone: body.phone, userText: body.message, replyText: rawAnswer });
+      const answer = guarded.replyText;
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'OUT', text: answer });
       return {
         ok: true,
@@ -161,6 +164,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
         provider: runtime.provider,
         providerLabel: runtime.providerLabel,
         model: runtime.model,
+        handoffBlocked: guarded.handoffBlocked,
         answer
       };
     } catch (error) {
