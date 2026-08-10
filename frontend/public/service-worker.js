@@ -1,5 +1,5 @@
-const CACHE_VERSION = 'glossflow-v10-market-cache';
-const RUNTIME_CACHE = 'glossflow-runtime-v10';
+const CACHE_VERSION = 'glossflow-v11-react-runtime-cache';
+const RUNTIME_CACHE = 'glossflow-runtime-v11';
 const APP_SHELL = ['/', '/index.html', '/offline.html', '/manifest.webmanifest', '/icon.svg'];
 const PUBLIC_API_CACHE = ['/public/salon', '/services', '/professionals', '/portfolio'];
 
