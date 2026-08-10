@@ -12,6 +12,7 @@ import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
 import { platformAdminRoutes } from './platform-admin.routes';
 import { platformSiteRoutes } from './platform-site.routes';
+import { platformCostRoutes } from './platform-cost.routes';
 import { commercialRoutes } from './commercial.routes';
 import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
@@ -32,13 +33,14 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(appointmentRoutes);
   app.register(whatsappWebhookRoutes);
 
-  /** Administração global: clientes, planos, módulos, MRR, Site & Marca e infraestrutura. */
+  /** Administração global: clientes, planos, módulos, MRR, Site & Marca, custos inclusos e infraestrutura. */
   app.register(async (platformAdmin) => {
     platformAdmin.addHook('preHandler', ensureAuthenticated);
     platformAdmin.addHook('preHandler', requireRoles(['SUPER_ADMIN']));
     platformAdmin.addHook('onResponse', writeAuditLog);
     platformAdmin.register(platformAdminRoutes);
     platformAdmin.register(platformSiteRoutes);
+    platformAdmin.register(platformCostRoutes);
   });
 
   /** Operação do salão, sempre isolada pelo salonId e pelos módulos contratados. */
