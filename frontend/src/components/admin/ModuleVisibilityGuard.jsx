@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { hasModule } from '../../utils/modules';
+import { OperationalNotificationsBell } from './OperationalNotificationsBell.jsx';
 
 const TITLE_TO_MODULE = {
   'Vitrine': 'SITE',
@@ -47,7 +48,6 @@ function normalizedText(element) {
 function isPlatformOnlyButton(button) {
   const title = button.getAttribute('title') || '';
   if (PLATFORM_ONLY_TITLES.has(title)) return true;
-
   const text = normalizedText(button);
   return PLATFORM_ONLY_TEXT.some((platformText) => text === platformText || text.startsWith(`${platformText} `));
 }
@@ -55,7 +55,6 @@ function isPlatformOnlyButton(button) {
 function moduleForButton(button) {
   const title = button.getAttribute('title') || '';
   if (TITLE_TO_MODULE[title]) return TITLE_TO_MODULE[title];
-
   const text = normalizedText(button);
   if (text === 'Site & Marca') return 'SITE';
   if (text === 'Testar IA') return 'IA';
@@ -82,10 +81,8 @@ function restoreElement(element) {
 
 /**
  * Camada visual de entitlements do ADMIN do salão.
- * - módulos desativados pelo SUPER_ADMIN não aparecem;
- * - áreas exclusivas da plataforma nunca são renderizadas visualmente no tenant;
- * - cards do dashboard respeitam os módulos contratados.
- * O backend continua sendo a fonte final de autorização.
+ * O sino de notificações é mantido aqui para ficar disponível em todas as telas
+ * operacionais sem acoplar a central a um dashboard específico.
  */
 export function ModuleVisibilityGuard({ salon }) {
   useEffect(() => {
@@ -93,6 +90,7 @@ export function ModuleVisibilityGuard({ salon }) {
 
     function apply() {
       document.querySelectorAll('button').forEach((button) => {
+        if (button.closest('.operational-notification-anchor')) return;
         if (isPlatformOnlyButton(button)) {
           hideElement(button);
           return;
@@ -124,5 +122,10 @@ export function ModuleVisibilityGuard({ salon }) {
     };
   }, [salon]);
 
-  return null;
+  if (!salon || !hasModule(salon, 'AGENDA')) return null;
+  return (
+    <div className="operational-notification-anchor" style={{ position: 'fixed', top: 18, right: 76, zIndex: 120 }}>
+      <OperationalNotificationsBell />
+    </div>
+  );
 }
