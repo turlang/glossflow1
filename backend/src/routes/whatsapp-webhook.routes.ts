@@ -6,6 +6,7 @@ import { guardAgentReply } from '../services/agent-response-guard.service';
 import { directAvailabilityFromText } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { confirmPendingBooking } from '../services/pending-booking.service';
+import { handleWaitlistWhatsAppReply } from '../services/waitlist.service';
 import {
   answerWhatsAppMessage,
   findSalonByWhatsApp,
@@ -99,7 +100,17 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
 
         if (await hasOpenHumanHandoff(salon.id, from)) continue;
 
-        const confirmation = text
+        const waitlistReply = text
+          ? await handleWaitlistWhatsAppReply({
+              salonId: salon.id,
+              salonName: salon.name,
+              clientPhone: from,
+              clientName: contactName,
+              text
+            })
+          : null;
+
+        const confirmation = !waitlistReply?.handled && text
           ? await confirmPendingBooking({
               salonId: salon.id,
               salonName: salon.name,
@@ -110,7 +121,9 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
           : null;
 
         let rawReplyText: string;
-        if (confirmation?.handled) {
+        if (waitlistReply?.handled) {
+          rawReplyText = waitlistReply.replyText;
+        } else if (confirmation?.handled) {
           rawReplyText = confirmation.replyText;
         } else {
           const [serviceDecision, directAvailability] = text
