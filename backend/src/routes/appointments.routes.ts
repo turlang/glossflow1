@@ -22,6 +22,12 @@ const availabilityQuerySchema = z.object({
   message: 'Informe month ou date para consultar a disponibilidade.'
 });
 
+const smartFitQuerySchema = z.object({
+  serviceId: objectIdSchema,
+  professionalId: objectIdSchema.optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida. Use YYYY-MM-DD.')
+});
+
 /** Rotas de agenda. A rota POST pública permite ao cliente criar reserva. */
 export async function appointmentRoutes(app: FastifyInstance) {
   /**
@@ -136,6 +142,38 @@ export async function appointmentRoutes(app: FastifyInstance) {
       include: { service: true, professional: true },
       orderBy: { startTime: 'asc' }
     });
+  });
+
+  /**
+   * Sugestões de encaixe para recepção/agenda operacional.
+   * O ranking evita criar pequenos buracos difíceis de reutilizar e prioriza
+   * blocos que ficam compactos junto a atendimento, intervalo ou fim da jornada.
+   */
+  app.get('/admin/appointments/smart-fit', adminAgendaAccess, async (request, reply) => {
+    const tenant = getTenant(request);
+    const query = smartFitQuerySchema.parse(request.query);
+    const salon = await prisma.salon.findUnique({
+      where: { id: tenant.salonId },
+      select: { id: true, openingHours: true }
+    });
+    if (!salon) return reply.status(404).send({ message: 'Salão não encontrado.' });
+
+    const availability = await publicBookingAvailability({
+      salon,
+      serviceId: query.serviceId,
+      professionalId: query.professionalId,
+      date: query.date
+    });
+    if (!availability) return reply.status(404).send({ message: 'Serviço não encontrado.' });
+    if (availability.mode !== 'day') return reply.status(400).send({ message: 'Não foi possível calcular o encaixe para este dia.' });
+
+    return {
+      date: query.date,
+      service: availability.service,
+      totalCapacity: availability.totalCapacity,
+      strategy: availability.smartFit?.strategy || 'BEST_FIT',
+      suggestions: availability.smartFit?.recommendedSlots || []
+    };
   });
 
   app.put('/admin/appointments/:id', adminAgendaAccess, async (request, reply) => {
