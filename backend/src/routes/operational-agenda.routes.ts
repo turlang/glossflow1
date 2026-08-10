@@ -13,6 +13,8 @@ import { appointmentSchema, objectIdSchema } from './schemas';
 import { getTenant } from './helpers';
 
 const ATTENDANCE_RESOURCE = 'AppointmentAttendance';
+const CONFIRMATION_RESOURCE = 'AppointmentClientConfirmation';
+const REMINDER_RESOURCE = 'AppointmentReminder';
 const attendanceSchema = z.object({
   status: z.enum(['SCHEDULED', 'ARRIVED', 'IN_SERVICE'])
 });
@@ -35,7 +37,7 @@ function ensureManager(role: string, reply: FastifyReply) {
 export async function operationalAgendaRoutes(app: FastifyInstance) {
   app.get('/admin/appointments/operational-options', async (request) => {
     const tenant = getTenant(request);
-    const [services, attendanceLogs] = await Promise.all([
+    const [services, attendanceLogs, confirmationLogs, reminderLogs] = await Promise.all([
       prisma.service.findMany({
         where: { salonId: tenant.salonId, active: true },
         orderBy: { name: 'asc' },
@@ -50,6 +52,26 @@ export async function operationalAgendaRoutes(app: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
         take: 500,
         select: { resourceId: true, metadata: true }
+      }),
+      prisma.auditLog.findMany({
+        where: {
+          salonId: tenant.salonId,
+          resource: CONFIRMATION_RESOURCE,
+          action: 'CLIENT_CONFIRMED_ATTENDANCE'
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        select: { resourceId: true, createdAt: true }
+      }),
+      prisma.auditLog.findMany({
+        where: {
+          salonId: tenant.salonId,
+          resource: REMINDER_RESOURCE,
+          action: { in: ['REMINDER_24H_SENT', 'REMINDER_2H_SENT'] }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+        select: { resourceId: true, action: true, createdAt: true }
       })
     ]);
 
@@ -60,10 +82,27 @@ export async function operationalAgendaRoutes(app: FastifyInstance) {
       attendanceByAppointment[item.resourceId] = String(metadata.status || 'SCHEDULED');
     }
 
+    const confirmationByAppointment: Record<string, string> = {};
+    for (const item of confirmationLogs) {
+      if (!item.resourceId || confirmationByAppointment[item.resourceId]) continue;
+      confirmationByAppointment[item.resourceId] = item.createdAt.toISOString();
+    }
+
+    const reminderByAppointment: Record<string, { main?: string; short?: string }> = {};
+    for (const item of reminderLogs) {
+      if (!item.resourceId) continue;
+      const current = reminderByAppointment[item.resourceId] || {};
+      if (item.action === 'REMINDER_24H_SENT' && !current.main) current.main = item.createdAt.toISOString();
+      if (item.action === 'REMINDER_2H_SENT' && !current.short) current.short = item.createdAt.toISOString();
+      reminderByAppointment[item.resourceId] = current;
+    }
+
     return {
       role: tenant.role,
       services,
-      attendanceByAppointment
+      attendanceByAppointment,
+      confirmationByAppointment,
+      reminderByAppointment
     };
   });
 
