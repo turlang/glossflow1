@@ -28,7 +28,27 @@ function statusFor(keys: string[]): IntegrationStatus['status'] {
   return missingKeys.length < keys.length ? 'ready' : 'missing';
 }
 
+function whatsappDefinition() {
+  const provider = String(process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase();
+  if (provider === 'twilio') {
+    const env = ['WHATSAPP_PROVIDER', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM'];
+    if (process.env.TWILIO_TRIAL_MODE === 'true') env.push('TWILIO_TRIAL_CONTENT_SID');
+    return {
+      name: process.env.TWILIO_TRIAL_MODE === 'true' ? 'WhatsApp via Twilio Trial' : 'WhatsApp via Twilio',
+      env,
+      description: 'Confirmações, lembretes e conversas por WhatsApp usando Twilio.'
+    };
+  }
+
+  return {
+    name: 'WhatsApp Cloud API',
+    env: ['WHATSAPP_PROVIDER', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID'],
+    description: 'Confirmações, lembretes, aniversários e campanhas por WhatsApp usando Meta Cloud API.'
+  };
+}
+
 export function getIntegrationStatus(): IntegrationStatus[] {
+  const whatsapp = whatsappDefinition();
   const items: Array<Omit<IntegrationStatus, 'missingEnv' | 'status'>> = [
     {
       key: 'openai',
@@ -39,10 +59,10 @@ export function getIntegrationStatus(): IntegrationStatus[] {
     },
     {
       key: 'whatsapp',
-      name: 'WhatsApp Cloud API',
+      name: whatsapp.name,
       category: 'Comunicação',
-      env: ['WHATSAPP_PROVIDER', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID'],
-      description: 'Confirmações, lembretes, aniversários e campanhas por WhatsApp.'
+      env: whatsapp.env,
+      description: whatsapp.description
     },
     {
       key: 'mercadopago',
