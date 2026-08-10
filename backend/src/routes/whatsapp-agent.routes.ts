@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { getAIRuntimeConfig } from '../services/ai-provider.service';
-import { availabilityClarification } from '../services/agent-intent.service';
+import { availabilityClarification, unavailableServiceReply } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
@@ -24,6 +24,14 @@ async function getAgentEntitlements(salonId: string) {
     ai: Boolean(salon && hasSalonModule(salon, 'IA')),
     agenda: Boolean(salon && hasSalonModule(salon, 'AGENDA'))
   };
+}
+
+function requestsHumanSupport(text: string) {
+  const value = String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  return /\b(humano|atendente|pessoa|alguem|falar com|reclamacao|reembolso|estorno)\b/.test(value);
 }
 
 function agentError(error: unknown) {
@@ -121,7 +129,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
     const entitlements = await getAgentEntitlements(tenant.salonId);
     if (!entitlements.whatsapp || !entitlements.ai || !entitlements.agenda) {
       return reply.status(403).send({
-        message: 'O agente WhatsApp exige os módulos WhatsApp, Inteligência Artificial e Agenda habilitados.',
+        message: 'O atendimento pelo WhatsApp exige os módulos WhatsApp, Inteligência Artificial e Agenda habilitados.',
         code: 'MODULE_DEPENDENCY_DISABLED'
       });
     }
@@ -147,14 +155,20 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
     });
     if (!salon) return reply.status(404).send({ message: 'Salão não encontrado.' });
 
-    if (await hasOpenHumanHandoff(salon.id, body.phone)) {
-      return reply.status(409).send({ message: 'Este telefone está em atendimento humano. Feche o handoff para retomar a IA.' });
+    const handoffOpen = await hasOpenHumanHandoff(salon.id, body.phone);
+    if (handoffOpen && !requestsHumanSupport(body.message)) {
+      // No laboratório, um handoff antigo não pode travar os próximos testes.
+      // Se a nova mensagem não pede atendimento humano, retomamos a automação.
+      await closeHumanHandoff(salon.id, body.phone);
+    } else if (handoffOpen) {
+      return reply.status(409).send({ message: 'Este telefone está em atendimento humano. Encerre o handoff para retomar o atendimento automático.' });
     }
 
     try {
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
-      const clarification = await availabilityClarification(salon.id, body.message);
-      const rawAnswer = clarification || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+      const unavailable = await unavailableServiceReply(salon.id, body.message);
+      const clarification = unavailable ? null : await availabilityClarification(salon.id, body.message);
+      const rawAnswer = unavailable || clarification || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
       const guarded = await guardAgentReply({ salonId: salon.id, phone: body.phone, userText: body.message, replyText: rawAnswer });
       const answer = guarded.replyText;
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'OUT', text: answer });
@@ -164,6 +178,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
         provider: runtime.provider,
         providerLabel: runtime.providerLabel,
         model: runtime.model,
+        salonName: salon.name,
         handoffBlocked: guarded.handoffBlocked,
         answer
       };
@@ -175,7 +190,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
         diagnosticCode: diagnostic.code,
         aiProvider: runtime.provider,
         aiModel: runtime.model
-      }, 'Falha no teste do agente de WhatsApp/IA');
+      }, 'Falha no teste do atendimento de WhatsApp/IA');
       return reply.status(diagnostic.status).send({
         message: diagnostic.message,
         code: diagnostic.code,
@@ -213,6 +228,6 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ message: 'Não há atendimento humano aberto para este telefone.' });
     }
     await closeHumanHandoff(tenant.salonId, normalized);
-    return { ok: true, phone: normalized, message: 'Atendimento humano encerrado. A IA pode voltar a responder.' };
+    return { ok: true, phone: normalized, message: 'Atendimento humano encerrado. O atendimento automático pode voltar a responder.' };
   });
 }
