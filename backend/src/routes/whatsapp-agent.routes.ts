@@ -6,6 +6,7 @@ import { availabilityClarification, unavailableServiceDecision } from '../servic
 import { guardAgentReply } from '../services/agent-response-guard.service';
 import { directAvailabilityFromText } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
+import { confirmPendingBooking } from '../services/pending-booking.service';
 import { getTenant } from './helpers';
 import {
   answerWhatsAppMessage,
@@ -172,23 +173,36 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
     try {
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
-      const [serviceDecision, directAvailability] = await Promise.all([
-        unavailableServiceDecision(salon.id, body.message),
-        directAvailabilityFromText({ salon, text: body.message })
-      ]);
-      const clarification = serviceDecision || directAvailability
-        ? null
-        : await availabilityClarification(salon.id, body.message);
+
+      const confirmation = await confirmPendingBooking({
+        salonId: salon.id,
+        salonName: salon.name,
+        clientPhone: body.phone,
+        clientName: body.clientName,
+        text: body.message
+      });
 
       let rawAnswer: string;
-      if (serviceDecision && directAvailability) {
-        rawAnswer = `${stripServiceChoicePrompt(serviceDecision.reply)}\n\n${directAvailability}`;
-      } else if (directAvailability) {
-        rawAnswer = directAvailability;
+      if (confirmation?.handled) {
+        rawAnswer = confirmation.replyText;
       } else {
-        rawAnswer = serviceDecision?.reply
-          || clarification
-          || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+        const [serviceDecision, directAvailability] = await Promise.all([
+          unavailableServiceDecision(salon.id, body.message),
+          directAvailabilityFromText({ salon, text: body.message })
+        ]);
+        const clarification = serviceDecision || directAvailability
+          ? null
+          : await availabilityClarification(salon.id, body.message);
+
+        if (serviceDecision && directAvailability) {
+          rawAnswer = `${stripServiceChoicePrompt(serviceDecision.reply)}\n\n${directAvailability}`;
+        } else if (directAvailability) {
+          rawAnswer = directAvailability;
+        } else {
+          rawAnswer = serviceDecision?.reply
+            || clarification
+            || await answerWhatsAppMessage({ salon, phone: body.phone, clientName: body.clientName, text: body.message });
+        }
       }
 
       const guarded = await guardAgentReply({ salonId: salon.id, phone: body.phone, userText: body.message, replyText: rawAnswer });
@@ -202,6 +216,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
         model: runtime.model,
         salonName: salon.name,
         handoffBlocked: guarded.handoffBlocked,
+        appointmentId: confirmation?.appointmentId || null,
         answer
       };
     } catch (error) {
