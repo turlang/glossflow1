@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceSalonModuleAccess, hasSalonModule } from '../services/module-access.service';
+import { professionalCanPerform } from '../services/professional-capability.service';
 import { bookingFitsBusinessWindow, publicBookingAvailability } from '../services/public-booking-availability.service';
 import { appointmentSchema, appointmentUpdateSchema, objectIdSchema } from './schemas';
 import { getPublicSalon, getTenant } from './helpers';
@@ -80,6 +81,9 @@ export async function appointmentRoutes(app: FastifyInstance) {
 
     if (!service) return reply.status(404).send({ message: 'Serviço não encontrado.' });
     if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
+    if (!professionalCanPerform(professional, service.id)) {
+      return reply.status(409).send({ message: `${professional.name} não está configurado para executar ${service.name}. Escolha outro profissional.` });
+    }
 
     const start = new Date(data.startTime);
     if (start.getTime() <= Date.now()) {
@@ -149,6 +153,9 @@ export async function appointmentRoutes(app: FastifyInstance) {
         where: { id: data.professionalId, salonId: tenant.salonId, active: true }
       });
       if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
+      if (!professionalCanPerform(professional, current.service.id)) {
+        return reply.status(409).send({ message: `${professional.name} não está configurado para executar ${current.service.name}.` });
+      }
     }
 
     const start = data.startTime ? new Date(data.startTime) : current.startTime;
