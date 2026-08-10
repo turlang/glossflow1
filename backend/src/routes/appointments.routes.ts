@@ -143,11 +143,29 @@ export async function appointmentRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = appointmentUpdateSchema.parse(request.body);
 
-    const [current, salon] = await Promise.all([
-      prisma.appointment.findFirst({ where: { id, salonId: tenant.salonId }, include: { service: true } }),
-      prisma.salon.findUnique({ where: { id: tenant.salonId }, select: { openingHours: true } })
-    ]);
+    const current = await prisma.appointment.findFirst({
+      where: { id, salonId: tenant.salonId },
+      include: { service: true, professional: true }
+    });
     if (!current) return reply.status(404).send({ message: 'Agendamento não encontrado.' });
+
+    const changesSchedule = Boolean(data.startTime || data.professionalId);
+
+    /**
+     * Atualizações puramente operacionais de status não devem ser bloqueadas
+     * pela data original do atendimento. Isso permite concluir/no-show/cancelar
+     * inclusive atendimentos passados sem fingir um reagendamento.
+     */
+    if (!changesSchedule) {
+      if (!data.status) return current;
+      return prisma.appointment.update({
+        where: { id },
+        data: { status: data.status },
+        include: { service: true, professional: true }
+      });
+    }
+
+    const salon = await prisma.salon.findUnique({ where: { id: tenant.salonId }, select: { openingHours: true } });
     if (!salon) return reply.status(404).send({ message: 'Salão não encontrado.' });
 
     const professionalId = data.professionalId || current.professionalId;
