@@ -1,5 +1,7 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3333').replace(/\/+$/, '');
 
+const AUTH_EXPIRED_EVENT = 'glossflow:auth-expired';
+
 function publicTenantHeaders() {
   if (typeof window === 'undefined') return {};
 
@@ -36,6 +38,14 @@ function apiErrorMessage(data) {
   return data?.message || 'Não foi possível concluir a solicitação.';
 }
 
+function clearSession({ notify = true } = {}) {
+  localStorage.removeItem('glossflow.token');
+  localStorage.removeItem('glossflow.refreshToken');
+  if (notify && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+  }
+}
+
 async function refreshAccessToken() {
   const refreshToken = localStorage.getItem('glossflow.refreshToken');
   if (!refreshToken) return null;
@@ -49,7 +59,12 @@ async function refreshAccessToken() {
   if (!response.ok) return null;
   const data = await response.json();
   if (data.token) localStorage.setItem('glossflow.token', data.token);
+  if (data.refreshToken) localStorage.setItem('glossflow.refreshToken', data.refreshToken);
   return data.token || null;
+}
+
+function isAuthBootstrapPath(path) {
+  return path === '/auth/login' || path === '/auth/refresh';
 }
 
 /**
@@ -58,7 +73,15 @@ async function refreshAccessToken() {
  * domínio próprio sem duplicar o projeto.
  */
 export async function request(path, options = {}, retry = true) {
-  const token = localStorage.getItem('glossflow.token');
+  let token = localStorage.getItem('glossflow.token');
+
+  // Se o access token sumiu, mas ainda existe refresh token, tenta restaurar a
+  // sessão antes de disparar uma rota administrativa sem Authorization.
+  if (!token && retry && !isAuthBootstrapPath(path) && localStorage.getItem('glossflow.refreshToken')) {
+    token = await refreshAccessToken();
+    if (!token) clearSession();
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -69,18 +92,26 @@ export async function request(path, options = {}, retry = true) {
     }
   });
 
-  if (response.status === 401 && retry) {
+  if (response.status === 401 && retry && !isAuthBootstrapPath(path)) {
     const newToken = await refreshAccessToken();
     if (newToken) return request(path, options, false);
-    localStorage.removeItem('glossflow.token');
-    localStorage.removeItem('glossflow.refreshToken');
+    clearSession();
   }
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    if (response.status === 401 && !isAuthBootstrapPath(path)) {
+      throw new Error('Sua sessão expirou. Entre novamente para continuar.');
+    }
     throw new Error(apiErrorMessage(data));
   }
 
   return data;
+}
+
+export function onAuthExpired(handler) {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(AUTH_EXPIRED_EVENT, handler);
+  return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handler);
 }
