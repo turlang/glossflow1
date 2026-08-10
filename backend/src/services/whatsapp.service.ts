@@ -30,8 +30,27 @@ type SendWhatsAppTemplateInput = {
   phoneNumberId?: string;
 };
 
+function defaultCountryCode() {
+  return String(process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '55').replace(/\D/g, '');
+}
+
 function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, '');
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+
+  // Aceita o formato brasileiro comum digitado no site, por exemplo
+  // (11) 96137-2048, e converte para o formato internacional exigido
+  // pelos providers: 5511961372048. O DDI pode ser sobrescrito por ENV.
+  if (digits.startsWith('0') && (digits.length === 11 || digits.length === 12)) {
+    digits = digits.slice(1);
+  }
+
+  const countryCode = defaultCountryCode();
+  if (countryCode && (digits.length === 10 || digits.length === 11)) {
+    digits = `${countryCode}${digits}`;
+  }
+
+  return digits;
 }
 
 function providerConfig(phoneNumberId?: string) {
@@ -346,7 +365,8 @@ export function whatsappRuntimeDiagnostics() {
           authTokenConfigured: Boolean(twilio.authToken),
           fromConfigured: Boolean(twilio.from),
           trialMode: twilio.trialMode,
-          trialContentSidConfigured: Boolean(twilio.trialContentSid)
+          trialContentSidConfigured: Boolean(twilio.trialContentSid),
+          defaultCountryCode: defaultCountryCode()
         }
       : undefined,
     templates: {
