@@ -5,6 +5,7 @@ import { appointmentRoutes } from './appointments.routes';
 import { whatsappWebhookRoutes } from './whatsapp-webhook.routes';
 import { dashboardRoutes } from './dashboard.routes';
 import { adminCrudRoutes } from './admin-crud.routes';
+import { professionalScheduleRoutes } from './professional-schedule.routes';
 import { tenantRoutes } from './tenant.routes';
 import { businessRoutes } from './business.routes';
 import { whatsappAgentRoutes } from './whatsapp-agent.routes';
@@ -60,6 +61,7 @@ export async function appRoutes(app: FastifyInstance) {
     operational.addHook('onResponse', writeAuditLog);
     operational.register(dashboardRoutes);
     operational.register(adminCrudRoutes);
+    operational.register(professionalScheduleRoutes);
     operational.register(tenantRoutes);
   });
 
