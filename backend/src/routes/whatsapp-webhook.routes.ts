@@ -3,10 +3,11 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
+import { handleAppointmentReminderReply } from '../services/appointment-reminder.service';
 import { directAvailabilityFromText } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { confirmPendingBooking } from '../services/pending-booking.service';
-import { handleWaitlistWhatsAppReply } from '../services/waitlist.service';
+import { handleWaitlistWhatsAppReply, matchWaitlistAfterAppointmentChange } from '../services/waitlist.service';
 import {
   answerWhatsAppMessage,
   findSalonByWhatsApp,
@@ -100,7 +101,19 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
 
         if (await hasOpenHumanHandoff(salon.id, from)) continue;
 
-        const waitlistReply = text
+        const reminderReply = text
+          ? await handleAppointmentReminderReply({ salonId: salon.id, clientPhone: from, text })
+          : null;
+
+        if (reminderReply?.cancelledAppointment) {
+          const cancelled = reminderReply.cancelledAppointment;
+          setImmediate(() => {
+            void matchWaitlistAfterAppointmentChange(cancelled)
+              .catch((error) => app.log.error(error, 'Falha ao processar lista de espera após cancelamento pelo lembrete.'));
+          });
+        }
+
+        const waitlistReply = !reminderReply?.handled && text
           ? await handleWaitlistWhatsAppReply({
               salonId: salon.id,
               salonName: salon.name,
@@ -110,7 +123,7 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
             })
           : null;
 
-        const confirmation = !waitlistReply?.handled && text
+        const confirmation = !reminderReply?.handled && !waitlistReply?.handled && text
           ? await confirmPendingBooking({
               salonId: salon.id,
               salonName: salon.name,
@@ -121,7 +134,9 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
           : null;
 
         let rawReplyText: string;
-        if (waitlistReply?.handled) {
+        if (reminderReply?.handled) {
+          rawReplyText = reminderReply.replyText;
+        } else if (waitlistReply?.handled) {
           rawReplyText = waitlistReply.replyText;
         } else if (confirmation?.handled) {
           rawReplyText = confirmation.replyText;
