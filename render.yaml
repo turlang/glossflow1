@@ -50,7 +50,13 @@ services:
       - key: BOOKING_SLOT_INTERVAL_MINUTES
         value: "30"
 
-      # IA
+      # IA — Groq principal, OpenAI mantida como opção de troca/fallback manual
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
