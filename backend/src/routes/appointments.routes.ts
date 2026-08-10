@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceSalonModuleAccess, hasSalonModule } from '../services/module-access.service';
+import { bookingFitsBusinessWindow, publicBookingAvailability } from '../services/public-booking-availability.service';
 import { appointmentSchema, appointmentUpdateSchema, objectIdSchema } from './schemas';
 import { getPublicSalon, getTenant } from './helpers';
 
@@ -10,8 +11,41 @@ const adminAgendaAccess = {
   preHandler: [ensureAuthenticated, requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']), enforceSalonModuleAccess]
 };
 
+const availabilityQuerySchema = z.object({
+  serviceId: objectIdSchema,
+  professionalId: objectIdSchema.optional(),
+  month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido. Use YYYY-MM.').optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida. Use YYYY-MM-DD.').optional()
+}).refine((value) => Boolean(value.month || value.date), {
+  message: 'Informe month ou date para consultar a disponibilidade.'
+});
+
 /** Rotas de agenda. A rota POST pública permite ao cliente criar reserva. */
 export async function appointmentRoutes(app: FastifyInstance) {
+  /**
+   * Calendário público orientado pela duração real do serviço.
+   * "capacity" representa quantos atendimentos completos ainda cabem nos blocos
+   * livres do profissional — e não quantos horários de início podem ser clicados.
+   */
+  app.get('/appointments/availability', async (request, reply) => {
+    const query = availabilityQuerySchema.parse(request.query);
+    const salon = await getPublicSalon(request);
+    if (!hasSalonModule(salon, 'AGENDA')) {
+      return reply.status(403).send({ message: 'Agendamento online não está habilitado para este salão.', code: 'MODULE_DISABLED', module: 'AGENDA' });
+    }
+
+    const availability = await publicBookingAvailability({
+      salon,
+      serviceId: query.serviceId,
+      professionalId: query.professionalId,
+      month: query.month,
+      date: query.date
+    });
+
+    if (!availability) return reply.status(404).send({ message: 'Serviço não encontrado para este salão.' });
+    return availability;
+  });
+
   /**
    * A vitrine pública só recebe os intervalos ocupados necessários para
    * disponibilidade. Dados pessoais do cliente nunca saem por esta rota.
@@ -52,6 +86,10 @@ export async function appointmentRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: 'Escolha um horário futuro para o agendamento.' });
     }
 
+    if (!bookingFitsBusinessWindow(salon.openingHours, start, service.durationMin)) {
+      return reply.status(400).send({ message: 'Este serviço não cabe integralmente dentro do horário de funcionamento escolhido. Selecione outro horário.' });
+    }
+
     const end = new Date(start.getTime() + service.durationMin * 60_000);
 
     const conflict = await prisma.appointment.findFirst({
@@ -63,7 +101,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
       }
     });
 
-    if (conflict) return reply.status(409).send({ message: 'Este profissional já possui agendamento neste horário.' });
+    if (conflict) return reply.status(409).send({ message: 'Este profissional já possui agendamento que ocupa parte deste período. Escolha outro horário.' });
 
     const existingClient = await prisma.client.findFirst({ where: { salonId: salon.id, phone: data.clientPhone } });
     const client = existingClient || await prisma.client.create({
