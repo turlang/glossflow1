@@ -8,6 +8,7 @@ import { WhatsAppAgentTester } from './components/admin/WhatsAppAgentTester.jsx'
 import { ProfessionalCapabilitiesAdmin } from './components/admin/ProfessionalCapabilitiesAdmin.jsx';
 import { ProfessionalScheduleAdmin } from './components/admin/ProfessionalScheduleAdmin.jsx';
 import { OperationalAgendaBoard } from './components/admin/OperationalAgendaBoard.jsx';
+import { SmartFitAdmin } from './components/admin/SmartFitAdmin.jsx';
 import { ModuleVisibilityGuard } from './components/admin/ModuleVisibilityGuard.jsx';
 import { CommercialLanding } from './components/commercial/CommercialLanding.jsx';
 import { hasModule } from './utils/modules';
@@ -51,7 +52,7 @@ export default function App() {
   const authRole = tokenRole(authToken);
   const isSuperAdmin = authRole === 'SUPER_ADMIN';
   const backofficeSalon = adminSalon || salon;
-  const backofficePages = ['admin', 'login', 'agent-test', 'professional-services', 'professional-schedule', 'operational-agenda'];
+  const backofficePages = ['admin', 'login', 'agent-test', 'professional-services', 'professional-schedule', 'operational-agenda', 'smart-fit'];
 
   function clearTenantAdminData() {
     setAdminSalon(null); setAppointments([]); setInventory([]); setUsers([]); setClients([]); setFinancialEntries([]);
@@ -70,6 +71,7 @@ export default function App() {
     if (action === 'professional-services') setPage(authToken && tokenRole(authToken) !== 'SUPER_ADMIN' ? 'professional-services' : 'login');
     if (action === 'professional-schedule') setPage(authToken && tokenRole(authToken) !== 'SUPER_ADMIN' ? 'professional-schedule' : 'login');
     if (action === 'operational-agenda') setPage(authToken && tokenRole(authToken) !== 'SUPER_ADMIN' ? 'operational-agenda' : 'login');
+    if (action === 'smart-fit') setPage(authToken && tokenRole(authToken) !== 'SUPER_ADMIN' ? 'smart-fit' : 'login');
     if (action === 'commercial') setPage('commercial');
     localStorage.setItem('glossflow.pwa.query-action', action || 'public');
   }, []);
@@ -84,7 +86,7 @@ export default function App() {
 
   useEffect(() => {
     if (!authToken) return;
-    if (isSuperAdmin && ['admin', 'agent-test', 'professional-services', 'professional-schedule', 'operational-agenda'].includes(page)) setPage('platform-admin');
+    if (isSuperAdmin && ['admin', 'agent-test', 'professional-services', 'professional-schedule', 'operational-agenda', 'smart-fit'].includes(page)) setPage('platform-admin');
     if (!isSuperAdmin && page === 'platform-admin') setPage('admin');
   }, [authToken, authRole, page]);
 
@@ -173,6 +175,7 @@ export default function App() {
       {!loading && !error && page === 'professional-services' && (isAuthenticated && !isSuperAdmin ? <ProfessionalCapabilitiesAdmin salon={backofficeSalon} services={services} professionals={professionals} reload={loadPublicData} setPage={setPage} /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
       {!loading && !error && page === 'professional-schedule' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <ProfessionalScheduleAdmin setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="A jornada da equipe faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
       {!loading && !error && page === 'operational-agenda' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <OperationalAgendaBoard appointments={appointments} professionals={professionals} reload={loadPublicData} setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="A agenda operacional faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
+      {!loading && !error && page === 'smart-fit' && (isAuthenticated && !isSuperAdmin && canUseBooking ? <SmartFitAdmin services={services} professionals={professionals} setPage={setPage} /> : isAuthenticated && !isSuperAdmin ? <StateMessage title="Módulo não habilitado" text="O encaixe inteligente faz parte do módulo Agenda." danger /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
       {!loading && !error && page === 'admin' && (isAuthenticated && !isSuperAdmin ? <AdminDashboard salon={backofficeSalon} services={services} professionals={professionals} portfolio={portfolio} appointments={appointments} inventory={inventory} users={users} clients={clients} financialEntries={financialEntries} commissions={commissions} loyalty={loyalty} subscription={subscription} whatsappTemplates={whatsappTemplates} insights={insights} reload={loadPublicData} setPage={setPage} theme={theme} toggleTheme={toggleTheme} /> : <LoginPage setPage={setPage} onLogin={setAuthToken} />)}
     </div>
   );
