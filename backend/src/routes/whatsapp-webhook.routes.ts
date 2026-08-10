@@ -3,7 +3,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
-import { directAvailabilityFromDecision } from '../services/direct-availability.service';
+import { directAvailabilityFromText } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
 import {
   answerWhatsAppMessage,
@@ -38,6 +38,12 @@ function validSignature(rawBody: string, signature: string, secret: string) {
   const expectedBuffer = Buffer.from(expected);
   const receivedBuffer = Buffer.from(signature);
   return expectedBuffer.length === receivedBuffer.length && timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+function stripServiceChoicePrompt(text: string) {
+  return String(text || '')
+    .replace(/\n\nSe quiser,\s*(?:escolha|me diga)[\s\S]*$/i, '')
+    .trim();
 }
 
 async function fallbackSalon(phoneNumberId: string) {
@@ -92,18 +98,23 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
 
         if (await hasOpenHumanHandoff(salon.id, from)) continue;
 
-        const serviceDecision = text ? await unavailableServiceDecision(salon.id, text) : null;
-        const clarification = text && !serviceDecision ? await availabilityClarification(salon.id, text) : null;
+        const [serviceDecision, directAvailability] = text
+          ? await Promise.all([
+              unavailableServiceDecision(salon.id, text),
+              directAvailabilityFromText({ salon, text })
+            ])
+          : [null, null];
+        const clarification = text && !serviceDecision && !directAvailability
+          ? await availabilityClarification(salon.id, text)
+          : null;
 
         let rawReplyText: string;
         if (!text) {
           rawReplyText = 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
-        } else if (serviceDecision?.continueWithAI) {
-          const availabilityAnswer = await directAvailabilityFromDecision({
-            salon,
-            decisionText: serviceDecision.aiText || text
-          });
-          rawReplyText = `${serviceDecision.reply}\n\n${availabilityAnswer}`;
+        } else if (serviceDecision && directAvailability) {
+          rawReplyText = `${stripServiceChoicePrompt(serviceDecision.reply)}\n\n${directAvailability}`;
+        } else if (directAvailability) {
+          rawReplyText = directAvailability;
         } else {
           rawReplyText = serviceDecision?.reply
             || clarification
