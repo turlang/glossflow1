@@ -227,6 +227,12 @@ export async function markAllOperationalNotificationsRead(input: { salonId: stri
   return { marked: missing.length };
 }
 
+function twilioTrialContentSid() {
+  const isTwilioTrial = String(process.env.WHATSAPP_PROVIDER || '').toLowerCase() === 'twilio'
+    && process.env.TWILIO_TRIAL_MODE === 'true';
+  return isTwilioTrial ? String(process.env.TWILIO_TRIAL_CONTENT_SID || '').trim() : '';
+}
+
 async function registerWhatsAppDelivery(input: {
   salonId: string;
   clientPhone: string;
@@ -236,19 +242,20 @@ async function registerWhatsAppDelivery(input: {
   templateName?: string;
   templateParameters?: Array<string | number>;
 }) {
-  const result = input.templateName
+  const effectiveTemplateName = input.templateName || twilioTrialContentSid() || undefined;
+  const result = effectiveTemplateName
     ? await sendWhatsAppTemplateMessage({
         phone: input.clientPhone,
-        templateName: input.templateName,
+        templateName: effectiveTemplateName,
         bodyParameters: input.templateParameters || []
       })
     : await sendWhatsAppMessage({ phone: input.clientPhone, message: input.message });
 
-  const providerData = result as { data?: { messages?: Array<{ id?: string }> } };
+  const providerData = result as { messageId?: string; data?: { messages?: Array<{ id?: string }>; sid?: string } };
   if (result.ok) {
     await saveWhatsAppMessage({
       salonId: input.salonId,
-      providerMessageId: providerData.data?.messages?.[0]?.id,
+      providerMessageId: providerData.messageId || providerData.data?.messages?.[0]?.id || providerData.data?.sid,
       phone: input.clientPhone,
       direction: 'OUT',
       text: input.message
@@ -262,7 +269,7 @@ async function registerWhatsAppDelivery(input: {
     salonId: input.salonId,
     type: 'WHATSAPP_DELIVERY_FAILED',
     title: 'Falha ao enviar WhatsApp',
-    message: `${input.contextTitle}. O agendamento continua válido, mas a mensagem automática para o cliente não foi entregue.${providerReason ? ` Meta/provider: ${providerReason}` : ''}`,
+    message: `${input.contextTitle}. O agendamento continua válido, mas a mensagem automática para o cliente não foi entregue.${providerReason ? ` Provider: ${providerReason}` : ''}`,
     appointmentId: input.appointmentId,
     severity: 'WARNING'
   });
