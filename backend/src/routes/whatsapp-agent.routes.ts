@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { getAIRuntimeConfig } from '../services/ai-provider.service';
 import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
+import { directAvailabilityFromDecision } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
 import {
@@ -157,8 +158,6 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
     const handoffOpen = await hasOpenHumanHandoff(salon.id, body.phone);
     if (handoffOpen && !requestsHumanSupport(body.message)) {
-      // No laboratório, um handoff antigo não pode travar os próximos testes.
-      // Se a nova mensagem não pede atendimento humano, retomamos a automação.
       await closeHumanHandoff(salon.id, body.phone);
     } else if (handoffOpen) {
       return reply.status(409).send({ message: 'Este telefone está em atendimento humano. Encerre o handoff para retomar o atendimento automático.' });
@@ -171,11 +170,9 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
       let rawAnswer: string;
       if (serviceDecision?.continueWithAI) {
-        const availabilityAnswer = await answerWhatsAppMessage({
+        const availabilityAnswer = await directAvailabilityFromDecision({
           salon,
-          phone: body.phone,
-          clientName: body.clientName,
-          text: serviceDecision.aiText || body.message
+          decisionText: serviceDecision.aiText || body.message
         });
         rawAnswer = `${serviceDecision.reply}\n\n${availabilityAnswer}`;
       } else {
