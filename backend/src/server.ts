@@ -6,6 +6,7 @@ import { appRoutes } from './routes/appRoutes';
 import { recordMetric } from './routes/metrics';
 import { captureOperationalError } from './services/sentry.service';
 import { ensureSuperAdminFromEnv } from './services/super-admin-bootstrap.service';
+import { scanAppointmentReminders } from './services/appointment-reminder.service';
 import { prisma } from './lib/prisma';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -188,6 +189,21 @@ app.setErrorHandler((error, _request, reply) => {
 
 app.register(appRoutes);
 
+function startReminderScheduler() {
+  const intervalMinutes = Math.max(5, Number(process.env.APPOINTMENT_REMINDER_SCAN_MINUTES || 10));
+  const run = () => {
+    void scanAppointmentReminders()
+      .then((result) => {
+        if (result.sent || result.failed) app.log.info({ reminders: result }, 'Varredura de lembretes concluída.');
+      })
+      .catch((error) => app.log.error(error, 'Falha na varredura automática de lembretes.'));
+  };
+
+  run();
+  const timer = setInterval(run, intervalMinutes * 60_000);
+  timer.unref();
+}
+
 const start = async () => {
   const port = Number(process.env.PORT) || 3333;
 
@@ -202,6 +218,7 @@ const start = async () => {
   });
 
   await app.listen({ port, host: '0.0.0.0' });
+  startReminderScheduler();
   console.log(`🚀 GlossFlow API rodando em http://localhost:${port} • build ${buildId}`);
 };
 
