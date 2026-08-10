@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { getAIRuntimeConfig } from '../services/ai-provider.service';
 import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
-import { directAvailabilityFromDecision } from '../services/direct-availability.service';
+import { directAvailabilityFromText } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
 import { getTenant } from './helpers';
 import {
@@ -33,6 +33,12 @@ function requestsHumanSupport(text: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
   return /\b(humano|atendente|pessoa|alguem|falar com|reclamacao|reembolso|estorno)\b/.test(value);
+}
+
+function stripServiceChoicePrompt(text: string) {
+  return String(text || '')
+    .replace(/\n\nSe quiser,\s*(?:escolha|me diga)[\s\S]*$/i, '')
+    .trim();
 }
 
 function agentError(error: unknown) {
@@ -113,6 +119,7 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
       aiProviderLabel: runtime.providerLabel,
       aiConfigured: runtime.configured,
       aiModel: runtime.model,
+      backendRevision: String(process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || '').slice(0, 12) || null,
       openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
       groqConfigured: Boolean(process.env.GROQ_API_KEY),
       whatsappTokenConfigured: Boolean(process.env.WHATSAPP_ACCESS_TOKEN),
@@ -165,16 +172,19 @@ export async function whatsappAgentRoutes(app: FastifyInstance) {
 
     try {
       await saveWhatsAppMessage({ salonId: salon.id, phone: body.phone, direction: 'IN', text: body.message });
-      const serviceDecision = await unavailableServiceDecision(salon.id, body.message);
-      const clarification = serviceDecision ? null : await availabilityClarification(salon.id, body.message);
+      const [serviceDecision, directAvailability] = await Promise.all([
+        unavailableServiceDecision(salon.id, body.message),
+        directAvailabilityFromText({ salon, text: body.message })
+      ]);
+      const clarification = serviceDecision || directAvailability
+        ? null
+        : await availabilityClarification(salon.id, body.message);
 
       let rawAnswer: string;
-      if (serviceDecision?.continueWithAI) {
-        const availabilityAnswer = await directAvailabilityFromDecision({
-          salon,
-          decisionText: serviceDecision.aiText || body.message
-        });
-        rawAnswer = `${serviceDecision.reply}\n\n${availabilityAnswer}`;
+      if (serviceDecision && directAvailability) {
+        rawAnswer = `${stripServiceChoicePrompt(serviceDecision.reply)}\n\n${directAvailability}`;
+      } else if (directAvailability) {
+        rawAnswer = directAvailability;
       } else {
         rawAnswer = serviceDecision?.reply
           || clarification
