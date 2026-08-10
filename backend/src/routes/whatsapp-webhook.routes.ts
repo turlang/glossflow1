@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
+import { availabilityClarification } from '../services/agent-intent.service';
 import { hasSalonModule } from '../services/module-access.service';
 import {
   answerWhatsAppMessage,
@@ -89,8 +90,9 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
 
         if (await hasOpenHumanHandoff(salon.id, from)) continue;
 
+        const clarification = text ? await availabilityClarification(salon.id, text) : null;
         const replyText = text
-          ? await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text })
+          ? (clarification || await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text }))
           : 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
 
         const result = await sendWhatsAppMessage({ to: from, message: replyText, phoneNumberId });
