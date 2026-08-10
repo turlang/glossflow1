@@ -1,0 +1,267 @@
+import { prisma } from '../lib/prisma';
+
+type SalonWindow = {
+  id: string;
+  openingHours: string;
+};
+
+type AvailabilityInput = {
+  salon: SalonWindow;
+  serviceId: string;
+  professionalId?: string;
+  month?: string;
+  date?: string;
+};
+
+type BusyInterval = { startTime: Date; endTime: Date; professionalId: string };
+
+function businessTimeZone() {
+  return process.env.BUSINESS_TIMEZONE || 'America/Sao_Paulo';
+}
+
+function localOffset() {
+  const value = process.env.BUSINESS_TIMEZONE_OFFSET || '-03:00';
+  return /^[+-]\d{2}:\d{2}$/.test(value) ? value : '-03:00';
+}
+
+function intervalMinutes() {
+  const value = Number(process.env.BOOKING_SLOT_INTERVAL_MINUTES || 30);
+  return Number.isFinite(value) && value >= 10 && value <= 120 ? value : 30;
+}
+
+function parseOpeningHours(text: string) {
+  const matches = [...String(text || '').matchAll(/\b([01]?\d|2[0-3])(?::([0-5]\d))?\s*h?\b/gi)]
+    .map((match) => ({ hour: Number(match[1]), minute: Number(match[2] || 0) }));
+
+  if (matches.length >= 2) {
+    const startMin = matches[0].hour * 60 + matches[0].minute;
+    const endMin = matches[1].hour * 60 + matches[1].minute;
+    if (startMin < endMin) return { startMin, endMin };
+  }
+
+  return { startMin: 9 * 60, endMin: 19 * 60 };
+}
+
+function asDate(date: string, minutes: number) {
+  const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
+  const minute = String(minutes % 60).padStart(2, '0');
+  return new Date(`${date}T${hour}:${minute}:00${localOffset()}`);
+}
+
+function addDays(date: string, amount: number) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + amount);
+  return value.toISOString().slice(0, 10);
+}
+
+function todayBusinessDate() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: businessTimeZone(),
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
+function monthBounds(month: string) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const start = `${year}-${String(monthNumber).padStart(2, '0')}-01`;
+  const next = new Date(Date.UTC(year, monthNumber, 1, 12));
+  const nextMonth = next.toISOString().slice(0, 7);
+  const endExclusive = `${nextMonth}-01`;
+  return { start, endExclusive };
+}
+
+function datesInMonth(month: string) {
+  const { start, endExclusive } = monthBounds(month);
+  const dates: string[] = [];
+  for (let date = start; date < endExclusive; date = addDays(date, 1)) dates.push(date);
+  return dates;
+}
+
+function closedByDefault(date: string) {
+  return new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
+}
+
+function mergeBusy(intervals: Array<{ start: Date; end: Date }>, dayStart: Date, dayEnd: Date) {
+  const normalized = intervals
+    .map(({ start, end }) => ({
+      start: new Date(Math.max(start.getTime(), dayStart.getTime())),
+      end: new Date(Math.min(end.getTime(), dayEnd.getTime()))
+    }))
+    .filter(({ start, end }) => start < end)
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const merged: Array<{ start: Date; end: Date }> = [];
+  for (const interval of normalized) {
+    const last = merged[merged.length - 1];
+    if (!last || interval.start > last.end) merged.push(interval);
+    else if (interval.end > last.end) last.end = interval.end;
+  }
+  return merged;
+}
+
+function freeBlocks(date: string, busy: Array<{ start: Date; end: Date }>, opening: { startMin: number; endMin: number }) {
+  if (closedByDefault(date)) return [];
+  const dayStart = asDate(date, opening.startMin);
+  const dayEnd = asDate(date, opening.endMin);
+  const merged = mergeBusy(busy, dayStart, dayEnd);
+  const blocks: Array<{ start: Date; end: Date }> = [];
+  let cursor = dayStart;
+
+  for (const interval of merged) {
+    if (cursor < interval.start) blocks.push({ start: cursor, end: interval.start });
+    if (interval.end > cursor) cursor = interval.end;
+  }
+  if (cursor < dayEnd) blocks.push({ start: cursor, end: dayEnd });
+  return blocks;
+}
+
+function capacityForBlocks(blocks: Array<{ start: Date; end: Date }>, durationMin: number) {
+  const durationMs = durationMin * 60_000;
+  return blocks.reduce((total, block) => total + Math.floor((block.end.getTime() - block.start.getTime()) / durationMs), 0);
+}
+
+function slotOptions(date: string, blocks: Array<{ start: Date; end: Date }>, durationMin: number) {
+  const interval = intervalMinutes();
+  const durationMs = durationMin * 60_000;
+  const options: Array<{ startTime: string; label: string }> = [];
+
+  const format = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: businessTimeZone(),
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  for (const block of blocks) {
+    const localStart = new Intl.DateTimeFormat('en-US', {
+      timeZone: businessTimeZone(), hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(block.start);
+    const startHour = Number(localStart.find((part) => part.type === 'hour')?.value || 0);
+    const startMinute = Number(localStart.find((part) => part.type === 'minute')?.value || 0);
+    const startOfBlockMin = startHour * 60 + startMinute;
+    let candidateMin = Math.ceil(startOfBlockMin / interval) * interval;
+
+    while (candidateMin < 24 * 60) {
+      const candidate = asDate(date, candidateMin);
+      const end = new Date(candidate.getTime() + durationMs);
+      if (candidate < block.start) {
+        candidateMin += interval;
+        continue;
+      }
+      if (end > block.end) break;
+      if (candidate > new Date()) {
+        options.push({ startTime: candidate.toISOString(), label: format.format(candidate) });
+      }
+      candidateMin += interval;
+    }
+  }
+
+  return options;
+}
+
+function busyForProfessional(appointments: BusyInterval[], professionalId: string, date: string) {
+  const dayStart = asDate(date, 0);
+  const dayEnd = asDate(addDays(date, 1), 0);
+  return appointments
+    .filter((appointment) => appointment.professionalId === professionalId && appointment.startTime < dayEnd && appointment.endTime > dayStart)
+    .map((appointment) => ({ start: appointment.startTime, end: appointment.endTime }));
+}
+
+export async function publicBookingAvailability(input: AvailabilityInput) {
+  const service = await prisma.service.findFirst({
+    where: { id: input.serviceId, salonId: input.salon.id, active: true },
+    select: { id: true, name: true, price: true, durationMin: true }
+  });
+  if (!service) return null;
+
+  const professionals = await prisma.professional.findMany({
+    where: {
+      salonId: input.salon.id,
+      active: true,
+      ...(input.professionalId ? { id: input.professionalId } : {})
+    },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, specialty: true, photoUrl: true }
+  });
+
+  const referenceMonth = input.month || input.date?.slice(0, 7) || todayBusinessDate().slice(0, 7);
+  const { start, endExclusive } = monthBounds(referenceMonth);
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      salonId: input.salon.id,
+      professionalId: { in: professionals.map((professional) => professional.id) },
+      status: 'CONFIRMED',
+      startTime: { lt: asDate(endExclusive, 0) },
+      endTime: { gt: asDate(start, 0) }
+    },
+    select: { professionalId: true, startTime: true, endTime: true }
+  });
+
+  const opening = parseOpeningHours(input.salon.openingHours);
+  const today = todayBusinessDate();
+
+  if (input.date) {
+    const date = input.date;
+    const detail = professionals.map((professional) => {
+      const blocks = date < today ? [] : freeBlocks(date, busyForProfessional(appointments, professional.id, date), opening);
+      const capacity = capacityForBlocks(blocks, service.durationMin);
+      return {
+        ...professional,
+        capacity,
+        slots: slotOptions(date, blocks, service.durationMin)
+      };
+    });
+
+    return {
+      mode: 'day' as const,
+      date,
+      service,
+      intervalMin: intervalMinutes(),
+      professionals: detail,
+      totalCapacity: detail.reduce((sum, professional) => sum + professional.capacity, 0)
+    };
+  }
+
+  const days = datesInMonth(referenceMonth).map((date) => {
+    const professionalCapacity = professionals.map((professional) => {
+      const blocks = date < today ? [] : freeBlocks(date, busyForProfessional(appointments, professional.id, date), opening);
+      return {
+        professionalId: professional.id,
+        professionalName: professional.name,
+        capacity: capacityForBlocks(blocks, service.durationMin)
+      };
+    });
+
+    return {
+      date,
+      totalCapacity: professionalCapacity.reduce((sum, professional) => sum + professional.capacity, 0),
+      professionals: professionalCapacity
+    };
+  });
+
+  return {
+    mode: 'month' as const,
+    month: referenceMonth,
+    service,
+    intervalMin: intervalMinutes(),
+    professionals,
+    days
+  };
+}
+
+export function bookingFitsBusinessWindow(openingHours: string, start: Date, durationMin: number) {
+  if (!Number.isFinite(start.getTime()) || start <= new Date()) return false;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: businessTimeZone(),
+    weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(start);
+  const weekday = parts.find((part) => part.type === 'weekday')?.value || '';
+  if (weekday === 'Sun') return false;
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value || 0);
+  const startMin = hour * 60 + minute;
+  const opening = parseOpeningHours(openingHours);
+  return startMin >= opening.startMin && startMin + durationMin <= opening.endMin;
+}
