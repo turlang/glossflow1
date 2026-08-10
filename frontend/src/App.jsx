@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { request } from './services/api';
+import { onAuthExpired, request } from './services/api';
 import { Header, PublicShowcase, BookingPage, LoginPage } from './components/public/PublicExperience.jsx';
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.jsx';
@@ -55,6 +55,12 @@ export default function App() {
   const backofficeSalon = adminSalon || salon;
   const backofficePages = ['admin', 'login', 'agent-test'];
 
+  function clearTenantAdminData() {
+    setAdminSalon(null); setAppointments([]); setInventory([]); setUsers([]); setClients([]); setFinancialEntries([]);
+    setCommissions({ rules: [], projections: [] }); setLoyalty({ program: null, entries: [] });
+    setSubscription({ plans: [], subscription: null }); setWhatsappTemplates([]); setInsights({ saved: [], suggestions: [] });
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const action = params.get('action');
@@ -65,6 +71,16 @@ export default function App() {
     if (action === 'agent-test') setPage(authToken && tokenRole(authToken) !== 'SUPER_ADMIN' ? 'agent-test' : 'login');
     if (action === 'commercial') setPage('commercial');
     localStorage.setItem('glossflow.pwa.query-action', action || 'public');
+  }, []);
+
+  useEffect(() => {
+    return onAuthExpired(() => {
+      setAuthToken('');
+      clearTenantAdminData();
+      setError('');
+      setLoading(false);
+      setPage('login');
+    });
   }, []);
 
   useEffect(() => {
@@ -89,12 +105,6 @@ export default function App() {
   }, [salon, adminSalon, page]);
 
   function toggleTheme() { setTheme((current) => current === 'dark' ? 'light' : 'dark'); }
-
-  function clearTenantAdminData() {
-    setAdminSalon(null); setAppointments([]); setInventory([]); setUsers([]); setClients([]); setFinancialEntries([]);
-    setCommissions({ rules: [], projections: [] }); setLoyalty({ program: null, entries: [] });
-    setSubscription({ plans: [], subscription: null }); setWhatsappTemplates([]); setInsights({ saved: [], suggestions: [] });
-  }
 
   async function loadPublicData() {
     setLoading(true); setError('');
