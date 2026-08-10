@@ -63,7 +63,13 @@ export const professionalSchema = z.object({
   specialty: z.string().min(2),
   bio: z.string().min(5),
   photoUrl: z.string().optional().default(''),
-  active: z.coerce.boolean().optional().default(true)
+  active: z.coerce.boolean().optional().default(true),
+  servicesConfigured: z.coerce.boolean().optional().default(false),
+  serviceIds: z.array(objectIdSchema).optional().default([])
+}).superRefine((value, ctx) => {
+  if (value.servicesConfigured && value.serviceIds.length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['serviceIds'], message: 'Selecione pelo menos um serviço atendido pelo profissional.' });
+  }
 });
 
 export const portfolioSchema = z.object({
