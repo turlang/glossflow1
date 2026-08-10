@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { filterProfessionalsForService } from './professional-capability.service';
 
 type SalonWindow = {
   id: string;
@@ -176,28 +177,37 @@ export async function publicBookingAvailability(input: AvailabilityInput) {
   });
   if (!service) return null;
 
-  const professionals = await prisma.professional.findMany({
-    where: {
-      salonId: input.salon.id,
-      active: true,
-      ...(input.professionalId ? { id: input.professionalId } : {})
-    },
+  const allProfessionals = await prisma.professional.findMany({
+    where: { salonId: input.salon.id, active: true },
     orderBy: { name: 'asc' },
-    select: { id: true, name: true, specialty: true, photoUrl: true }
+    select: {
+      id: true,
+      name: true,
+      specialty: true,
+      photoUrl: true,
+      servicesConfigured: true,
+      serviceIds: true
+    }
   });
+
+  const professionals = filterProfessionalsForService(allProfessionals, service.id)
+    .filter((professional) => !input.professionalId || professional.id === input.professionalId)
+    .map(({ serviceIds: _serviceIds, servicesConfigured: _servicesConfigured, ...professional }) => professional);
 
   const referenceMonth = input.month || input.date?.slice(0, 7) || todayBusinessDate().slice(0, 7);
   const { start, endExclusive } = monthBounds(referenceMonth);
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      salonId: input.salon.id,
-      professionalId: { in: professionals.map((professional) => professional.id) },
-      status: 'CONFIRMED',
-      startTime: { lt: asDate(endExclusive, 0) },
-      endTime: { gt: asDate(start, 0) }
-    },
-    select: { professionalId: true, startTime: true, endTime: true }
-  });
+  const appointments = professionals.length
+    ? await prisma.appointment.findMany({
+        where: {
+          salonId: input.salon.id,
+          professionalId: { in: professionals.map((professional) => professional.id) },
+          status: 'CONFIRMED',
+          startTime: { lt: asDate(endExclusive, 0) },
+          endTime: { gt: asDate(start, 0) }
+        },
+        select: { professionalId: true, startTime: true, endTime: true }
+      })
+    : [];
 
   const opening = parseOpeningHours(input.salon.openingHours);
   const today = todayBusinessDate();
