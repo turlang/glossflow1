@@ -73,6 +73,7 @@ export function SmartFitAdmin({ services, professionals, setPage }) {
           </div>
           <div className="smart-fit-actions">
             <button className="secondary" type="button" onClick={() => setPage('operational-agenda')}>Agenda Visual</button>
+            <button className="secondary" type="button" onClick={() => setPage('waitlist')}>Lista de espera</button>
             <button className="secondary" type="button" onClick={() => setPage('professional-schedule')}>Jornada</button>
             <button className="secondary" type="button" onClick={() => setPage('admin')}>Painel</button>
           </div>
