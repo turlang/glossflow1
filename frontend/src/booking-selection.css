@@ -1,0 +1,112 @@
+/*
+ * Feedback visual forte para o fluxo de agendamento público.
+ * O componente já mantém os estados `.is-selected`; este arquivo torna a
+ * escolha inequívoca em qualquer tema/identidade white-label.
+ */
+.booking-experience .booking-service,
+.booking-experience .booking-pro-chip,
+.booking-experience .booking-day,
+.booking-experience .booking-slot {
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.booking-experience .booking-service.is-selected,
+.booking-experience .booking-pro-chip.is-selected,
+.booking-experience .booking-day.is-selected,
+.booking-experience .booking-slot.is-selected {
+  position: relative;
+  border: 2px solid var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 22%, var(--card)) !important;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent),
+    0 10px 28px color-mix(in srgb, var(--primary) 15%, transparent) !important;
+  transform: translateY(-2px);
+}
+
+.booking-experience .booking-service.is-selected::after,
+.booking-experience .booking-pro-chip.is-selected::after,
+.booking-experience .booking-day.is-selected::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #111;
+  font-size: .78rem;
+  font-weight: 1000;
+  line-height: 1;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .22);
+  pointer-events: none;
+}
+
+.booking-experience .booking-service.is-selected > span:first-child,
+.booking-experience .booking-pro-chip.is-selected strong,
+.booking-experience .booking-day.is-selected .booking-day-number {
+  color: var(--primary) !important;
+}
+
+.booking-experience .booking-pro-chip.is-selected .booking-pro-avatar {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.booking-experience .booking-day.is-selected {
+  outline: 1px solid color-mix(in srgb, var(--primary) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.booking-experience .booking-day.is-selected > strong {
+  color: var(--text) !important;
+}
+
+.booking-experience .booking-slot.is-selected {
+  padding-left: 12px;
+  padding-right: 12px;
+  font-weight: 950;
+}
+
+.booking-experience .booking-slot.is-selected::before {
+  content: '✓ ';
+  color: var(--primary);
+  font-weight: 1000;
+}
+
+.booking-experience .booking-service:focus-visible,
+.booking-experience .booking-pro-chip:focus-visible,
+.booking-experience .booking-day:focus-visible,
+.booking-experience .booking-slot:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: 3px;
+}
+
+/* O número da etapa também confirma visualmente que uma escolha foi feita. */
+.booking-experience .booking-step:has(.booking-service.is-selected) .booking-step-number,
+.booking-experience .booking-step:has(.booking-pro-chip.is-selected) .booking-step-number,
+.booking-experience .booking-step:has(.booking-day.is-selected) .booking-step-number,
+.booking-experience .booking-step:has(.booking-slot.is-selected) .booking-step-number {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+@media (max-width: 720px) {
+  .booking-experience .booking-service.is-selected,
+  .booking-experience .booking-pro-chip.is-selected,
+  .booking-experience .booking-day.is-selected,
+  .booking-experience .booking-slot.is-selected {
+    transform: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 34%, transparent) !important;
+  }
+
+  .booking-experience .booking-service.is-selected::after,
+  .booking-experience .booking-pro-chip.is-selected::after,
+  .booking-experience .booking-day.is-selected::after {
+    width: 20px;
+    height: 20px;
+    top: 5px;
+    right: 5px;
+    font-size: .68rem;
+  }
+}
