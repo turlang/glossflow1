@@ -5,6 +5,7 @@ import { availabilityClarification, unavailableServiceDecision } from '../servic
 import { guardAgentReply } from '../services/agent-response-guard.service';
 import { directAvailabilityFromText } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
+import { confirmPendingBooking } from '../services/pending-booking.service';
 import {
   answerWhatsAppMessage,
   findSalonByWhatsApp,
@@ -98,27 +99,41 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
 
         if (await hasOpenHumanHandoff(salon.id, from)) continue;
 
-        const [serviceDecision, directAvailability] = text
-          ? await Promise.all([
-              unavailableServiceDecision(salon.id, text),
-              directAvailabilityFromText({ salon, text })
-            ])
-          : [null, null];
-        const clarification = text && !serviceDecision && !directAvailability
-          ? await availabilityClarification(salon.id, text)
+        const confirmation = text
+          ? await confirmPendingBooking({
+              salonId: salon.id,
+              salonName: salon.name,
+              clientPhone: from,
+              clientName: contactName,
+              text
+            })
           : null;
 
         let rawReplyText: string;
-        if (!text) {
-          rawReplyText = 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
-        } else if (serviceDecision && directAvailability) {
-          rawReplyText = `${stripServiceChoicePrompt(serviceDecision.reply)}\n\n${directAvailability}`;
-        } else if (directAvailability) {
-          rawReplyText = directAvailability;
+        if (confirmation?.handled) {
+          rawReplyText = confirmation.replyText;
         } else {
-          rawReplyText = serviceDecision?.reply
-            || clarification
-            || await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text });
+          const [serviceDecision, directAvailability] = text
+            ? await Promise.all([
+                unavailableServiceDecision(salon.id, text),
+                directAvailabilityFromText({ salon, text })
+              ])
+            : [null, null];
+          const clarification = text && !serviceDecision && !directAvailability
+            ? await availabilityClarification(salon.id, text)
+            : null;
+
+          if (!text) {
+            rawReplyText = 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
+          } else if (serviceDecision && directAvailability) {
+            rawReplyText = `${stripServiceChoicePrompt(serviceDecision.reply)}\n\n${directAvailability}`;
+          } else if (directAvailability) {
+            rawReplyText = directAvailability;
+          } else {
+            rawReplyText = serviceDecision?.reply
+              || clarification
+              || await answerWhatsAppMessage({ salon, phone: from, clientName: contactName, text });
+          }
         }
 
         const guarded = await guardAgentReply({ salonId: salon.id, phone: from, userText: text, replyText: rawReplyText });
