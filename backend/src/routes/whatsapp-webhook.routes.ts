@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
+import { directAvailabilityFromDecision } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
 import {
   answerWhatsAppMessage,
@@ -98,11 +99,9 @@ async function processPayload(app: FastifyInstance, payload: MetaWebhookPayload)
         if (!text) {
           rawReplyText = 'No momento consigo atender mensagens de texto. Se preferir, posso encaminhar você para uma pessoa da equipe.';
         } else if (serviceDecision?.continueWithAI) {
-          const availabilityAnswer = await answerWhatsAppMessage({
+          const availabilityAnswer = await directAvailabilityFromDecision({
             salon,
-            phone: from,
-            clientName: contactName,
-            text: serviceDecision.aiText || text
+            decisionText: serviceDecision.aiText || text
           });
           rawReplyText = `${serviceDecision.reply}\n\n${availabilityAnswer}`;
         } else {
