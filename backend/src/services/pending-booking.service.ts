@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { professionalCanPerform } from './professional-capability.service';
+import { bookingFitsProfessionalSchedule } from './professional-schedule.service';
 
 function norm(v: string) {
   return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -44,7 +45,6 @@ async function latestPendingSummary(salonId: string, clientPhone: string) {
     const text = String(meta.text || '').trim();
     if (!text) continue;
 
-    // Se já houve confirmação final depois do resumo, não reutiliza um pedido antigo.
     if (/agendamento (?:j[aá] est[aá] )?confirmado/i.test(text) || /hor[aá]rio j[aá] est[aá] reservado/i.test(text)) return null;
 
     const summary = parseSummary(text);
@@ -65,13 +65,14 @@ export async function confirmPendingBooking(input: { salonId: string; salonName:
   const summary = await latestPendingSummary(input.salonId, input.clientPhone);
   if (!summary) return null;
 
-  const [services, professionals] = await Promise.all([
+  const [services, professionals, salon] = await Promise.all([
     prisma.service.findMany({ where: { salonId: input.salonId, active: true } }),
-    prisma.professional.findMany({ where: { salonId: input.salonId, active: true } })
+    prisma.professional.findMany({ where: { salonId: input.salonId, active: true } }),
+    prisma.salon.findUnique({ where: { id: input.salonId }, select: { openingHours: true } })
   ]);
   const service = services.find((x) => norm(x.name) === norm(summary.service));
   const professional = professionals.find((x) => norm(x.name) === norm(summary.professional));
-  if (!service || !professional) return { handled: true, replyText: 'Não consegui validar esse resumo. Escolha o horário novamente, por favor.' };
+  if (!service || !professional || !salon) return { handled: true, replyText: 'Não consegui validar esse resumo. Escolha o horário novamente, por favor.' };
   if (!professionalCanPerform(professional, service.id)) {
     return { handled: true, replyText: `${professional.name} não está mais habilitado para executar ${service.name}. Posso consultar outro profissional para você.` };
   }
@@ -80,6 +81,10 @@ export async function confirmPendingBooking(input: { salonId: string; salonName:
   if (start.getTime() <= Date.now()) return { handled: true, replyText: 'Esse horário já passou ou não é mais válido. Posso consultar novos horários para você.' };
 
   const end = new Date(start.getTime() + service.durationMin * 60000);
+  if (!bookingFitsProfessionalSchedule({ professional, openingHours: salon.openingHours, start, end })) {
+    return { handled: true, replyText: `${professional.name} não está mais disponível durante todo esse período. Posso consultar novos horários livres para você.` };
+  }
+
   const normalizedPhone = phone(input.clientPhone);
 
   const existing = await prisma.appointment.findFirst({
