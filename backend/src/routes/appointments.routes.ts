@@ -2,6 +2,17 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
+import {
+  cancellationMinHours,
+  createAppointmentManagementAccess,
+  createOperationalNotification,
+  listOperationalNotifications,
+  markAllOperationalNotificationsRead,
+  markOperationalNotificationRead,
+  notifyAppointmentCancelled,
+  notifyAppointmentCreated,
+  validateAppointmentManagementAccess
+} from '../services/appointment-notification.service';
 import { enforceSalonModuleAccess, hasSalonModule } from '../services/module-access.service';
 import { professionalCanPerform } from '../services/professional-capability.service';
 import { bookingFitsProfessionalSchedule } from '../services/professional-schedule.service';
@@ -27,6 +38,11 @@ const smartFitQuerySchema = z.object({
   serviceId: objectIdSchema,
   professionalId: objectIdSchema.optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida. Use YYYY-MM-DD.')
+});
+
+const managementQuerySchema = z.object({
+  appointmentId: objectIdSchema,
+  token: z.string().min(32)
 });
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido. Use HH:mm.');
@@ -55,6 +71,16 @@ function normalizePhone(value: string) {
 
 function slotInWindow(label: string, earliest: string, latest: string) {
   return label >= earliest && label <= latest;
+}
+
+function cancellationWindow(startTime: Date) {
+  const hours = cancellationMinHours();
+  const cancelUntil = new Date(startTime.getTime() - hours * 60 * 60_000);
+  return {
+    minHours: hours,
+    cancelUntil,
+    canCancel: Date.now() <= cancelUntil.getTime()
+  };
 }
 
 /** Rotas de agenda. A rota POST pública permite ao cliente criar reserva. */
@@ -90,6 +116,90 @@ export async function appointmentRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Página pública de gerenciamento: o token é secreto e fica armazenado somente como hash no backend. */
+  app.get('/appointments/manage', async (request, reply) => {
+    const query = managementQuerySchema.parse(request.query);
+    const salon = await getPublicSalon(request);
+    const valid = await validateAppointmentManagementAccess({ salonId: salon.id, appointmentId: query.appointmentId, token: query.token });
+    if (!valid) return reply.status(404).send({ message: 'Link de gerenciamento inválido ou expirado.' });
+
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: query.appointmentId, salonId: salon.id },
+      include: { service: true, professional: true }
+    });
+    if (!appointment) return reply.status(404).send({ message: 'Agendamento não encontrado.' });
+    const policy = cancellationWindow(appointment.startTime);
+
+    return {
+      id: appointment.id,
+      clientName: appointment.clientName,
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      status: appointment.status,
+      service: { id: appointment.service.id, name: appointment.service.name, durationMin: appointment.service.durationMin },
+      professional: { id: appointment.professional.id, name: appointment.professional.name },
+      cancellationPolicy: {
+        minHours: policy.minHours,
+        cancelUntil: policy.cancelUntil,
+        canCancel: appointment.status === 'CONFIRMED' && policy.canCancel
+      }
+    };
+  });
+
+  app.post('/appointments/cancel', async (request, reply) => {
+    const data = managementQuerySchema.parse(request.body);
+    const salon = await getPublicSalon(request);
+    const valid = await validateAppointmentManagementAccess({ salonId: salon.id, appointmentId: data.appointmentId, token: data.token });
+    if (!valid) return reply.status(404).send({ message: 'Link de gerenciamento inválido ou expirado.' });
+
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: data.appointmentId, salonId: salon.id },
+      include: { service: true, professional: true }
+    });
+    if (!appointment) return reply.status(404).send({ message: 'Agendamento não encontrado.' });
+    if (appointment.status === 'CANCELED') {
+      return { cancelled: true, alreadyCancelled: true, message: 'Este agendamento já está cancelado.' };
+    }
+    if (appointment.status !== 'CONFIRMED') {
+      return reply.status(409).send({ message: 'Este agendamento não pode mais ser cancelado pelo cliente.' });
+    }
+
+    const policy = cancellationWindow(appointment.startTime);
+    if (!policy.canCancel) {
+      return reply.status(409).send({
+        message: `O cancelamento online precisa ser feito com no mínimo ${policy.minHours} horas de antecedência. Entre em contato com o salão para verificar uma exceção.`,
+        code: 'CANCELLATION_WINDOW_CLOSED',
+        minHours: policy.minHours,
+        cancelUntil: policy.cancelUntil
+      });
+    }
+
+    await prisma.appointment.update({ where: { id: appointment.id }, data: { status: 'CANCELED' } });
+    const notification = await notifyAppointmentCancelled({
+      salonId: salon.id,
+      salonName: salon.name,
+      clientName: appointment.clientName,
+      clientPhone: appointment.clientPhone,
+      appointmentId: appointment.id,
+      serviceName: appointment.service.name,
+      professionalId: appointment.professional.id,
+      professionalName: appointment.professional.name,
+      startTime: appointment.startTime,
+      cancelledBy: 'CLIENT'
+    });
+
+    setImmediate(() => {
+      void matchWaitlistAfterAppointmentChange({ salonId: salon.id, previousStartTime: appointment.startTime })
+        .catch((error) => app.log.error(error, 'Falha ao processar lista de espera após cancelamento do cliente.'));
+    });
+
+    return {
+      cancelled: true,
+      message: 'Agendamento cancelado com sucesso. O horário foi liberado na agenda.',
+      clientNotification: notification.ok ? 'SENT' : 'FAILED'
+    };
+  });
+
   app.post('/appointments/waitlist', async (request, reply) => {
     const data = waitlistCreateSchema.parse(request.body);
     const salon = await getPublicSalon(request);
@@ -112,40 +222,21 @@ export async function appointmentRoutes(app: FastifyInstance) {
       return reply.status(409).send({ message: `${professional.name} não executa ${service.name}.` });
     }
 
-    const availability = await publicBookingAvailability({
-      salon,
-      serviceId: service.id,
-      professionalId: professional?.id,
-      date: data.desiredDate
-    });
+    const availability = await publicBookingAvailability({ salon, serviceId: service.id, professionalId: professional?.id, date: data.desiredDate });
     if (availability?.mode === 'day') {
       const compatibleSlot = availability.professionals.some((item) => item.slots.some((slot) => slotInWindow(slot.label, data.earliestTime, data.latestTime)));
-      if (compatibleSlot) {
-        return reply.status(409).send({ message: 'Já existe um horário disponível dentro dessa preferência. Escolha diretamente no calendário.', code: 'SLOT_AVAILABLE' });
-      }
+      if (compatibleSlot) return reply.status(409).send({ message: 'Já existe um horário disponível dentro dessa preferência. Escolha diretamente no calendário.', code: 'SLOT_AVAILABLE' });
     }
 
     const phone = normalizePhone(data.clientPhone);
     const duplicate = await prisma.waitlistEntry.findFirst({
-      where: {
-        salonId: salon.id,
-        serviceId: service.id,
-        clientPhone: phone,
-        desiredDate: data.desiredDate,
-        status: { in: ['WAITING', 'OFFERED'] }
-      }
+      where: { salonId: salon.id, serviceId: service.id, clientPhone: phone, desiredDate: data.desiredDate, status: { in: ['WAITING', 'OFFERED'] } }
     });
     if (duplicate) return reply.status(409).send({ message: 'Você já está na lista de espera para esse serviço e essa data.' });
 
     const existingClient = await prisma.client.findFirst({ where: { salonId: salon.id, phone } });
     const client = existingClient || await prisma.client.create({
-      data: {
-        name: data.clientName,
-        phone,
-        email: data.clientEmail || null,
-        notes: 'Criado automaticamente pela lista de espera.',
-        salonId: salon.id
-      }
+      data: { name: data.clientName, phone, email: data.clientEmail || null, notes: 'Criado automaticamente pela lista de espera.', salonId: salon.id }
     });
 
     const entry = await prisma.waitlistEntry.create({
@@ -165,10 +256,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
       include: { service: true, professional: true }
     });
 
-    return reply.status(201).send({
-      ...entry,
-      message: 'Você entrou na lista de espera. Se surgir uma vaga compatível, o GlossFlow poderá avisar pelo WhatsApp.'
-    });
+    return reply.status(201).send({ ...entry, message: 'Você entrou na lista de espera. Se surgir uma vaga compatível, o GlossFlow poderá avisar pelo WhatsApp.' });
   });
 
   app.get('/admin/appointments', adminAgendaAccess, async (request) => {
@@ -178,6 +266,25 @@ export async function appointmentRoutes(app: FastifyInstance) {
       include: { service: true, professional: true },
       orderBy: { startTime: 'asc' }
     });
+  });
+
+  app.get('/admin/appointments/notifications', adminAgendaAccess, async (request) => {
+    const tenant = getTenant(request);
+    const notifications = await listOperationalNotifications({ salonId: tenant.salonId, userId: tenant.id, limit: 50 });
+    return { notifications, unread: notifications.filter((item) => !item.read).length };
+  });
+
+  app.put('/admin/appointments/notifications/read-all', adminAgendaAccess, async (request) => {
+    const tenant = getTenant(request);
+    return markAllOperationalNotificationsRead({ salonId: tenant.salonId, userId: tenant.id });
+  });
+
+  app.put('/admin/appointments/notifications/:id/read', adminAgendaAccess, async (request, reply) => {
+    const tenant = getTenant(request);
+    const { id } = z.object({ id: objectIdSchema }).parse(request.params);
+    const marked = await markOperationalNotificationRead({ salonId: tenant.salonId, userId: tenant.id, notificationId: id });
+    if (!marked) return reply.status(404).send({ message: 'Notificação não encontrada.' });
+    return { read: true };
   });
 
   app.get('/admin/appointments/waitlist', adminAgendaAccess, async (request) => {
@@ -190,13 +297,20 @@ export async function appointmentRoutes(app: FastifyInstance) {
     });
   });
 
-  app.post('/admin/appointments/waitlist/scan', adminAgendaAccess, async (request, reply) => {
+  app.post('/admin/appointments/waitlist/scan', adminAgendaAccess, async (request) => {
     const tenant = getTenant(request);
     const { date } = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(request.body);
     const result = await matchWaitlistForDate({ salonId: tenant.salonId, date });
     if (!result) return { matched: false, message: 'Nenhum cliente da fila possui encaixe compatível neste momento.' };
     if ('offered' in result && result.offered === false) {
-      return reply.status(502).send({ ...result, message: 'Encontrei um cliente compatível, mas não consegui enviar a oferta pelo WhatsApp.' });
+      await createOperationalNotification({
+        salonId: tenant.salonId,
+        type: 'WAITLIST_ACTION_REQUIRED',
+        title: 'Lista de espera precisa de atenção',
+        message: 'Encontrei um cliente compatível, mas o WhatsApp não entregou a oferta. Verifique a integração ou faça contato manual com o cliente.',
+        severity: 'WARNING'
+      });
+      return { ...result, warning: true, message: 'Encontrei um cliente compatível, mas não consegui enviar a oferta pelo WhatsApp. A equipe foi notificada para fazer contato manual.' };
     }
     return result;
   });
@@ -216,12 +330,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     const salon = await prisma.salon.findUnique({ where: { id: tenant.salonId }, select: { id: true, openingHours: true } });
     if (!salon) return reply.status(404).send({ message: 'Salão não encontrado.' });
 
-    const availability = await publicBookingAvailability({
-      salon,
-      serviceId: query.serviceId,
-      professionalId: query.professionalId,
-      date: query.date
-    });
+    const availability = await publicBookingAvailability({ salon, serviceId: query.serviceId, professionalId: query.professionalId, date: query.date });
     if (!availability) return reply.status(404).send({ message: 'Serviço não encontrado.' });
     if (availability.mode !== 'day') return reply.status(400).send({ message: 'Não foi possível calcular o encaixe para este dia.' });
 
@@ -245,7 +354,6 @@ export async function appointmentRoutes(app: FastifyInstance) {
       prisma.service.findFirst({ where: { id: data.serviceId, salonId: salon.id, active: true } }),
       prisma.professional.findFirst({ where: { id: data.professionalId, salonId: salon.id, active: true } })
     ]);
-
     if (!service) return reply.status(404).send({ message: 'Serviço não encontrado.' });
     if (!professional) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
     if (!professionalCanPerform(professional, service.id)) {
@@ -268,15 +376,16 @@ export async function appointmentRoutes(app: FastifyInstance) {
     });
     if (conflict) return reply.status(409).send({ message: 'Este profissional já possui agendamento que ocupa parte deste período. Escolha outro horário.' });
 
-    const existingClient = await prisma.client.findFirst({ where: { salonId: salon.id, phone: data.clientPhone } });
+    const clientPhone = normalizePhone(data.clientPhone);
+    const existingClient = await prisma.client.findFirst({ where: { salonId: salon.id, phone: clientPhone } });
     const client = existingClient || await prisma.client.create({
-      data: { name: data.clientName, phone: data.clientPhone, email: data.clientEmail || null, notes: 'Criado automaticamente pelo agendamento público.', salonId: salon.id }
+      data: { name: data.clientName, phone: clientPhone, email: data.clientEmail || null, notes: 'Criado automaticamente pelo agendamento público.', salonId: salon.id }
     });
 
     const appointment = await prisma.appointment.create({
       data: {
         clientName: data.clientName,
-        clientPhone: data.clientPhone,
+        clientPhone,
         clientEmail: data.clientEmail || null,
         clientId: client.id,
         startTime: start,
@@ -288,7 +397,37 @@ export async function appointmentRoutes(app: FastifyInstance) {
       }
     });
 
-    return reply.status(201).send(appointment);
+    const management = await createAppointmentManagementAccess({
+      salonId: salon.id,
+      salonSlug: salon.slug,
+      customDomain: salon.customDomain,
+      appointmentId: appointment.id
+    });
+
+    const clientNotification = await notifyAppointmentCreated({
+      salonId: salon.id,
+      salonName: salon.name,
+      clientName: appointment.clientName,
+      clientPhone: appointment.clientPhone,
+      appointmentId: appointment.id,
+      serviceName: service.name,
+      professionalId: professional.id,
+      professionalName: professional.name,
+      startTime: appointment.startTime,
+      managementUrl: management.url
+    });
+
+    return reply.status(201).send({
+      ...appointment,
+      confirmation: {
+        confirmed: true,
+        protocol: appointment.id.slice(-8).toUpperCase(),
+        cancellationMinHours: cancellationMinHours(),
+        managementUrl: management.url,
+        managementToken: management.token,
+        clientNotification: clientNotification.ok ? 'SENT' : 'FAILED'
+      }
+    });
   });
 
   app.put('/admin/appointments/:id', adminAgendaAccess, async (request, reply) => {
@@ -305,10 +444,21 @@ export async function appointmentRoutes(app: FastifyInstance) {
     const changesSchedule = Boolean(data.startTime || data.professionalId);
     if (!changesSchedule) {
       if (!data.status) return current;
-      const updated = await prisma.appointment.update({
-        where: { id }, data: { status: data.status }, include: { service: true, professional: true }
-      });
+      const updated = await prisma.appointment.update({ where: { id }, data: { status: data.status }, include: { service: true, professional: true } });
       if (current.status === 'CONFIRMED' && data.status === 'CANCELED') {
+        const salon = await prisma.salon.findUnique({ where: { id: tenant.salonId }, select: { name: true } });
+        await notifyAppointmentCancelled({
+          salonId: tenant.salonId,
+          salonName: salon?.name || 'salão',
+          clientName: current.clientName,
+          clientPhone: current.clientPhone,
+          appointmentId: current.id,
+          serviceName: current.service.name,
+          professionalId: current.professional.id,
+          professionalName: current.professional.name,
+          startTime: current.startTime,
+          cancelledBy: 'TEAM'
+        });
         setImmediate(() => {
           void matchWaitlistAfterAppointmentChange({ salonId: tenant.salonId, previousStartTime: current.startTime })
             .catch((error) => app.log.error(error, 'Falha ao processar lista de espera após cancelamento.'));
@@ -348,6 +498,16 @@ export async function appointmentRoutes(app: FastifyInstance) {
     const freedPreviousSpace = current.status === 'CONFIRMED'
       && (current.startTime.getTime() !== start.getTime() || current.professionalId !== professionalId || data.status === 'CANCELED');
     if (freedPreviousSpace) {
+      await createOperationalNotification({
+        salonId: tenant.salonId,
+        type: 'APPOINTMENT_RESCHEDULED',
+        title: 'Agendamento reagendado',
+        message: `${current.clientName} foi movido para um novo horário/profissional.`,
+        appointmentId: current.id,
+        professionalId,
+        clientName: current.clientName,
+        severity: 'INFO'
+      });
       setImmediate(() => {
         void matchWaitlistAfterAppointmentChange({ salonId: tenant.salonId, previousStartTime: current.startTime })
           .catch((error) => app.log.error(error, 'Falha ao processar lista de espera após reagendamento.'));
