@@ -16,6 +16,17 @@ type AvailabilityInput = {
 };
 
 type BusyInterval = { startTime: Date; endTime: Date; professionalId: string };
+type FreeBlock = { start: Date; end: Date };
+
+type RankedSlot = {
+  startTime: string;
+  label: string;
+  fitScore: number;
+  recommended: boolean;
+  fitReason: string;
+  freeBeforeMin: number;
+  freeAfterMin: number;
+};
 
 function businessTimeZone() {
   return process.env.BUSINESS_TIMEZONE || 'America/Sao_Paulo';
@@ -70,15 +81,44 @@ function datesInMonth(month: string) {
   return dates;
 }
 
-function capacityForBlocks(blocks: Array<{ start: Date; end: Date }>, durationMin: number) {
+function capacityForBlocks(blocks: FreeBlock[], durationMin: number) {
   const durationMs = durationMin * 60_000;
   return blocks.reduce((total, block) => total + Math.floor((block.end.getTime() - block.start.getTime()) / durationMs), 0);
 }
 
-function slotOptions(date: string, blocks: Array<{ start: Date; end: Date }>, durationMin: number) {
+function fitForCandidate(input: {
+  block: FreeBlock;
+  candidate: Date;
+  end: Date;
+  minUsefulDuration: number;
+}) {
+  const before = Math.max(0, Math.round((input.candidate.getTime() - input.block.start.getTime()) / 60_000));
+  const after = Math.max(0, Math.round((input.block.end.getTime() - input.end.getTime()) / 60_000));
+  const minUseful = Math.max(intervalMinutes(), input.minUsefulDuration);
+
+  const orphanPenalty = [before, after].reduce((sum, value) => {
+    if (value <= 0 || value >= minUseful) return sum;
+    return sum + (minUseful - value);
+  }, 0);
+
+  const splitPenalty = before > 0 && after > 0 ? 16 : 0;
+  const edgeBonus = before === 0 || after === 0 ? 14 : 0;
+  const exactBonus = before === 0 && after === 0 ? 16 : 0;
+  const slackPenalty = Math.min(24, Math.round((before + after) / 30));
+  const score = Math.max(1, Math.min(100, Math.round(100 - orphanPenalty * 1.25 - splitPenalty - slackPenalty + edgeBonus + exactBonus)));
+
+  let reason = 'Preserva melhor os espaços restantes da agenda.';
+  if (before === 0 && after === 0) reason = 'Preenche exatamente um bloco livre, sem deixar espaço ocioso.';
+  else if (before === 0 || after === 0) reason = 'Encosta no início ou fim de um bloco livre e evita dividir a agenda.';
+  else if (orphanPenalty > 0) reason = 'Horário disponível, mas pode deixar um pequeno intervalo difícil de aproveitar.';
+
+  return { score, reason, before, after };
+}
+
+function slotOptions(date: string, blocks: FreeBlock[], durationMin: number, minUsefulDuration: number) {
   const interval = intervalMinutes();
   const durationMs = durationMin * 60_000;
-  const options: Array<{ startTime: string; label: string }> = [];
+  const options: Omit<RankedSlot, 'recommended'>[] = [];
 
   const format = new Intl.DateTimeFormat('pt-BR', {
     timeZone: businessTimeZone(),
@@ -102,12 +142,24 @@ function slotOptions(date: string, blocks: Array<{ start: Date; end: Date }>, du
         continue;
       }
       if (end > block.end) break;
-      if (candidate > new Date()) options.push({ startTime: candidate.toISOString(), label: format.format(candidate) });
+      if (candidate > new Date()) {
+        const fit = fitForCandidate({ block, candidate, end, minUsefulDuration });
+        options.push({
+          startTime: candidate.toISOString(),
+          label: format.format(candidate),
+          fitScore: fit.score,
+          fitReason: fit.reason,
+          freeBeforeMin: fit.before,
+          freeAfterMin: fit.after
+        });
+      }
       candidateMin += interval;
     }
   }
 
-  return options;
+  return options
+    .sort((a, b) => b.fitScore - a.fitScore || new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+    .map((slot, index) => ({ ...slot, recommended: index < 2 }));
 }
 
 function busyForProfessional(appointments: BusyInterval[], professionalId: string, date: string) {
@@ -128,11 +180,20 @@ function publicProfessional(professional: any) {
 }
 
 export async function publicBookingAvailability(input: AvailabilityInput) {
-  const service = await prisma.service.findFirst({
-    where: { id: input.serviceId, salonId: input.salon.id, active: true },
-    select: { id: true, name: true, price: true, durationMin: true }
-  });
+  const [service, activeDurations] = await Promise.all([
+    prisma.service.findFirst({
+      where: { id: input.serviceId, salonId: input.salon.id, active: true },
+      select: { id: true, name: true, price: true, durationMin: true }
+    }),
+    prisma.service.findMany({
+      where: { salonId: input.salon.id, active: true },
+      select: { durationMin: true }
+    })
+  ]);
   if (!service) return null;
+
+  const validDurations = activeDurations.map((item) => Number(item.durationMin)).filter((value) => Number.isFinite(value) && value > 0);
+  const minUsefulDuration = validDurations.length ? Math.min(...validDurations) : intervalMinutes();
 
   const allProfessionals = await prisma.professional.findMany({
     where: { salonId: input.salon.id, active: true },
@@ -183,9 +244,19 @@ export async function publicBookingAvailability(input: AvailabilityInput) {
       return {
         ...publicProfessional(professional),
         capacity,
-        slots: slotOptions(date, blocks, service.durationMin)
+        slots: slotOptions(date, blocks, service.durationMin, minUsefulDuration)
       };
     });
+
+    const recommendedSlots = detail
+      .flatMap((professional) => professional.slots.map((slot) => ({
+        ...slot,
+        professionalId: professional.id,
+        professionalName: professional.name
+      })))
+      .sort((a, b) => b.fitScore - a.fitScore || new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+      .slice(0, 8)
+      .map((slot, index) => ({ ...slot, recommended: index < 3 }));
 
     return {
       mode: 'day' as const,
@@ -193,23 +264,31 @@ export async function publicBookingAvailability(input: AvailabilityInput) {
       service,
       intervalMin: intervalMinutes(),
       professionals: detail,
-      totalCapacity: detail.reduce((sum, professional) => sum + professional.capacity, 0)
+      totalCapacity: detail.reduce((sum, professional) => sum + professional.capacity, 0),
+      smartFit: {
+        strategy: 'BEST_FIT' as const,
+        minUsefulDuration,
+        recommendedSlots
+      }
     };
   }
 
   const days = datesInMonth(referenceMonth).map((date) => {
     const professionalCapacity = professionals.map((professional) => {
       const blocks = freeFor(professional, date);
+      const bestSlot = slotOptions(date, blocks, service.durationMin, minUsefulDuration)[0];
       return {
         professionalId: professional.id,
         professionalName: professional.name,
-        capacity: capacityForBlocks(blocks, service.durationMin)
+        capacity: capacityForBlocks(blocks, service.durationMin),
+        bestFitScore: bestSlot?.fitScore || 0
       };
     });
 
     return {
       date,
       totalCapacity: professionalCapacity.reduce((sum, professional) => sum + professional.capacity, 0),
+      bestFitScore: Math.max(0, ...professionalCapacity.map((professional) => professional.bestFitScore)),
       professionals: professionalCapacity
     };
   });
