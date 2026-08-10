@@ -105,20 +105,23 @@ model Service {
 }
 
 model Professional {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  name               String
-  specialty          String
-  bio                String   @default("")
-  photoUrl           String   @default("")
-  active             Boolean  @default(true)
-  servicesConfigured Boolean  @default(false)
-  serviceIds         String[] @default([]) @db.ObjectId
-  salonId            String   @db.ObjectId
-  salon              Salon    @relation(fields: [salonId], references: [id])
-  appointments       Appointment[]
-  commissionRules    CommissionRule[]
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                     String   @id @default(auto()) @map("_id") @db.ObjectId
+  name                   String
+  specialty              String
+  bio                    String   @default("")
+  photoUrl               String   @default("")
+  active                 Boolean  @default(true)
+  servicesConfigured     Boolean  @default(false)
+  serviceIds             String[] @default([]) @db.ObjectId
+  workScheduleConfigured Boolean  @default(false)
+  weeklySchedule         Json?
+  timeBlocks             Json?
+  salonId                String   @db.ObjectId
+  salon                  Salon    @relation(fields: [salonId], references: [id])
+  appointments           Appointment[]
+  commissionRules        CommissionRule[]
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@index([salonId])
 }
@@ -255,11 +258,11 @@ model LoyaltyProgram {
   name              String
   pointsPerCurrency Float
   rewardDescription String
-  active             Boolean  @default(true)
-  salonId            String   @unique @db.ObjectId
-  salon              Salon    @relation(fields: [salonId], references: [id])
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  active            Boolean  @default(true)
+  salonId           String   @unique @db.ObjectId
+  salon             Salon    @relation(fields: [salonId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model LoyaltyEntry {
