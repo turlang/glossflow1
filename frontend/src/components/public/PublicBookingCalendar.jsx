@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { request } from '../../services/api';
 import { currency } from '../../utils/format';
 import { Input, Textarea } from '../ui/Forms.jsx';
+import { PublicWaitlistForm } from './PublicWaitlistForm.jsx';
 
 function tenantStyle(salon) {
   if (!salon) return undefined;
@@ -16,6 +17,11 @@ function tenantStyle(salon) {
 function currentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function todayIso() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function shiftMonth(value, amount) {
@@ -73,6 +79,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
       return Array.isArray(professional.serviceIds) && professional.serviceIds.includes(serviceId);
     });
   }, [professionals, serviceId]);
+  const selectedProfessional = eligibleProfessionals.find((professional) => professional.id === professionalId) || null;
 
   useEffect(() => {
     if (!serviceId) {
@@ -107,7 +114,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
   }, [monthData, month]);
 
   async function chooseDate(day) {
-    if (!day || day.totalCapacity <= 0 || !serviceId) return;
+    if (!day || !serviceId || day.date < todayIso()) return;
     setSelectedDate(day.date);
     setSelectedSlot(null);
     setFeedback('');
@@ -187,12 +194,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
           </div>
           <div className="booking-service-grid">
             {services.map((service) => (
-              <button
-                key={service.id}
-                type="button"
-                className={`booking-service ${serviceId === service.id ? 'is-selected' : ''}`}
-                onClick={() => chooseService(service.id)}
-              >
+              <button key={service.id} type="button" className={`booking-service ${serviceId === service.id ? 'is-selected' : ''}`} onClick={() => chooseService(service.id)}>
                 <span>{service.name}</span>
                 <strong>{currency(service.price)}</strong>
                 <small>⏱ {durationLabel(service.durationMin)}</small>
@@ -214,9 +216,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
                 </button>
                 {eligibleProfessionals.map((professional) => (
                   <button key={professional.id} type="button" className={`booking-pro-chip ${professionalId === professional.id ? 'is-selected' : ''}`} onClick={() => chooseProfessional(professional.id)}>
-                    {professional.photoUrl
-                      ? <img className="booking-pro-avatar" src={professional.photoUrl} alt="" />
-                      : <span className="booking-pro-avatar">{professional.name.charAt(0)}</span>}
+                    {professional.photoUrl ? <img className="booking-pro-avatar" src={professional.photoUrl} alt="" /> : <span className="booking-pro-avatar">{professional.name.charAt(0)}</span>}
                     <span><strong>{professional.name}</strong><small>{professional.specialty}</small></span>
                   </button>
                 ))}
@@ -230,7 +230,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
             <div className="booking-step-head booking-calendar-heading">
               <div className="booking-step-head-copy">
                 <span className="booking-step-number">3</span>
-                <div><strong>Escolha o dia</strong><small>“Vagas” = atendimentos completos que ainda cabem no dia.</small></div>
+                <div><strong>Escolha o dia</strong><small>Dias lotados podem ser abertos para entrar na lista de espera.</small></div>
               </div>
               <div className="booking-month-nav">
                 <button type="button" onClick={() => setMonth(shiftMonth(month, -1))} disabled={month <= currentMonth()} aria-label="Mês anterior">‹</button>
@@ -240,29 +240,30 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
             </div>
 
             <div className="booking-capacity-note">
-              <strong>{selectedService.name}</strong> ocupa <strong>{durationLabel(selectedService.durationMin)}</strong>. Por isso um dia com vários horários de início pode ter apenas 1 ou 2 vagas reais.
+              <strong>{selectedService.name}</strong> ocupa <strong>{durationLabel(selectedService.durationMin)}</strong>. “Vagas” representa atendimentos completos que realmente cabem no dia.
             </div>
 
             {loadingMonth ? <div className="booking-loading">Calculando disponibilidade real…</div> : (
               <div className="booking-calendar">
                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((label) => <div key={label} className="booking-weekday">{label}</div>)}
-                {calendarCells.map((day, index) => day ? (
-                  <button
-                    type="button"
-                    key={day.date}
-                    className={`booking-day ${selectedDate === day.date ? 'is-selected' : ''} ${day.totalCapacity <= 0 ? 'is-unavailable' : ''}`}
-                    onClick={() => chooseDate(day)}
-                    disabled={day.totalCapacity <= 0}
-                  >
-                    <span className="booking-day-number">{dayNumber(day.date)}</span>
-                    <strong>{day.totalCapacity > 0 ? `${day.totalCapacity} ${day.totalCapacity === 1 ? 'vaga' : 'vagas'}` : 'Lotado'}</strong>
-                    <span className="booking-day-professionals">
-                      {day.professionals.filter((item) => item.capacity > 0).slice(0, 3).map((item) => (
-                        <small key={item.professionalId}>{item.professionalName.split(' ')[0]} · {item.capacity}</small>
-                      ))}
-                    </span>
-                  </button>
-                ) : <div className="booking-day is-empty" key={`blank-${index}`} />)}
+                {calendarCells.map((day, index) => day ? (() => {
+                  const past = day.date < todayIso();
+                  return (
+                    <button
+                      type="button"
+                      key={day.date}
+                      className={`booking-day ${selectedDate === day.date ? 'is-selected' : ''} ${day.totalCapacity <= 0 ? 'is-full' : ''} ${past ? 'is-past' : ''}`}
+                      onClick={() => chooseDate(day)}
+                      disabled={past}
+                    >
+                      <span className="booking-day-number">{dayNumber(day.date)}</span>
+                      <strong>{day.totalCapacity > 0 ? `${day.totalCapacity} ${day.totalCapacity === 1 ? 'vaga' : 'vagas'}` : 'Lista de espera'}</strong>
+                      <span className="booking-day-professionals">
+                        {day.professionals.filter((item) => item.capacity > 0).slice(0, 3).map((item) => <small key={item.professionalId}>{item.professionalName.split(' ')[0]} · {item.capacity}</small>)}
+                      </span>
+                    </button>
+                  );
+                })() : <div className="booking-day is-empty" key={`blank-${index}`} />)}
               </div>
             )}
           </section>
@@ -272,17 +273,14 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
           <section className="booking-step booking-slots-section">
             <div className="booking-step-head">
               <span className="booking-step-number">4</span>
-              <div><strong>Horários em {dateTitle(selectedDate)}</strong><small>Escolha o profissional e o horário que preferir.</small></div>
+              <div><strong>Horários em {dateTitle(selectedDate)}</strong><small>Escolha um horário ou entre na fila se não houver encaixe compatível.</small></div>
             </div>
             {loadingDay ? <div className="booking-loading">Abrindo horários…</div> : (
               <div className="booking-day-detail">
                 {(dayData?.professionals || []).map((professional) => (
                   <article className="booking-pro-availability" key={professional.id}>
                     <div className="booking-pro-summary">
-                      <div>
-                        <strong>{professional.name}</strong>
-                        <small>{professional.specialty}</small>
-                      </div>
+                      <div><strong>{professional.name}</strong><small>{professional.specialty}</small></div>
                       <span>{professional.capacity} {professional.capacity === 1 ? 'vaga real' : 'vagas reais'}</span>
                     </div>
                     {professional.slots.length ? (
@@ -290,18 +288,18 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
                         {professional.slots.map((slot) => {
                           const active = selectedSlot?.professionalId === professional.id && selectedSlot?.startTime === slot.startTime;
                           return (
-                            <button
-                              type="button"
-                              key={`${professional.id}-${slot.startTime}`}
-                              className={`booking-slot ${active ? 'is-selected' : ''}`}
-                              onClick={() => setSelectedSlot({ ...slot, professionalId: professional.id, professionalName: professional.name })}
-                            >{slot.label}</button>
+                            <button type="button" key={`${professional.id}-${slot.startTime}`} className={`booking-slot ${active ? 'is-selected' : ''}`} onClick={() => setSelectedSlot({ ...slot, professionalId: professional.id, professionalName: professional.name })}>
+                              {slot.label}
+                            </button>
                           );
                         })}
                       </div>
                     ) : <p className="booking-empty-copy">Sem horários que comportem este serviço nesse dia.</p>}
                   </article>
                 ))}
+                {dayData && dayData.totalCapacity <= 0 && (
+                  <PublicWaitlistForm service={selectedService} date={selectedDate} professionalId={professionalId} professionalName={selectedProfessional?.name || ''} salon={salon} />
+                )}
               </div>
             )}
           </section>
@@ -345,7 +343,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
         .booking-service-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.booking-service{display:grid;text-align:left;gap:7px;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:18px;padding:16px;cursor:pointer}.booking-service>span{font-weight:800}.booking-service>strong{font-size:1.05rem}.booking-service small{color:var(--muted)}.booking-service.is-selected,.booking-pro-chip.is-selected,.booking-slot.is-selected{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 22%,transparent);background:color-mix(in srgb,var(--primary) 8%,var(--card))}
         .booking-professional-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:5px}.booking-pro-chip{min-width:220px;display:flex;align-items:center;gap:11px;text-align:left;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:18px;padding:11px 14px;cursor:pointer}.booking-pro-chip>span:last-child{display:grid;gap:2px}.booking-pro-chip small{color:var(--muted)}.booking-pro-avatar{width:42px;height:42px;min-width:42px;border-radius:50%;object-fit:cover;display:grid;place-items:center;background:color-mix(in srgb,var(--primary) 18%,var(--card));font-weight:900}
         .booking-calendar-heading{justify-content:space-between;align-items:center}.booking-step-head-copy{display:flex!important;align-items:center;gap:12px}.booking-month-nav{display:flex!important;align-items:center;gap:10px}.booking-month-nav strong{text-transform:capitalize;min-width:160px;text-align:center}.booking-month-nav button{width:38px;height:38px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:1.4rem;cursor:pointer}.booking-month-nav button:disabled{opacity:.3;cursor:not-allowed}.booking-capacity-note{margin:-4px 0 18px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--primary) 8%,var(--card));color:var(--muted)}
-        .booking-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}.booking-weekday{text-align:center;color:var(--muted);font-size:.78rem;font-weight:800;padding:5px}.booking-day{min-height:118px;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:16px;padding:10px;display:flex;flex-direction:column;align-items:flex-start;gap:7px;cursor:pointer;text-align:left}.booking-day:hover:not(:disabled){transform:translateY(-1px);border-color:color-mix(in srgb,var(--primary) 55%,var(--border))}.booking-day.is-selected{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--card))}.booking-day.is-unavailable{opacity:.42;cursor:not-allowed}.booking-day.is-empty{border:0;background:transparent}.booking-day-number{font-weight:900;font-size:1.05rem}.booking-day>strong{font-size:.82rem}.booking-day-professionals{display:grid;gap:2px;color:var(--muted);font-size:.72rem}.booking-day-professionals small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+        .booking-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}.booking-weekday{text-align:center;color:var(--muted);font-size:.78rem;font-weight:800;padding:5px}.booking-day{min-height:118px;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:16px;padding:10px;display:flex;flex-direction:column;align-items:flex-start;gap:7px;cursor:pointer;text-align:left}.booking-day:hover:not(:disabled){transform:translateY(-1px);border-color:color-mix(in srgb,var(--primary) 55%,var(--border))}.booking-day.is-selected{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--card))}.booking-day.is-full{opacity:.72;border-style:dashed}.booking-day.is-full>strong{color:var(--primary)}.booking-day.is-past{opacity:.34;cursor:not-allowed}.booking-day.is-empty{border:0;background:transparent}.booking-day-number{font-weight:900;font-size:1.05rem}.booking-day>strong{font-size:.82rem}.booking-day-professionals{display:grid;gap:2px;color:var(--muted);font-size:.72rem}.booking-day-professionals small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
         .booking-loading,.booking-empty-copy{padding:20px;color:var(--muted);text-align:center}.booking-day-detail{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.booking-pro-availability{border:1px solid var(--border);background:var(--card);border-radius:18px;padding:16px}.booking-pro-summary{display:flex;justify-content:space-between;gap:10px;align-items:start;margin-bottom:13px}.booking-pro-summary>div{display:grid;gap:3px}.booking-pro-summary small{color:var(--muted)}.booking-pro-summary>span{font-size:.76rem;font-weight:900;padding:6px 9px;border-radius:999px;background:color-mix(in srgb,var(--primary) 12%,var(--surface))}.booking-slot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:8px}.booking-slot{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:12px;padding:10px 8px;font-weight:800;cursor:pointer}
         .booking-checkout{display:grid;grid-template-columns:minmax(260px,.75fr) minmax(0,1.5fr);gap:22px}.booking-summary-card{border-radius:18px;padding:20px;background:color-mix(in srgb,var(--primary) 10%,var(--card));align-self:start}.booking-summary-card h2{margin:8px 0}.booking-summary-card p{color:var(--muted);margin:8px 0}.booking-summary-price{display:block;font-size:1.45rem;margin-top:16px}.booking-client-form{display:grid;gap:14px}.booking-client-form h2{margin:0}.booking-contact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.booking-contact-grid>*:last-child{grid-column:1/-1}
         .booking-success{display:flex;gap:14px;align-items:center;padding:18px 20px;border-radius:18px;border:1px solid color-mix(in srgb,#3fb950 40%,var(--border));background:color-mix(in srgb,#3fb950 8%,var(--surface))}.booking-success>span{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#3fb950;color:#07150a;font-weight:1000;font-size:1.25rem}.booking-success p{margin:4px 0 0;color:var(--muted)}.booking-feedback{max-width:760px}
