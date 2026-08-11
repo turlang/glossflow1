@@ -41,6 +41,7 @@ describe('AgendaRescheduleForm', () => {
     await user.type(screen.getByLabelText('Horário'), '14:30');
     await user.selectOptions(screen.getByLabelText('Profissional'), 'p2');
     await user.tab();
+    await user.tab();
     await user.keyboard('{Enter}');
 
     expect(onConfirm).toHaveBeenCalledWith({
@@ -68,7 +69,8 @@ describe('AgendaRescheduleForm', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Confirmar reagendamento' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Este profissional já possui agendamento neste horário.');
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Este profissional já possui agendamento neste horário.');
     expect(onCancel).not.toHaveBeenCalled();
     expect(screen.getByRole('form', { name: 'Reagendar atendimento' })).toBeTruthy();
   });
