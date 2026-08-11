@@ -1,12 +1,12 @@
-# Render Blueprint — GlossFlow API / Client Ready
-# Um único backend atende vários salões por tenant, vitrine white-label e WhatsApp.
+# Render Blueprint — GlossFlow API
+# Este é o blueprint canônico do backend. Não manter cópias divergentes em infra/.
 services:
   - type: web
     name: glossflow-api
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm install --include=dev && npx prisma generate --schema prisma/schema.prisma && npm run build
+    buildCommand: npm ci && npm run prisma:generate && npm run build
     startCommand: npm run start
     autoDeploy: true
     healthCheckPath: /health
@@ -15,14 +15,18 @@ services:
         value: 20
       - key: NODE_ENV
         value: production
+
+      # Dados e segurança
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_ORIGIN
         sync: false
+      - key: PUBLIC_API_URL
+        value: https://glossflow-api.onrender.com
 
-      # Super Admin da plataforma — provisionado automaticamente no startup
+      # Super Admin — provisionamento idempotente no startup
       - key: SUPER_ADMIN_NAME
         value: Super Admin GlossFlow
       - key: SUPER_ADMIN_EMAIL
@@ -35,8 +39,10 @@ services:
         sync: false
       - key: DEFAULT_PUBLIC_SALON_SLUG
         value: glossflow
+      - key: APP_PUBLIC_URL
+        sync: false
 
-      # Operação e segurança
+      # Operação
       - key: RATE_LIMIT_PER_MINUTE
         value: "180"
       - key: ACCESS_TOKEN_MINUTES
@@ -49,8 +55,12 @@ services:
         value: "-03:00"
       - key: BOOKING_SLOT_INTERVAL_MINUTES
         value: "30"
+      - key: CLIENT_CANCELLATION_MIN_HOURS
+        value: "12"
+      - key: APPOINTMENT_REMINDER_SCAN_MINUTES
+        value: "10"
 
-      # IA — Groq principal, OpenAI mantida como opção de troca/fallback manual
+      # IA — Groq principal; OpenAI permanece apenas como fallback opcional
       - key: AI_PROVIDER
         value: groq
       - key: GROQ_API_KEY
@@ -62,11 +72,45 @@ services:
       - key: OPENAI_MODEL
         value: gpt-4o-mini
 
-      # WhatsApp Cloud API / Meta
+      # WhatsApp — Twilio é o provider operacional atual
       - key: WHATSAPP_PROVIDER
-        value: meta
+        value: twilio
       - key: WHATSAPP_DRY_RUN
-        value: "true"
+        value: "false"
+      - key: WHATSAPP_DEFAULT_COUNTRY_CODE
+        value: "55"
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: TWILIO_WEBHOOK_URL
+        value: https://glossflow-api.onrender.com/webhooks/whatsapp/twilio
+      - key: TWILIO_STATUS_CALLBACK_URL
+        value: https://glossflow-api.onrender.com/webhooks/whatsapp/twilio/status
+      - key: TWILIO_DEFAULT_SALON_SLUG
+        value: glossflow
+      # Trial é somente QA. Em sender de produção, configure false.
+      - key: TWILIO_TRIAL_MODE
+        sync: false
+      - key: TWILIO_TRIAL_CONTENT_SID
+        sync: false
+
+      # Templates / Contents da Twilio
+      - key: WHATSAPP_TEMPLATE_LANGUAGE
+        value: pt_BR
+      - key: WHATSAPP_TEMPLATE_APPOINTMENT_CONFIRMED
+        sync: false
+      - key: WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED
+        sync: false
+      - key: WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER_24H
+        sync: false
+      - key: WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER_2H
+        sync: false
+
+      # Meta permanece suportada pelo código como provider alternativo,
+      # mas não é necessária na configuração operacional atual.
       - key: WHATSAPP_ACCESS_TOKEN
         sync: false
       - key: WHATSAPP_PHONE_NUMBER_ID
@@ -76,7 +120,7 @@ services:
       - key: WHATSAPP_APP_SECRET
         sync: false
 
-      # Pagamentos — não são necessários para o primeiro cliente, permanecem opcionais
+      # Pagamentos opcionais
       - key: PAYMENTS_DRY_RUN
         value: "true"
       - key: MERCADO_PAGO_ACCESS_TOKEN
