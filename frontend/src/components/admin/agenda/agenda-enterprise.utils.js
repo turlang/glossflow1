@@ -28,6 +28,12 @@ export function localDateFromTimestamp(value) {
   return Number.isNaN(date.getTime()) ? '' : toLocalIsoDate(date);
 }
 
+export function daysInSelectedMonth(selectedDate) {
+  const selected = parseLocalDate(selectedDate);
+  if (!selected) return 0;
+  return new Date(selected.getFullYear(), selected.getMonth() + 1, 0, 12).getDate();
+}
+
 export function buildWeekDays(selectedDate) {
   const selected = parseLocalDate(selectedDate);
   if (!selected) return [];
@@ -102,12 +108,12 @@ export function filterAppointmentsForView({ appointments, viewMode, selectedDate
   return appointments.filter((appointment) => appointment.dateIso >= start && appointment.dateIso <= end);
 }
 
-export function calculateAgendaMetrics({ appointments, professionals, viewMode, hours = AGENDA_HOURS }) {
+export function calculateAgendaMetrics({ appointments, professionals, viewMode, selectedDate, hours = AGENDA_HOURS }) {
   const list = Array.isArray(appointments) ? appointments : [];
   const team = Array.isArray(professionals) ? professionals : [];
   const potential = list.reduce((sum, appointment) => sum + Number(appointment.service?.price || 0), 0);
   const occupiedSlots = new Set(list.map((appointment) => `${appointment.professional?.id || appointment.professionalId}-${appointment.dateIso}-${appointment.hourKey}`)).size;
-  const periodDays = viewMode === 'week' ? 7 : viewMode === 'month' ? 1 : 1;
+  const periodDays = viewMode === 'week' ? 7 : viewMode === 'month' ? Math.max(1, daysInSelectedMonth(selectedDate)) : 1;
   const capacity = Math.max(1, team.length * hours.length * periodDays);
   return {
     count: list.length,
