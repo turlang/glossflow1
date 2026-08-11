@@ -1,0 +1,31 @@
+name: Finalize Backend Typing Once
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/finalize-backend-typing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+      - name: Apply typing migration
+        run: node scripts/finalize-backend-typing.mjs
+      - name: Commit finalized sources
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/business.routes.ts backend/src/services/public-booking-availability.service.ts backend/src/services/waitlist.service.ts backend/src/services/whatsapp.service.ts
+          git commit -m "refactor: finalize backend typing"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
