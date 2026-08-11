@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
@@ -49,7 +50,7 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = userSchema.parse(request.body);
-    const updateData: any = { name: data.name, email: data.email, role: data.role, active: data.active };
+    const updateData: Prisma.UserUpdateManyMutationInput = { name: data.name, email: data.email, role: data.role, active: data.active };
     if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
     const result = await prisma.user.updateMany({ where: { id, salonId: tenant.salonId }, data: updateData });
     if (result.count === 0) return reply.status(404).send({ message: 'Usuário não encontrado neste salão.' });
@@ -156,26 +157,26 @@ export async function adminCrudRoutes(app: FastifyInstance) {
     if (!current) return reply.status(404).send({ message: 'Produto não encontrado neste salão.' });
 
     const quantityChanged = data.quantity !== current.quantity;
-    const operations = [
-      prisma.inventoryProduct.updateMany({
-        where: { id, salonId: tenant.salonId },
-        data
-      })
-    ];
-
     if (quantityChanged) {
-      operations.push(prisma.inventoryMovement.create({
-        data: {
-          type: 'ADJUSTMENT',
-          quantity: data.quantity,
-          reason: `Ajuste pelo cadastro do produto. Saldo anterior: ${current.quantity}; novo saldo: ${data.quantity}.`,
-          productId: id,
-          salonId: tenant.salonId
-        }
-      }) as any);
+      await prisma.$transaction([
+        prisma.inventoryProduct.updateMany({
+          where: { id, salonId: tenant.salonId },
+          data
+        }),
+        prisma.inventoryMovement.create({
+          data: {
+            type: 'ADJUSTMENT',
+            quantity: data.quantity,
+            reason: `Ajuste pelo cadastro do produto. Saldo anterior: ${current.quantity}; novo saldo: ${data.quantity}.`,
+            productId: id,
+            salonId: tenant.salonId
+          }
+        })
+      ]);
+    } else {
+      await prisma.inventoryProduct.updateMany({ where: { id, salonId: tenant.salonId }, data });
     }
 
-    await prisma.$transaction(operations as any);
     return prisma.inventoryProduct.findFirst({ where: { id, salonId: tenant.salonId }, include: { movements: { orderBy: { createdAt: 'desc' }, take: 20 } } });
   });
 
