@@ -3,6 +3,7 @@ import { authRoutes } from './auth.routes';
 import { publicRoutes } from './public.routes';
 import { appointmentRoutes } from './appointments.routes';
 import { whatsappWebhookRoutes } from './whatsapp-webhook.routes';
+import { twilioWhatsAppWebhookRoutes } from './twilio-whatsapp-webhook.routes';
 import { dashboardRoutes } from './dashboard.routes';
 import { adminCrudRoutes } from './admin-crud.routes';
 import { professionalScheduleRoutes } from './professional-schedule.routes';
@@ -34,6 +35,7 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(publicRoutes);
   app.register(appointmentRoutes);
   app.register(whatsappWebhookRoutes);
+  app.register(twilioWhatsAppWebhookRoutes);
 
   /** Administração global: clientes, planos, módulos, MRR, Site & Marca, custos inclusos e infraestrutura. */
   app.register(async (platformAdmin) => {
