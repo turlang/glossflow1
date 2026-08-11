@@ -1,59 +1,99 @@
-# GlossFlow Enterprise v8.5 — Checklist de Produção
+# GlossFlow Smart — Checklist de Produção
 
-Este checklist transforma o projeto de MVP avançado em uma versão candidata a produção comercial. Use antes de apresentar, vender ou publicar o SaaS.
+Use este checklist antes de cada piloto comercial, publicação relevante ou ativação de novo tenant.
 
-## 1. Segurança obrigatória
+## Segurança
 
-- Nunca subir `.env` real para GitHub, ZIP público ou hospedagem compartilhada.
-- Usar `JWT_SECRET` forte com mais de 32 caracteres.
-- Trocar a senha padrão `admin@glossflow.com / 123456` antes de usar com clientes reais.
-- Criar um usuário por pessoa, evitando compartilhamento de senha.
-- Usar HTTPS em produção.
-- Configurar origem CORS fixa no backend, nunca `origin: true` em produção.
-- Ativar backup automático no MongoDB Atlas.
+- [ ] `.env` e credenciais reais não estão versionados.
+- [ ] `JWT_SECRET` possui pelo menos 32 caracteres.
+- [ ] cada pessoa possui usuário próprio; não compartilhar login.
+- [ ] `SUPER_ADMIN` está separado das contas do salão.
+- [ ] HTTPS ativo no frontend, backend e webhooks.
+- [ ] CORS contém apenas origens esperadas, subdomínios white-label e domínios cadastrados.
+- [ ] logs não exibem JWT, senha, Auth Token da Twilio ou chave de IA.
+- [ ] backups do MongoDB Atlas estão configurados conforme o plano contratado.
 
-## 2. Banco de dados
+## Banco e Prisma
 
-- Confirmar `DATABASE_URL` real no `backend/.env`.
-- Rodar `npx prisma generate`.
-- Rodar `npx prisma db push`.
-- Rodar `npm run seed` somente em ambiente de teste ou homologação.
-- Criar rotina de backup.
+- [ ] `backend/prisma/schema.prisma` é a única fonte canônica do schema.
+- [ ] `npm run prisma:generate` passa.
+- [ ] alterações de schema foram aplicadas conscientemente.
+- [ ] `npm run seed` **não** será executado em banco com dados reais.
+- [ ] consultas privadas filtram `salonId` da sessão.
 
-## 3. Frontend
+## Frontend
 
-- Testar em 1366x768, 1920x1080, tablet e celular.
-- Validar a vitrine pública sem login.
-- Validar login administrativo.
-- Validar cadastro, edição e exclusão de serviços, profissionais, portfólio e estoque.
-- Validar agendamento público e visualização na agenda.
+- [ ] build Vite passa.
+- [ ] vitrine pública abre sem login.
+- [ ] tenant correto é resolvido por slug/host.
+- [ ] layout validado em desktop e mobile.
+- [ ] sessão expirada redireciona para login.
+- [ ] erro de permissão em recurso isolado não provoca logout indevido.
 
-## 4. SaaS comercial
+## Agenda
 
-- Definir planos: Básico, Profissional e Premium.
-- Definir limites por plano: profissionais, serviços, imagens, automações e unidades.
-- Integrar pagamento real: Mercado Pago, Stripe ou Asaas.
-- Criar termos de uso e política de privacidade.
+- [ ] serviço/profissional compatíveis.
+- [ ] jornada e bloqueios respeitados.
+- [ ] conflito de horário impedido no backend.
+- [ ] agendamento público persiste.
+- [ ] protocolo e link de gerenciamento são gerados.
+- [ ] cancelamento respeita antecedência configurada.
+- [ ] reagendamento revalida disponibilidade.
+- [ ] Agenda Operacional e Smart Fit continuam funcionais.
+- [ ] lista de espera não marca oferta como entregue quando o WhatsApp falha.
 
-## 5. LGPD
+## WhatsApp / Twilio
 
-- Informar ao cliente final quais dados são coletados.
-- Permitir correção ou exclusão de dados pessoais.
-- Não coletar dados sensíveis desnecessários.
-- Registrar consentimento quando houver disparo de mensagens.
+- [ ] `WHATSAPP_PROVIDER=twilio` no ambiente operacional atual.
+- [ ] `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` e sender estão corretos.
+- [ ] webhook de entrada aponta para `/webhooks/whatsapp/twilio`.
+- [ ] callback de status aponta para `/webhooks/whatsapp/twilio/status` ou é derivado corretamente.
+- [ ] assinatura do webhook de entrada é validada.
+- [ ] confirmação de agendamento chega ao número de teste/produção.
+- [ ] callback registra `sent` e, quando disponível, `delivered`/`read`.
+- [ ] `failed`/`undelivered` geram diagnóstico operacional.
+- [ ] Trial/Sandbox não é tratado como ambiente final de cliente.
 
-## 6. WhatsApp e IA
+## IA
 
-- Templates estão prontos para uso, mas o disparo real depende de provedor externo.
-- Recomendados: Evolution API, Twilio ou Z-API.
-- IA deve usar variáveis de ambiente e logs controlados.
+- [ ] `AI_PROVIDER=groq` quando Groq for o provider ativo.
+- [ ] chave fica somente no backend.
+- [ ] resposta do modelo passa pelos guards necessários.
+- [ ] indisponibilidade da IA possui fallback/erro controlado.
 
-## 7. Critério de aceite para nota 9,5
+## CRM, Estoque e Financeiro
 
-A versão pode ser considerada 9,5 quando:
+- [ ] CRUD de clientes respeita tenant e papel.
+- [ ] estoque não permite saldo negativo.
+- [ ] movimentações preservam histórico.
+- [ ] desativação lógica é usada quando histórico precisa ser mantido.
+- [ ] rotas financeiras e de usuários continuam restritas ao ADMIN quando aplicável.
 
-- O fluxo completo funciona sem intervenção técnica.
-- O visual se mantém consistente em desktop, notebook, tablet e celular.
-- O salão consegue operar agenda, vitrine, serviços, profissionais e estoque sem programador.
-- O backend não expõe segredo, senha ou erro técnico para o usuário final.
-- O projeto tem documentação suficiente para instalação, uso e manutenção.
+## Qualidade
+
+Backend:
+
+```bash
+cd backend
+npm ci
+npm run prisma:generate
+npm run lint
+npm test
+npm run build
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+- [ ] GitHub Quality Gate verde.
+- [ ] Production Gate verde.
+- [ ] smoke test manual do fluxo alterado concluído.
+
+## Critério de liberação
+
+Uma versão não deve ser promovida apenas porque compilou. Para fluxos com Agenda, WhatsApp, pagamento ou dados de cliente, é obrigatório ter evidência de execução real ou de sandbox equivalente antes da liberação.
