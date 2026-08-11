@@ -1,0 +1,41 @@
+name: Rebuild Hygiene Lockfiles
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - frontend/package.json
+      - backend/package.json
+      - .github/workflows/rebuild-lockfiles.yml
+
+permissions:
+  contents: write
+
+jobs:
+  lockfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+      - name: Regenerate backend lock
+        working-directory: backend
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Regenerate frontend lock
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit generated locks
+        run: |
+          if git diff --quiet -- backend/package-lock.json frontend/package-lock.json; then
+            echo "Lockfiles already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/package-lock.json frontend/package-lock.json
+          git commit -m "build: synchronize dependency lockfiles"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
