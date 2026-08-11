@@ -1,136 +1,138 @@
 # Deploy do GlossFlow — Render + Vercel
 
-Este projeto está preparado para publicar a API no **Render**, o frontend no **Vercel** e manter o banco no **MongoDB Atlas**.
+Arquitetura operacional atual:
 
-## 1. Antes de publicar
+```text
+Frontend React/Vite  -> Vercel
+Backend Fastify/TS   -> Render
+Banco                -> MongoDB Atlas
+IA                   -> Groq
+WhatsApp             -> Twilio
+```
 
-Confirme que você possui:
+O arquivo `render.yaml` é o blueprint canônico do backend.
 
-- Repositório no GitHub com o projeto completo.
-- Banco MongoDB Atlas ativo.
-- String real `DATABASE_URL` do MongoDB Atlas.
-- Uma chave `JWT_SECRET` forte, com mais de 32 caracteres.
+## 1. Pré-requisitos
 
-Nunca suba `.env` real para o GitHub.
+- repositório GitHub atualizado;
+- MongoDB Atlas ativo;
+- `DATABASE_URL` válida;
+- `JWT_SECRET` forte (mínimo de 32 caracteres em produção);
+- projeto Vercel para `frontend/`;
+- serviço Render para `backend/`;
+- credenciais Groq/Twilio quando esses módulos estiverem ativos.
 
----
+Nunca versionar `.env`, Auth Token da Twilio, JWT secret ou chaves de IA.
 
 ## 2. Backend no Render
 
-### Opção recomendada pelo Dashboard
+Configuração manual equivalente ao blueprint:
 
-No Render:
-
-1. Clique em **New > Web Service**.
-2. Conecte o repositório do GitHub.
-3. Configure:
-
-```txt
+```text
 Name: glossflow-api
 Root Directory: backend
 Runtime: Node
-Build Command: npm install && npx prisma generate && npm run build
+Build Command: npm ci && npm run prisma:generate && npm run build
 Start Command: npm run start
 Health Check Path: /health
 ```
 
-O Render usa comandos `buildCommand` e `startCommand` para serviços Node, e esses mesmos campos também estão documentados no Blueprint `render.yaml`.
-
-### Variáveis de ambiente no Render
-
-Configure:
+Variáveis mínimas:
 
 ```env
 NODE_ENV=production
-DATABASE_URL="mongodb+srv://usuario:senha@cluster.mongodb.net/glossflow?retryWrites=true&w=majority"
-JWT_SECRET="uma-chave-muito-forte-com-mais-de-32-caracteres"
-FRONTEND_ORIGIN="https://sua-url-da-vercel.vercel.app"
-RATE_LIMIT_PER_MINUTE=180
-ACCESS_TOKEN_MINUTES=30
-REFRESH_TOKEN_DAYS=7
-OPENAI_API_KEY=""
-OPENAI_MODEL="gpt-4o-mini"
+DATABASE_URL=...
+JWT_SECRET=...
+FRONTEND_ORIGIN=https://seu-frontend.vercel.app
+PUBLIC_API_URL=https://glossflow-api.onrender.com
+APP_PUBLIC_URL=https://seu-frontend.vercel.app
 ```
 
-Após o primeiro deploy, abra:
+IA atual:
 
-```txt
-https://sua-api.onrender.com/health
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=...
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
-Resultado esperado:
+WhatsApp atual:
 
-```json
-{"ok":true,"app":"GlossFlow API"}
+```env
+WHATSAPP_PROVIDER=twilio
+WHATSAPP_DRY_RUN=false
+WHATSAPP_DEFAULT_COUNTRY_CODE=55
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_FROM=whatsapp:+...
+TWILIO_WEBHOOK_URL=https://glossflow-api.onrender.com/webhooks/whatsapp/twilio
+TWILIO_STATUS_CALLBACK_URL=https://glossflow-api.onrender.com/webhooks/whatsapp/twilio/status
 ```
 
----
+Para Sandbox/Trial de QA, configure também `TWILIO_TRIAL_MODE` e o `TWILIO_TRIAL_CONTENT_SID` fornecido pela Twilio. Não tratar Trial como ambiente de produção.
 
 ## 3. Frontend no Vercel
 
-No Vercel:
-
-1. Clique em **New Project**.
-2. Importe o repositório do GitHub.
-3. Configure:
-
-```txt
+```text
 Root Directory: frontend
 Framework Preset: Vite
+Install Command: npm ci
 Build Command: npm run build
 Output Directory: dist
-Install Command: npm install
 ```
 
-### Variável de ambiente na Vercel
+Variável principal:
 
 ```env
-VITE_API_URL="https://sua-api.onrender.com"
+VITE_API_URL=https://glossflow-api.onrender.com
 ```
 
-Depois do deploy, copie a URL da Vercel e volte ao Render para atualizar:
+Se usar uma vitrine de demonstração fixa, `VITE_SALON_SLUG` pode definir o tenant padrão do frontend.
 
-```env
-FRONTEND_ORIGIN="https://sua-url-da-vercel.vercel.app"
+## 4. Ordem segura de publicação
+
+1. Merge/push no GitHub.
+2. Aguarde o Quality Gate.
+3. Confirme o deploy do Render.
+4. Valide `/health`.
+5. Confirme o deploy do Vercel.
+6. Faça smoke test de login, vitrine e agendamento.
+7. Para mudanças de WhatsApp, valide callback de status e webhook de entrada.
+
+## 5. Banco e Prisma
+
+O schema canônico fica somente em:
+
+```text
+backend/prisma/schema.prisma
 ```
 
-Republique o backend após alterar essa variável.
+Comandos locais:
 
----
-
-## 4. Seed inicial
-
-Depois que o backend estiver conectado ao MongoDB Atlas, execute o seed localmente apontando para o banco de produção, ou use o shell do Render se disponível.
-
-Localmente:
-
-```powershell
+```bash
 cd backend
-$env:DATABASE_URL="mongodb+srv://usuario:senha@cluster.mongodb.net/glossflow?retryWrites=true&w=majority"
-npm install
-npx prisma generate
-npm run seed
+npm ci
+npm run prisma:generate
+npm run prisma:push
 ```
 
-Atenção: rode seed apenas quando quiser criar dados iniciais/demonstração.
+`npm run seed` apaga/recria diversos dados de demonstração. **Não execute seed em um banco de produção com dados reais de clientes.**
 
----
+## 6. Smoke test de produção
 
-## 5. Checklist rápido
+Checklist mínimo:
 
-- [ ] MongoDB Atlas liberado para conexão.
-- [ ] `DATABASE_URL` configurada no Render.
-- [ ] `JWT_SECRET` forte configurado.
-- [ ] Backend abre `/health`.
-- [ ] Vercel aponta `VITE_API_URL` para o Render.
-- [ ] Render `FRONTEND_ORIGIN` aponta para a URL da Vercel.
-- [ ] Login admin testado.
-- [ ] Agendamento testado.
-- [ ] Agenda Enterprise testada.
-- [ ] PWA instalado no celular para validação.
+- [ ] `/health` responde 200;
+- [ ] login funciona;
+- [ ] tenant correto aparece na vitrine;
+- [ ] agenda retorna disponibilidade;
+- [ ] novo agendamento persiste;
+- [ ] confirmação WhatsApp é aceita pela Twilio;
+- [ ] callback registra `sent` e, quando aplicável, `delivered`/`read`;
+- [ ] cancelamento respeita política configurada;
+- [ ] nenhuma credencial aparece nos logs;
+- [ ] Super Admin e tenant continuam isolados.
 
----
+## 7. Render Free
 
-## 6. Observação sobre o Render Free
-
-Em planos gratuitos, a API pode demorar alguns segundos para responder após ficar inativa. Para apresentação comercial ou uso real, considere um plano pago para evitar cold start.
+Instâncias gratuitas podem hibernar. Isso afeta timers internos de lembretes e pode aumentar latência do primeiro request. Para lembretes com horário estrito em produção, prefira instância sem hibernação ou um Cron externo chamando uma rotina idempotente.
