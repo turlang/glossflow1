@@ -7,8 +7,21 @@ on:
     branches: [main]
 
 jobs:
+  hygiene:
+    name: repository-hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Bloqueia retorno de artefatos legados, .env reais, backups e arquivos
+      # grandes acidentais antes de gastar tempo com os builds da aplicação.
+      - run: node scripts/check-repository-hygiene.mjs
+
   backend:
     runs-on: ubuntu-latest
+    needs: hygiene
     defaults:
       run:
         working-directory: backend
@@ -30,6 +43,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    needs: hygiene
     defaults:
       run:
         working-directory: frontend
