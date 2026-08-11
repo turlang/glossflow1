@@ -5,6 +5,7 @@ on:
     branches: [agent/rebuild-hygiene-m2-9]
     paths:
       - .github/workflows/split-frontend-css.yml
+      - scripts/split-frontend-css.mjs
 
 permissions:
   contents: write
