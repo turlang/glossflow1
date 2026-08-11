@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../../lib/prisma';
-import { appointmentUpdateSchema } from '../schemas';
 import { getTenant } from '../helpers';
 import { professionalCanPerform } from '../../services/professional-capability.service';
 import { bookingFitsProfessionalSchedule } from '../../services/professional-schedule.service';
@@ -15,7 +14,7 @@ import {
 import { matchWaitlistAfterAppointmentChange } from '../../services/waitlist.service';
 import { buildAppointmentConflictWhere, changesAppointmentSchedule, resolveAppointmentSchedule } from '../../services/appointment-reschedule.service';
 import { adminAgendaAccess } from './access';
-import { idParamSchema, smartFitQuerySchema } from './contracts';
+import { appointmentUpdateSchema, idParamSchema, smartFitQuerySchema } from './contracts';
 
 export async function adminAppointmentRoutes(app: FastifyInstance) {
   app.get('/admin/appointments', adminAgendaAccess, async (request) => {
