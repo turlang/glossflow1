@@ -1,0 +1,79 @@
+name: Marco 10 Admin CSS
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/marco10-admin-css.yml
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - name: Extract admin inline styles
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          admin = Path('frontend/src/components/admin')
+          pattern = re.compile(r'\n\s*<style>\{`(.*?)`\}</style>', re.S)
+          blocks = []
+          changed = []
+
+          for path in sorted(admin.rglob('*.jsx')):
+              text = path.read_text(encoding='utf-8')
+              matches = pattern.findall(text)
+              if not matches:
+                  continue
+              for block in matches:
+                  rel = path.relative_to(admin)
+                  blocks.append(f'/* {rel.as_posix()} */\n{block.strip()}\n')
+              cleaned, count = pattern.subn('', text)
+              if count:
+                  path.write_text(cleaned, encoding='utf-8')
+                  changed.append(path)
+
+          if len(changed) != 9:
+              raise SystemExit(f'Expected 9 admin JSX files with inline styles, found {len(changed)}')
+
+          remaining = []
+          for path in admin.rglob('*.jsx'):
+              if '<style>' in path.read_text(encoding='utf-8'):
+                  remaining.append(str(path))
+          if remaining:
+              raise SystemExit('Admin inline styles remain: ' + ', '.join(remaining))
+
+          target = Path('frontend/src/admin-component-styles.css')
+          target.write_text(
+              '/* Admin component styles extracted during Marco 10. Loaded last to preserve inline-style precedence over shared sheets. */\n\n'
+              + '\n'.join(blocks),
+              encoding='utf-8'
+          )
+
+          main = Path('frontend/src/main.jsx')
+          text = main.read_text(encoding='utf-8')
+          import_line = "import './admin-component-styles.css';"
+          if import_line not in text:
+              marker = "import './public-booking.css';"
+              if marker not in text:
+                  raise SystemExit('public-booking.css import marker not found')
+              text = text.replace(marker, marker + '\n' + import_line, 1)
+              main.write_text(text, encoding='utf-8')
+
+          print(f'Extracted styles from {len(changed)} admin components.')
+          PY
+      - name: Commit Marco 10 CSS extraction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/components/admin frontend/src/admin-component-styles.css frontend/src/main.jsx
+          git commit -m "refactor: extract remaining admin component css"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
