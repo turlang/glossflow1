@@ -46,8 +46,8 @@ export function RecentBookingConfirmation() {
             <p>O horário já foi gravado na agenda do salão.</p>
 
             {booking.clientNotification === 'SENT'
-              ? <div className="recent-booking-notice success">✓ A confirmação também foi enviada pelo WhatsApp.</div>
-              : <div className="recent-booking-notice warning">⚠ O horário está confirmado, mas a mensagem automática de WhatsApp não pôde ser entregue. Guarde este protocolo e o link abaixo.</div>}
+              ? <div className="recent-booking-notice success">✓ A solicitação de confirmação foi aceita pelo WhatsApp. A entrega ainda depende do provedor e pode levar alguns instantes.</div>
+              : <div className="recent-booking-notice warning">⚠ O horário está confirmado, mas a solicitação de WhatsApp não foi aceita pelo provedor. Guarde este protocolo e o link abaixo.</div>}
 
             <div className="recent-booking-policy">
               <strong>Cancelamento</strong>
