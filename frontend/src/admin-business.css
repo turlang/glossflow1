@@ -1,0 +1,93 @@
+/* =========================================================
+   Fase 2 — Central de Automações Visual
+   ---------------------------------------------------------
+   Este módulo transforma automações em uma jornada visual de
+   cliente, reduzindo carga cognitiva para usuários não técnicos.
+   O padrão visual segue princípios de ferramentas como Zapier,
+   Make e n8n, mas simplificado para operação de salão.
+   ========================================================= */
+.automation-builder{
+  display:grid;
+  grid-template-columns:minmax(260px,.8fr) minmax(0,1.7fr) minmax(240px,.7fr);
+  gap:18px;
+  align-items:stretch;
+  overflow:hidden;
+}
+.builder-copy h2{margin:8px 0 10px;color:var(--strong);font-size:clamp(1.45rem,2.2vw,2.3rem);line-height:1.05;letter-spacing:-.04em}
+.builder-copy p,.builder-guide p{margin:0;color:var(--muted);line-height:1.6}
+.builder-canvas{
+  display:grid;
+  grid-template-columns:repeat(11,auto);
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  padding:14px;
+  overflow-x:auto;
+  border-radius:22px;
+  background:
+    linear-gradient(135deg,rgba(167,139,250,.10),rgba(214,179,95,.08)),
+    rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.10);
+}
+.workflow-node{
+  width:132px;
+  min-height:126px;
+  display:grid;
+  justify-items:start;
+  align-content:start;
+  gap:8px;
+  padding:14px;
+  text-align:left;
+  border-radius:20px;
+  color:var(--text);
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.035));
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:var(--shadow-sm);
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.workflow-node:hover{transform:translateY(-2px);border-color:rgba(214,179,95,.45);box-shadow:var(--shadow-md)}
+.workflow-node.active{border-color:rgba(214,179,95,.72);box-shadow:var(--shadow-md),inset 0 0 0 2px rgba(214,179,95,.16)}
+.workflow-node>span{width:38px;height:38px;display:grid;place-items:center;border-radius:14px;background:rgba(214,179,95,.14);font-size:1.15rem}
+.workflow-node strong{font-size:.98rem;line-height:1.12;color:var(--strong)}
+.workflow-node small{color:var(--muted);font-size:.76rem;line-height:1.35;font-weight:750}
+.workflow-connector{width:34px;height:2px;background:linear-gradient(90deg,var(--gold),var(--primary));opacity:.72;position:relative}
+.workflow-connector::after{content:'';position:absolute;right:-2px;top:50%;width:8px;height:8px;border-top:2px solid var(--primary);border-right:2px solid var(--primary);transform:translateY(-50%) rotate(45deg)}
+.builder-guide{display:grid;align-content:start;gap:10px;padding:16px;border-radius:22px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.10)}
+.builder-guide strong{color:var(--gold-2);font-size:1rem}
+.builder-guide ol{margin:0;padding-left:18px;color:var(--muted);line-height:1.7}
+.builder-guide code{padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.08);color:var(--gold-2)}
+.saved-automations .editable-row{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(0,1.2fr) auto;align-items:center}
+.saved-automations .editable-row p{margin:0;color:var(--muted);line-height:1.45}
+@media(max-width:1180px){.automation-builder{grid-template-columns:1fr}.builder-canvas{grid-template-columns:repeat(11,auto)}.builder-guide{max-width:none}.saved-automations .editable-row{grid-template-columns:1fr}}
+@media(max-width:720px){.workflow-node{width:120px;min-height:118px}.builder-canvas{padding:10px}.workflow-connector{width:24px}.automation-builder{gap:12px}.builder-guide{padding:12px}}
+
+/* =========================================================
+   Fase 3 — Assistente IA Operacional
+   ---------------------------------------------------------
+   Camada visual para análise gerencial em linguagem natural.
+   A proposta é entregar decisões rápidas sem obrigar o gestor
+   a navegar por CRM, financeiro, estoque e agenda manualmente.
+   ========================================================= */
+.ai-assistant-page{display:grid;gap:18px}.ai-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;overflow:hidden}.ai-hero h2{margin:8px 0 10px;color:var(--strong);font-size:clamp(1.7rem,3vw,2.8rem);line-height:1;letter-spacing:-.05em}.ai-health-grid{display:grid;grid-template-columns:repeat(2,minmax(130px,1fr));gap:10px;min-width:min(100%,420px)}.ai-health-grid article{padding:15px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.035));border:1px solid var(--line)}.ai-health-grid span{display:block;color:var(--muted);font-size:.72rem;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.ai-health-grid strong{display:block;margin-top:6px;color:var(--gold-2);font-size:1.35rem}.ai-workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.65fr);gap:18px}.ai-chat{display:grid;gap:16px}.ai-question-box{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}.ai-question-box label{display:grid;gap:8px}.ai-question-box label span{color:var(--soft);font-size:.78rem;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.ai-question-box textarea{min-height:96px;width:100%;resize:vertical;padding:14px 16px;border-radius:18px;color:var(--text);background:rgba(7,10,18,.55);border:1px solid var(--line);outline:none}.ai-question-box textarea:focus{border-color:rgba(214,179,95,.72);box-shadow:0 0 0 4px rgba(214,179,95,.11)}.ai-answer{display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;padding:16px;border-radius:22px;background:linear-gradient(135deg,rgba(167,139,250,.13),rgba(214,179,95,.07));border:1px solid rgba(255,255,255,.12)}.ai-avatar{width:52px;height:52px;display:grid;place-items:center;border-radius:18px;color:#111827;background:linear-gradient(135deg,var(--gold-2),var(--primary));font-weight:950}.ai-answer strong{display:block;margin-bottom:8px;color:var(--strong)}.ai-answer pre{white-space:pre-wrap;margin:0;color:var(--muted);font:inherit;line-height:1.65}.ai-side{display:grid;align-content:start;gap:12px}.ai-side h3,.ai-recommendations h3{margin:0;color:var(--strong);font-size:1.2rem}.ai-side p,.ai-recommendations .panel-help{margin:0;color:var(--muted);line-height:1.55}.ai-prompt-list{display:grid;gap:8px}.ai-prompt-list button{padding:11px 13px;border-radius:15px;text-align:left;color:var(--text);background:rgba(255,255,255,.055);border:1px solid var(--line);font-weight:850;transition:.18s ease}.ai-prompt-list button:hover{transform:translateY(-1px);border-color:rgba(214,179,95,.44);background:rgba(214,179,95,.07)}.ai-recommendations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.ai-mini-list{display:grid;gap:8px;margin-top:12px}.ai-mini-list span{display:block;padding:10px 12px;border-radius:14px;color:var(--muted);background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);line-height:1.35}@media(max-width:1180px){.ai-hero{flex-direction:column}.ai-health-grid{width:100%}.ai-workspace,.ai-recommendations{grid-template-columns:1fr}.ai-question-box{grid-template-columns:1fr}.ai-question-box .primary{width:100%}}@media(max-width:720px){.ai-health-grid{grid-template-columns:1fr}.ai-answer{grid-template-columns:1fr}.ai-avatar{width:44px;height:44px;border-radius:15px}}
+
+/* =========================================================
+   Fase 4 — Dashboard Executivo
+   ---------------------------------------------------------
+   Painel decisório para gestores: receita, lucro, ticket
+   médio, retenção, rankings, metas, projeção e ações rápidas.
+   O objetivo é reduzir navegação e transformar dados em decisão.
+   ========================================================= */
+.executive-dashboard{display:grid;gap:18px}
+.executive-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;overflow:hidden}
+.executive-hero h2{margin:8px 0 10px;color:var(--strong);font-size:clamp(1.75rem,3.2vw,3rem);line-height:1;letter-spacing:-.055em}
+.executive-goal-card{min-width:min(100%,380px);display:grid;gap:8px;padding:16px;border-radius:22px;background:linear-gradient(135deg,rgba(214,179,95,.16),rgba(139,92,246,.12));border:1px solid rgba(214,179,95,.28)}
+.executive-goal-card span,.executive-goal-card small{color:var(--muted);font-size:.75rem;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.executive-goal-card strong{color:var(--gold-2);font-size:1.25rem}.goal-bar{height:11px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid var(--line)}.goal-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--gold-2),var(--primary))}
+.executive-kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.executive-kpi-grid article{padding:16px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035));border:1px solid var(--line);box-shadow:var(--shadow-sm)}.executive-kpi-grid span{display:block;color:var(--muted);font-size:.72rem;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.executive-kpi-grid strong{display:block;margin:8px 0 3px;color:var(--strong);font-size:clamp(1.25rem,2vw,1.8rem);letter-spacing:-.035em}.executive-kpi-grid small{color:var(--muted);font-size:.8rem;line-height:1.35}
+.executive-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.executive-chart-card,.executive-insights-card,.executive-ranking-card{align-content:start}.cash-bars{display:grid;gap:12px;margin-top:14px}.cash-bars div{display:grid;grid-template-columns:88px minmax(0,1fr) 112px;gap:10px;align-items:center}.cash-bars span{color:var(--muted);font-size:.82rem;font-weight:900}.cash-bars b{height:16px;border-radius:999px;background:linear-gradient(90deg,var(--gold-2),var(--primary));box-shadow:0 10px 24px rgba(167,139,250,.16)}.cash-bars strong{text-align:right;color:var(--strong);font-size:.88rem}
+.executive-insights-list{display:grid;gap:10px;margin-top:14px}.executive-insights-list span{display:block;padding:12px 14px;border-radius:16px;color:var(--muted);line-height:1.45;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
+.executive-ranking-list{display:grid;gap:10px;margin-top:14px}.executive-ranking-list div{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}.executive-ranking-list b{width:34px;height:34px;display:grid;place-items:center;border-radius:12px;color:#111827;background:linear-gradient(135deg,var(--gold-2),var(--primary));font-weight:950}.executive-ranking-list span{display:grid;gap:2px;min-width:0}.executive-ranking-list strong{color:var(--strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.executive-ranking-list small{color:var(--muted);font-size:.78rem}.executive-ranking-list em{font-style:normal;color:var(--gold-2);font-weight:950;white-space:nowrap}
+.executive-actions{display:flex;align-items:center;justify-content:space-between;gap:18px}.executive-actions h2{margin:6px 0 0;color:var(--strong);font-size:clamp(1.35rem,2.2vw,2rem);line-height:1.05}.executive-action-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}.executive-action-grid button{min-height:44px;padding:0 14px;border-radius:999px;color:var(--text);background:rgba(255,255,255,.065);border:1px solid var(--line);font-weight:950;transition:.18s ease}.executive-action-grid button:hover{transform:translateY(-1px);border-color:rgba(214,179,95,.45);background:rgba(214,179,95,.08)}
+@media(max-width:1320px){.executive-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.executive-hero{flex-direction:column}.executive-goal-card{width:100%}}
+@media(max-width:900px){.executive-grid{grid-template-columns:1fr}.executive-actions{align-items:flex-start;flex-direction:column}.executive-action-grid{justify-content:flex-start;width:100%}.executive-action-grid button{flex:1 1 180px}.cash-bars div{grid-template-columns:1fr}.cash-bars strong{text-align:left}.executive-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.executive-kpi-grid{grid-template-columns:1fr}.executive-ranking-list div{grid-template-columns:34px minmax(0,1fr)}.executive-ranking-list em{grid-column:2;text-align:left}.executive-action-grid button{width:100%}}
+
