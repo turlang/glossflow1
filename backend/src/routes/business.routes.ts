@@ -109,8 +109,8 @@ export async function businessRoutes(app: FastifyInstance) {
       prisma.appointment.findMany({ where: { salonId: tenant.salonId, status: { in: ['CONFIRMED', 'COMPLETED'] } }, include: { service: true, professional: true } })
     ]);
 
-    const projections = appointments.map((appointment: any) => {
-      const rule = rules.find((item: any) => item.professionalId === appointment.professionalId && item.active);
+    const projections = appointments.map((appointment) => {
+      const rule = rules.find((item) => item.professionalId === appointment.professionalId && item.active);
       const percentage = rule?.percentage ?? 40;
       return { appointmentId: appointment.id, professional: appointment.professional.name, service: appointment.service.name, baseValue: appointment.service.price, percentage, commission: appointment.service.price * (percentage / 100), commissionPaid: appointment.commissionPaid };
     });
@@ -234,13 +234,13 @@ export async function businessRoutes(app: FastifyInstance) {
     ]);
 
     const normalized = question.toLowerCase();
-    const revenue = financialEntries.filter((entry: any) => entry.type === 'REVENUE').reduce((sum: number, entry: any) => sum + entry.amount, 0);
-    const expenses = financialEntries.filter((entry: any) => entry.type === 'EXPENSE').reduce((sum: number, entry: any) => sum + entry.amount, 0);
+    const revenue = financialEntries.filter((entry) => entry.type === 'REVENUE').reduce((sum, entry) => sum + entry.amount, 0);
+    const expenses = financialEntries.filter((entry) => entry.type === 'EXPENSE').reduce((sum, entry) => sum + entry.amount, 0);
     const profit = revenue - expenses;
-    const lowStock = inventory.filter((item: any) => item.quantity <= item.minimumQuantity);
-    const appointmentsValue = appointments.reduce((sum: number, appointment: any) => sum + Number(appointment.service?.price || 0), 0);
+    const lowStock = inventory.filter((item) => item.quantity <= item.minimumQuantity);
+    const appointmentsValue = appointments.reduce((sum, appointment) => sum + Number(appointment.service?.price || 0), 0);
     const averageTicket = appointments.length ? appointmentsValue / appointments.length : 0;
-    const topService = [...services].sort((a: any, b: any) => Number(b.price || 0) - Number(a.price || 0))[0] as any;
+    const topService = [...services].sort((a, b) => Number(b.price || 0) - Number(a.price || 0))[0];
 
     let answer: string;
 
@@ -249,22 +249,22 @@ export async function businessRoutes(app: FastifyInstance) {
     } else if (normalized.includes('fatur') || normalized.includes('lucro') || normalized.includes('financeiro')) {
       answer = ['Análise financeira:', `• Receita registrada: R$ ${revenue.toFixed(2)}.`, `• Despesas registradas: R$ ${expenses.toFixed(2)}.`, `• Resultado estimado: R$ ${profit.toFixed(2)}.`, `• Ticket médio da agenda: R$ ${averageTicket.toFixed(2)}.`, profit < 0 ? '• Atenção: despesas superaram receitas. Revise custos, comissões e promoções.' : '• Recomendação: criar metas semanais e promover serviços acima do ticket médio.'].join('\n');
     } else if (normalized.includes('produto') || normalized.includes('estoque') || normalized.includes('reposição')) {
-      answer = ['Análise de estoque:', `• Produtos monitorados: ${inventory.length}.`, `• Produtos em alerta: ${lowStock.length}.`, lowStock.length ? `• Prioridade: ${lowStock.slice(0, 3).map((item: any) => item.name).join(', ')}.` : '• Nenhum produto abaixo do mínimo agora.', '• Boa prática: vincular consumo de produto ao serviço para previsão automática.'].join('\n');
+      answer = ['Análise de estoque:', `• Produtos monitorados: ${inventory.length}.`, `• Produtos em alerta: ${lowStock.length}.`, lowStock.length ? `• Prioridade: ${lowStock.slice(0, 3).map((item) => item.name).join(', ')}.` : '• Nenhum produto abaixo do mínimo agora.', '• Boa prática: vincular consumo de produto ao serviço para previsão automática.'].join('\n');
     } else if (normalized.includes('campanha') || normalized.includes('promo')) {
       answer = ['Campanha sugerida:', '• Objetivo: preencher horários vagos e elevar ticket médio.', `• Serviço foco: ${topService?.name || 'serviço de maior margem'}.`, '• Mensagem: "Olá {nome}! Temos horários selecionados esta semana com condição especial. Quer reservar?"', '• Métrica: respostas, agendamentos criados e receita recuperada.'].join('\n');
     } else if (normalized.includes('profissional')) {
-      const ranking = professionals.map((professional: any) => {
-        const total = appointments.filter((appointment: any) => appointment.professionalId === professional.id).reduce((sum: number, appointment: any) => sum + Number(appointment.service?.price || 0), 0);
+      const ranking = professionals.map((professional) => {
+        const total = appointments.filter((appointment) => appointment.professionalId === professional.id).reduce((sum, appointment) => sum + Number(appointment.service?.price || 0), 0);
         return { name: professional.name, total };
-      }).sort((a: any, b: any) => b.total - a.total);
-      answer = ['Análise por profissional:', ...ranking.slice(0, 5).map((item: any, index: number) => `• ${index + 1}. ${item.name}: R$ ${item.total.toFixed(2)} em agenda.`), '• Recomendação: compare ocupação, ticket médio e recorrência antes de definir metas.'].join('\n');
+      }).sort((a, b) => b.total - a.total);
+      answer = ['Análise por profissional:', ...ranking.slice(0, 5).map((item, index) => `• ${index + 1}. ${item.name}: R$ ${item.total.toFixed(2)} em agenda.`), '• Recomendação: compare ocupação, ticket médio e recorrência antes de definir metas.'].join('\n');
     } else {
       answer = ['Resumo executivo:', `• Serviços ativos: ${services.length}.`, `• Profissionais cadastrados: ${professionals.length}.`, `• Agendamentos registrados: ${appointments.length}.`, `• Receita registrada: R$ ${revenue.toFixed(2)} e resultado estimado de R$ ${profit.toFixed(2)}.`, `• Estoque em alerta: ${lowStock.length} produto(s).`, '• Próxima ação: revisar horários vagos, ativar campanha de retorno e acompanhar ticket médio.'].join('\n');
     }
 
     if (process.env.OPENAI_API_KEY) {
       try {
-        const context = { services: services.length, professionals: professionals.length, appointments: appointments.length, clients: clients.length, revenue, expenses, profit, averageTicket, lowStock: lowStock.map((item: any) => item.name).slice(0, 8) };
+        const context = { services: services.length, professionals: professionals.length, appointments: appointments.length, clients: clients.length, revenue, expenses, profit, averageTicket, lowStock: lowStock.map((item) => item.name).slice(0, 8) };
         const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -296,9 +296,9 @@ export async function businessRoutes(app: FastifyInstance) {
       prisma.aiSuggestion.findMany({ where: { salonId: tenant.salonId, resolved: false }, orderBy: { createdAt: 'desc' } })
     ]);
 
-    const lowStock = inventory.filter((item: any) => item.quantity <= item.minimumQuantity);
-    const revenue = financialEntries.filter((e: any) => e.type === 'REVENUE').reduce((sum: number, e: any) => sum + e.amount, 0);
-    const expenses = financialEntries.filter((e: any) => e.type === 'EXPENSE').reduce((sum: number, e: any) => sum + e.amount, 0);
+    const lowStock = inventory.filter((item) => item.quantity <= item.minimumQuantity);
+    const revenue = financialEntries.filter((e) => e.type === 'REVENUE').reduce((sum, e) => sum + e.amount, 0);
+    const expenses = financialEntries.filter((e) => e.type === 'EXPENSE').reduce((sum, e) => sum + e.amount, 0);
 
     const suggestions = [
       lowStock.length ? { title: 'Reposição de estoque', category: 'Estoque', priority: 'HIGH', content: `${lowStock.length} produto(s) estão no limite mínimo. Priorize reposição antes dos próximos atendimentos.` } : null,

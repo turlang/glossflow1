@@ -29,8 +29,8 @@ export async function observabilityRoutes(app: FastifyInstance) {
       prisma.financialEntry.findMany({ where: { salonId: tenant.salonId } })
     ]);
 
-    const revenue = financialEntries.filter((entry: any) => entry.type === 'REVENUE').reduce((sum: number, entry: any) => sum + Number(entry.amount || 0), 0);
-    const expenses = financialEntries.filter((entry: any) => entry.type === 'EXPENSE').reduce((sum: number, entry: any) => sum + Number(entry.amount || 0), 0);
+    const revenue = financialEntries.filter((entry) => entry.type === 'REVENUE').reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const expenses = financialEntries.filter((entry) => entry.type === 'EXPENSE').reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
     const errorRate = metrics.totalRequests ? Math.round((metrics.errors / metrics.totalRequests) * 100) : 0;
     const healthScore = Math.max(60, Math.min(99, 98 - errorRate - Math.max(0, metrics.averageLatency - 350) / 25));
 

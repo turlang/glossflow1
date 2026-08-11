@@ -75,17 +75,17 @@ export async function platformAdminRoutes(app: FastifyInstance) {
       })
     ]);
 
-    const mrr = activeSubscriptions.reduce((sum: number, subscription: any) => sum + Number(subscription.plan?.price || 0), 0);
+    const mrr = activeSubscriptions.reduce((sum, subscription) => sum + Number(subscription.plan?.price || 0), 0);
     return {
       totals: { salons, users, plans: plans.length, subscriptions: subscriptions.length },
       revenue: { mrr, mrrFormatted: `R$ ${brl(mrr)}` },
       subscriptionStatus: {
-        trial: subscriptions.filter((item: any) => item.status === 'TRIAL').length,
-        active: subscriptions.filter((item: any) => item.status === 'ACTIVE').length,
-        pastDue: subscriptions.filter((item: any) => item.status === 'PAST_DUE').length,
-        canceled: subscriptions.filter((item: any) => item.status === 'CANCELED').length
+        trial: subscriptions.filter((item) => item.status === 'TRIAL').length,
+        active: subscriptions.filter((item) => item.status === 'ACTIVE').length,
+        pastDue: subscriptions.filter((item) => item.status === 'PAST_DUE').length,
+        canceled: subscriptions.filter((item) => item.status === 'CANCELED').length
       },
-      recentSubscriptions: subscriptions.slice(0, 10).map((subscription: any) => ({
+      recentSubscriptions: subscriptions.slice(0, 10).map((subscription) => ({
         id: subscription.id,
         status: subscription.status,
         salon: subscription.salon?.name,
@@ -109,8 +109,8 @@ export async function platformAdminRoutes(app: FastifyInstance) {
       }
     });
 
-    return salons.map((salon: any) => {
-      const owner = salon.users.find((user: any) => user.role === 'ADMIN') || salon.users[0] || null;
+    return salons.map((salon) => {
+      const owner = salon.users.find((user) => user.role === 'ADMIN') || salon.users[0] || null;
       return {
         id: salon.id,
         slug: salon.slug,
@@ -121,7 +121,7 @@ export async function platformAdminRoutes(app: FastifyInstance) {
         openingHours: salon.openingHours,
         customDomain: salon.customDomain,
         users: salon.users.length,
-        activeUsers: salon.users.filter((user: any) => user.active).length,
+        activeUsers: salon.users.filter((user) => user.active).length,
         owner: owner ? { id: owner.id, name: owner.name, email: owner.email, active: owner.active } : null,
         modulesConfigured: Boolean(salon.modulesConfigured),
         enabledModules: normalizeEnabledModules(salon),
@@ -217,9 +217,9 @@ export async function platformAdminRoutes(app: FastifyInstance) {
       prisma.appointment.findFirst({ where: { salonId: id }, orderBy: { startTime: 'desc' }, select: { startTime: true, status: true, clientName: true } })
     ]);
 
-    const revenue = financialEntries.filter((entry: any) => entry.type === 'REVENUE').reduce((sum: number, entry: any) => sum + Number(entry.amount || 0), 0);
-    const expenses = financialEntries.filter((entry: any) => entry.type === 'EXPENSE').reduce((sum: number, entry: any) => sum + Number(entry.amount || 0), 0);
-    const lowStock = products.filter((item: any) => Number(item.quantity) <= Number(item.minimumQuantity)).length;
+    const revenue = financialEntries.filter((entry) => entry.type === 'REVENUE').reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const expenses = financialEntries.filter((entry) => entry.type === 'EXPENSE').reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const lowStock = products.filter((item) => Number(item.quantity) <= Number(item.minimumQuantity)).length;
 
     return {
       salon: { id: salon.id, name: salon.name, slug: salon.slug },
