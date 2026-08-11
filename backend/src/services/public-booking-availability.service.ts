@@ -17,8 +17,9 @@ type AvailabilityInput = {
 
 type BusyInterval = { startTime: Date; endTime: Date; professionalId: string };
 type FreeBlock = { start: Date; end: Date };
+type PublicProfessionalInput = { id: string; name: string; specialty: string; photoUrl: string | null };
 
-type RankedSlot = {
+export type RankedSlot = {
   startTime: string;
   label: string;
   fitScore: number;
@@ -170,7 +171,7 @@ function busyForProfessional(appointments: BusyInterval[], professionalId: strin
     .map((appointment) => ({ start: appointment.startTime, end: appointment.endTime }));
 }
 
-function publicProfessional(professional: any) {
+function publicProfessional(professional: PublicProfessionalInput) {
   return {
     id: professional.id,
     name: professional.name,

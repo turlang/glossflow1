@@ -89,8 +89,14 @@ function whatsappAddress(phone: string) {
   return normalized ? `whatsapp:+${normalized}` : '';
 }
 
-function metaErrorDetails(data: any) {
-  const error = data?.error || {};
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function metaErrorDetails(data: unknown) {
+  const error = asRecord(asRecord(data).error);
   return {
     errorCode: Number(error.code || 0) || null,
     errorSubcode: Number(error.error_subcode || 0) || null,

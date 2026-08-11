@@ -274,8 +274,15 @@ export async function businessRoutes(app: FastifyInstance) {
           ] })
         });
         if (aiResponse.ok) {
-          const data = await aiResponse.json() as any;
-          const connectedAnswer = data?.choices?.[0]?.message?.content?.trim();
+          const rawResponse: unknown = await aiResponse.json();
+          const parsedResponse = z.object({
+            choices: z.array(z.object({
+              message: z.object({ content: z.string().optional().nullable() })
+            })).optional().default([])
+          }).safeParse(rawResponse);
+          const connectedAnswer = parsedResponse.success
+            ? parsedResponse.data.choices[0]?.message.content?.trim()
+            : undefined;
           if (connectedAnswer) answer = connectedAnswer;
         }
       } catch {
