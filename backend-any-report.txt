@@ -1,1 +1,0 @@
-backend/src/routes/growth.routes.ts:261: const professionals = appointments.reduce((acc: Record<string, number>, appointment: any) => {
