@@ -1,0 +1,80 @@
+name: Remaining Hygiene Inspection
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/remaining-hygiene-inspection.yml
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - name: Inspect structural debt
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          lines = ['# Remaining hygiene inspection', '']
+
+          lines.append('## Admin JSX inline style blocks')
+          style_hits = []
+          for path in sorted(Path('frontend/src/components/admin').rglob('*.jsx')):
+              text = path.read_text(encoding='utf-8')
+              blocks = len(re.findall(r'<style(?:\s[^>]*)?>', text))
+              template_styles = len(re.findall(r'<style>\{`', text))
+              if blocks:
+                  style_hits.append((str(path), blocks, template_styles, len(text.splitlines())))
+          if style_hits:
+              for item in style_hits:
+                  lines.append(f'- {item[0]}: style={item[1]}, template={item[2]}, lines={item[3]}')
+          else:
+              lines.append('- ZERO_ADMIN_INLINE_STYLE')
+
+          lines.extend(['', '## Largest backend TypeScript files'])
+          backend = []
+          for path in Path('backend/src').rglob('*.ts'):
+              text = path.read_text(encoding='utf-8')
+              backend.append((len(text.splitlines()), len(text.encode()), str(path)))
+          for line_count, size, name in sorted(backend, reverse=True)[:20]:
+              lines.append(f'- {name}: {line_count} lines, {size} bytes')
+
+          lines.extend(['', '## Existing backend tests'])
+          for path in sorted(Path('backend/tests').glob('*.test.js')):
+              text = path.read_text(encoding='utf-8')
+              count = len(re.findall(r'\btest\(', text))
+              lines.append(f'- {path}: {count} tests')
+
+          lines.extend(['', '## Existing frontend tests'])
+          for path in sorted(Path('frontend/src').rglob('*.test.*')):
+              text = path.read_text(encoding='utf-8')
+              count = len(re.findall(r'\bit\(', text)) + len(re.findall(r'\btest\(', text))
+              lines.append(f'- {path}: {count} tests')
+
+          lines.extend(['', '## User documentation'])
+          docs = Path('docs/usuario')
+          if docs.exists():
+              for path in sorted(docs.rglob('*')):
+                  if path.is_file():
+                      text = path.read_text(encoding='utf-8', errors='replace')
+                      lines.append(f'- {path}: {len(text.splitlines())} lines, {len(text.split())} words')
+          else:
+              lines.append('- docs/usuario missing')
+
+          Path('remaining-hygiene-inspection.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add remaining-hygiene-inspection.md
+          git commit -m "chore: capture remaining hygiene inspection"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
