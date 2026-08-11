@@ -1,53 +1,101 @@
-# GlossFlow — Quality Gate 10/10
+# GlossFlow Smart — Quality Gate
 
-Esta versão foi ajustada com foco em entrega profissional, segurança multi-tenant e prontidão de deploy.
+O Quality Gate existe para impedir regressões estruturais, erros de TypeScript/build e retorno de artefatos inseguros antes de uma mudança chegar ao ambiente de produção.
 
-## Melhorias aplicadas
+## Pipeline atual
 
-- Remoção obrigatória de arquivos sensíveis e artefatos gerados no pacote final.
-- Correção dos scripts Prisma para usar o schema único em `../prisma/schema.prisma` quando executados pelo backend.
-- Endurecimento de rotas administrativas com `salonId` em operações críticas de update/delete.
-- Desativação segura de usuários em vez de exclusão direta.
-- Bloqueio para impedir que o usuário autenticado desative a própria conta.
-- Testes automatizados mínimos com `node:test` para validação de variáveis de ambiente.
-- Pipeline local documentado com `lint`, `test`, `build` e `deploy:verify`.
-- Validação de `JWT_SECRET` forte antes de deploy.
-- Documentação objetiva das integrações que dependem de provedores externos.
+O workflow `.github/workflows/quality.yml` possui três gates independentes por responsabilidade:
 
-## Como validar localmente
+1. `repository-hygiene`
+2. `backend`
+3. `frontend`
 
-Backend:
+Backend e frontend só começam depois que a higienização estrutural é aprovada.
+
+## Repository Hygiene
+
+Executa:
+
+```bash
+node scripts/check-repository-hygiene.mjs
+```
+
+O checker bloqueia, entre outros:
+
+- `setup.js` restaurador legado;
+- schema/seed Prisma duplicados na raiz;
+- blueprint Render antigo duplicado;
+- `.env` real versionado;
+- arquivos `.bak`, `.old`, `.orig`, `.tmp` e `.temp`;
+- arquivos acima de 5 MB sem revisão explícita.
+
+A fonte Prisma canônica é:
+
+```text
+backend/prisma/schema.prisma
+```
+
+O blueprint Render canônico é:
+
+```text
+render.yaml
+```
+
+## Backend Gate
+
+Executa:
 
 ```bash
 cd backend
-npm install
-cp .env.example .env
+npm ci
 npm run prisma:generate
-npm run prisma:push
-npm run seed
 npm run lint
 npm test
 npm run build
-npm run dev
 ```
 
-Frontend:
+`npm run lint` atualmente usa o TypeScript em modo `--noEmit`, preservando `strict: true` como validação estática principal do backend.
+
+## Frontend Gate
+
+Executa:
 
 ```bash
 cd frontend
-npm install
-cp .env.example .env
+npm ci
 npm run build
-npm run dev
 ```
 
-## Observação importante
+O build Vite é o gate automatizado atual do frontend. A adoção de ESLint real está registrada como evolução de engenharia; não chamamos o build de desenvolvimento de análise estática completa.
 
-Pagamentos, WhatsApp real, Sentry, Cloudinary, OpenAI e Google Calendar dependem de contas externas e chaves reais. O projeto está preparado para essas integrações, mas elas só ficam 100% operacionais após configurar as credenciais no ambiente de produção.
+## Critérios além do CI
 
-## Nota técnica após os ajustes
+CI verde não substitui smoke test em fluxos externos. Mudanças em Agenda, WhatsApp, pagamentos, autenticação ou isolamento multi-tenant precisam de validação do comportamento afetado.
 
-- Código, estrutura e segurança base: 9,5/10
-- Projeto acadêmico/portfólio: 10/10
-- Piloto comercial: 9/10
-- SaaS comercial com integrações externas configuradas: 10/10
+Exemplos:
+
+- Agenda: criar/reagendar/cancelar e conferir conflito/jornada;
+- Twilio: observar callback `sent` e, quando disponível, `delivered`/`read`;
+- RBAC: testar papéis diferentes sem vazamento entre tenants;
+- CRM/Estoque: confirmar persistência e permissões depois de CRUDs.
+
+## Padrões de manutenção
+
+Consulte:
+
+- `docs/engineering/CODING_STANDARDS.md`
+- `docs/engineering/ARCHITECTURE.md`
+- `docs/engineering/HYGIENE_REPORT.md`
+- `CONTRIBUTING.md`
+
+Comentários devem documentar contratos, riscos, segurança, decisões e fallbacks. Comentários que apenas repetem o código são considerados ruído e não fazem parte do padrão do GlossFlow.
+
+## Definição de aprovado
+
+Uma mudança estrutural está aprovada quando:
+
+- Repository Hygiene passa;
+- backend passa TypeScript/testes/build;
+- frontend gera build;
+- o fluxo alterado possui smoke test quando necessário;
+- nenhum segredo ou artefato obsoleto foi introduzido.
