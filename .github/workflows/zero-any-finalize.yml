@@ -1,0 +1,176 @@
+name: Finalize Backend Typing
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/zero-any-finalize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - name: Apply deterministic typing cleanup
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # admin-crud: type user mutation and split heterogeneous transaction branches.
+          path = Path('backend/src/routes/admin-crud.routes.ts')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              "import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';\n",
+              "import { Prisma } from '@prisma/client';\nimport { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';\n",
+              1,
+          )
+          text = text.replace(
+              "const updateData: any = { name: data.name, email: data.email, role: data.role, active: data.active };",
+              "const updateData: Prisma.UserUpdateManyMutationInput = { name: data.name, email: data.email, role: data.role, active: data.active };",
+              1,
+          )
+          old = """    const quantityChanged = data.quantity !== current.quantity;
+    const operations = [
+      prisma.inventoryProduct.updateMany({
+        where: { id, salonId: tenant.salonId },
+        data
+      })
+    ];
+
+    if (quantityChanged) {
+      operations.push(prisma.inventoryMovement.create({
+        data: {
+          type: 'ADJUSTMENT',
+          quantity: data.quantity,
+          reason: `Ajuste pelo cadastro do produto. Saldo anterior: ${current.quantity}; novo saldo: ${data.quantity}.`,
+          productId: id,
+          salonId: tenant.salonId
+        }
+      }) as any);
+    }
+
+    await prisma.$transaction(operations as any);"""
+          new = """    const quantityChanged = data.quantity !== current.quantity;
+    if (quantityChanged) {
+      await prisma.$transaction([
+        prisma.inventoryProduct.updateMany({
+          where: { id, salonId: tenant.salonId },
+          data
+        }),
+        prisma.inventoryMovement.create({
+          data: {
+            type: 'ADJUSTMENT',
+            quantity: data.quantity,
+            reason: `Ajuste pelo cadastro do produto. Saldo anterior: ${current.quantity}; novo saldo: ${data.quantity}.`,
+            productId: id,
+            salonId: tenant.salonId
+          }
+        })
+      ]);
+    } else {
+      await prisma.inventoryProduct.updateMany({
+        where: { id, salonId: tenant.salonId },
+        data
+      });
+    }"""
+          if old not in text:
+              raise SystemExit('admin-crud transaction block not found')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+
+          # Public booking: export slot contract and type public professional projection.
+          path = Path('backend/src/services/public-booking-availability.service.ts')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('type RankedSlot = {', 'export type RankedSlot = {', 1)
+          marker = "type BusyInterval = { startTime: Date; endTime: Date; professionalId: string };\ntype FreeBlock = { start: Date; end: Date };\n"
+          addition = marker + "type PublicProfessionalInput = { id: string; name: string; specialty: string; photoUrl: string | null };\n"
+          if marker not in text:
+              raise SystemExit('public booking type marker missing')
+          text = text.replace(marker, addition, 1)
+          text = text.replace('function publicProfessional(professional: any) {', 'function publicProfessional(professional: PublicProfessionalInput) {', 1)
+          path.write_text(text, encoding='utf-8')
+
+          # Waitlist: use the exported ranked slot shape plus professional identity.
+          path = Path('backend/src/services/waitlist.service.ts')
+          text = path.read_text(encoding='utf-8')
+          old_import = "import { publicBookingAvailability } from './public-booking-availability.service';"
+          new_import = "import { publicBookingAvailability, RankedSlot } from './public-booking-availability.service';"
+          if old_import not in text:
+              raise SystemExit('waitlist availability import missing')
+          text = text.replace(old_import, new_import, 1)
+          marker = "const OFFER_MINUTES = Number(process.env.WAITLIST_OFFER_MINUTES || 20);"
+          slot_type = marker + "\n\ntype WaitlistCandidateSlot = RankedSlot & { professionalId: string; professionalName: string };"
+          if marker not in text:
+              raise SystemExit('waitlist offer marker missing')
+          text = text.replace(marker, slot_type, 1)
+          text = text.replace('    slot: any;', '    slot: WaitlistCandidateSlot;', 1)
+          path.write_text(text, encoding='utf-8')
+
+          # WhatsApp provider payloads enter as unknown and are narrowed explicitly.
+          path = Path('backend/src/services/whatsapp.service.ts')
+          text = path.read_text(encoding='utf-8')
+          old = """function metaErrorDetails(data: any) {
+  const error = data?.error || {};
+  return {
+    errorCode: Number(error.code || 0) || null,
+    errorSubcode: Number(error.error_subcode || 0) || null,
+    errorType: String(error.type || ''),
+    errorMessage: String(error.message || ''),
+    fbtraceId: String(error.fbtrace_id || '')
+  };
+}"""
+          new = """function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function metaErrorDetails(data: unknown) {
+  const error = asRecord(asRecord(data).error);
+  return {
+    errorCode: Number(error.code || 0) || null,
+    errorSubcode: Number(error.error_subcode || 0) || null,
+    errorType: String(error.type || ''),
+    errorMessage: String(error.message || ''),
+    fbtraceId: String(error.fbtrace_id || '')
+  };
+}"""
+          if old not in text:
+              raise SystemExit('metaErrorDetails block missing')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+
+          # OpenAI compatibility route: validate unknown JSON before reading choices.
+          path = Path('backend/src/routes/business.routes.ts')
+          text = path.read_text(encoding='utf-8')
+          old = """          const data = await aiResponse.json() as any;
+          const connectedAnswer = data?.choices?.[0]?.message?.content?.trim();
+          if (connectedAnswer) answer = connectedAnswer;"""
+          new = """          const rawResponse: unknown = await aiResponse.json();
+          const parsedResponse = z.object({
+            choices: z.array(z.object({
+              message: z.object({ content: z.string().optional().nullable() })
+            })).optional().default([])
+          }).safeParse(rawResponse);
+          const connectedAnswer = parsedResponse.success
+            ? parsedResponse.data.choices[0]?.message.content?.trim()
+            : undefined;
+          if (connectedAnswer) answer = connectedAnswer;"""
+          if old not in text:
+              raise SystemExit('business OpenAI response block missing')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit typing cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/admin-crud.routes.ts backend/src/routes/business.routes.ts backend/src/services/public-booking-availability.service.ts backend/src/services/waitlist.service.ts backend/src/services/whatsapp.service.ts
+          git commit -m "refactor: eliminate remaining unsafe backend typing"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
