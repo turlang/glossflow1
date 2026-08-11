@@ -1,111 +1,103 @@
-# Como usar o GlossFlow SaaS Pro
+# Como usar o GlossFlow Smart
 
-## 1. Acessar a vitrine
+Este guia descreve o comportamento atual do produto. Para arquitetura e padrões de código, consulte `docs/engineering/`.
 
-Abra o frontend em `http://localhost:5173`. A vitrine mostra serviços, profissionais, portfólio e botão de agendamento.
+## 1. Vitrine pública
 
-## 2. Fazer login no painel
+A vitrine apresenta marca do salão, serviços, equipe, portfólio e acesso ao agendamento online. O tenant pode ser resolvido por slug, subdomínio ou domínio próprio conforme a configuração da plataforma.
 
-Clique em **Admin** e use:
+## 2. Acesso administrativo
 
-```txt
-admin@glossflow.com
-123456
+Use uma conta provisionada para o salão. Não existem credenciais fixas recomendadas para produção.
+
+Papéis principais:
+
+- `SUPER_ADMIN`: administração global da plataforma;
+- `ADMIN`: gestão completa do tenant;
+- `RECEPTION`: operação permitida de agenda/CRM/estoque e módulos liberados;
+- `PROFESSIONAL`: acesso operacional limitado.
+
+## 3. Serviços e profissionais
+
+Cadastre serviços com preço, duração e informações públicas. Depois configure quais serviços cada profissional pode executar e a jornada individual de trabalho, incluindo pausas e bloqueios.
+
+## 4. Agenda
+
+O módulo Agenda inclui:
+
+- disponibilidade pública;
+- validação de conflito;
+- capacidade por profissional;
+- jornada individual;
+- visão operacional dia/semana;
+- reagendamento;
+- estados operacionais de atendimento;
+- Smart Fit;
+- lista de espera.
+
+As regras críticas são sempre validadas novamente no backend.
+
+## 5. Confirmação do cliente
+
+Depois de um agendamento público, o cliente recebe:
+
+- protocolo;
+- política de cancelamento;
+- link seguro de gerenciamento;
+- tentativa de confirmação pelo WhatsApp quando o módulo estiver ativo.
+
+O GlossFlow diferencia uma solicitação aceita pelo provider de uma mensagem realmente entregue. No fluxo Twilio, callbacks podem registrar `sent`, `delivered`, `read`, `failed` ou `undelivered`.
+
+## 6. WhatsApp
+
+A integração operacional atual usa Twilio.
+
+Entrada:
+
+```text
+WhatsApp -> Twilio -> /webhooks/whatsapp/twilio -> GlossFlow
 ```
 
-## 3. Cadastrar serviços
+Status de entrega:
 
-Entre em **Serviços**. Preencha imagem, nome, descrição, preço e duração. Clique em salvar. Para alterar, use **Editar** na lista.
+```text
+Twilio -> /webhooks/whatsapp/twilio/status -> GlossFlow
+```
 
-## 4. Cadastrar profissionais
+O Sandbox/Trial serve somente para QA e possui limitações de templates/recipientes. Um WhatsApp Sender completo é necessário para operação real com clientes.
 
-Entre em **Profissionais**. Cadastre foto, nome, especialidade e biografia. Esses dados aparecem na vitrine pública e no agendamento.
+## 7. CRM
 
-## 5. Cadastrar trabalhos da vitrine
+Clientes podem ser cadastrados manualmente e também são criados/relacionados durante o agendamento público. O CRM mantém dados de contato, preferências, observações e histórico relacionado.
 
-Entre em **Vitrine**. Adicione título, categoria, descrição e imagem do resultado. Use fotos reais do salão para aumentar conversão.
+## 8. Estoque
 
-## 6. Visualizar agendamentos
+Cadastre produtos com categoria, fornecedor, unidade, saldo, mínimo e valores. Use movimentações explícitas para entrada, saída e ajuste. Produtos com histórico são desativados logicamente em vez de apagados fisicamente.
 
-Entre em **Agenda**. Os agendamentos aparecem no modelo semanal com post-its, mantendo a visualização atual escolhida para o projeto.
+## 9. Financeiro e comissões
 
-## 7. Controlar estoque
+O ADMIN pode registrar receitas/despesas e regras de comissão. Esses dados alimentam indicadores do painel executivo.
 
-Entre em **Estoque**. Cadastre produtos, fornecedor, quantidade, quantidade mínima, custo e imagem. Use movimentações para entrada, saída e ajuste.
+## 10. Fidelidade
 
-## 8. Cadastrar clientes
+O programa de fidelidade permite configurar regra de pontos e registrar movimentações por cliente conforme permissões do tenant.
 
-Entre em **Clientes**. Cadastre nome, WhatsApp, e-mail, aniversário, preferências e observações. Clientes que agendam pela vitrine também entram automaticamente no CRM.
+## 11. IA
 
-## 9. Controlar financeiro
+O provider principal atual é Groq. O agente e os recursos inteligentes devem usar a camada de provider do backend e nunca expor chave da IA ao navegador.
 
-Entre em **Financeiro**. Registre receitas e despesas com categoria, descrição, valor, forma de pagamento e data. O painel mostra receita, despesa e resultado.
+## 12. Super Admin
 
-## 10. Configurar comissões
+A administração global controla tenants, módulos, planos e configurações de plataforma. Site & Marca e decisões globais não devem ser alterados por usuários comuns do salão.
 
-Entre em **Comissões**. Cadastre o percentual de cada profissional. O sistema calcula projeções com base nos serviços agendados.
+## 13. Atualização de dados
 
-## 11. Criar fidelidade
+Após operações administrativas, o frontend executa atualização silenciosa dos dados do backoffice para preservar a tela/aba atual. Falhas em um endpoint sem permissão não devem ser tratadas automaticamente como sessão expirada.
 
-Entre em **Fidelidade**. Configure o programa e registre pontos por cliente. Use para campanhas de retorno e descontos.
+## 14. Segurança operacional
 
-## 12. Configurar assinatura
-
-Entre em **Assinatura**. Veja o plano ativo do salão e altere status. Esse módulo prepara o projeto para venda como SaaS.
-
-## 13. Preparar WhatsApp e IA
-
-Entre em **Automações**. Cadastre templates de WhatsApp e veja insights gerenciais. Em produção, conecte com Evolution API/Twilio e OpenAI API.
-
-## Fase 2 — Central de Automações Visual
-
-A área de **Automações** agora possui um construtor visual de jornada do cliente.
-
-### Como usar
-
-1. Acesse **Admin > Automações**.
-2. Clique em um bloco do fluxo, como **Confirmação**, **Lembrete** ou **Avaliação**.
-3. O sistema preencherá um modelo de mensagem automaticamente.
-4. Personalize o texto usando variáveis como `{nome}`, `{servico}`, `{data}` e `{hora}`.
-5. Escolha se a automação ficará **Ativa** ou **Pausada**.
-6. Clique em **Salvar automação**.
-
-### Observação técnica
-
-Nesta fase, as automações são templates gerenciáveis dentro do SaaS. O disparo real via WhatsApp deve ser conectado posteriormente a um provedor como Evolution API, Z-API, Twilio ou Meta WhatsApp Cloud API.
-
-## Fase 3 — Assistente IA
-
-A versão 9.2 adiciona uma aba **Assistente IA** no painel administrativo.
-
-### Como usar
-
-1. Acesse o painel administrativo.
-2. Clique em **Assistente IA** no menu lateral.
-3. Digite uma pergunta, por exemplo:
-   - Quem são meus melhores clientes?
-   - Quais produtos precisam de reposição?
-   - Qual profissional mais faturou?
-   - Crie uma campanha para horários vagos.
-4. Clique em **Gerar resposta**.
-
-### O que o assistente analisa
-
-- Clientes cadastrados.
-- Serviços ativos.
-- Profissionais.
-- Agendamentos.
-- Estoque.
-- Receita, despesa e lucro.
-- Insights gerenciais já existentes.
-
-### Observação técnica
-
-Nesta fase, o assistente funciona com uma inteligência local determinística, sem depender de API externa. Em produção, a rota `/admin/ai/assistant` pode ser conectada a OpenAI, filas, cache, auditoria e histórico persistente.
-
-## Dashboard Executivo
-
-1. Acesse o painel administrativo.
-2. Clique em **Dashboard** na barra lateral.
-3. Acompanhe receita, lucro, ticket médio, retenção e previsão mensal.
-4. Use os botões de ação rápida para abrir automações, financeiro, comissões ou o Assistente IA.
+- nunca compartilhar tokens ou senhas em prints;
+- não executar `npm run seed` em banco de produção com dados reais;
+- não versionar `.env`;
+- confirmar o tenant antes de alterações administrativas;
+- validar o Quality Gate após mudanças de código.
