@@ -258,7 +258,7 @@ export async function growthRoutes(app: FastifyInstance) {
     const ticketAverage = appointments.length ? appointmentValue / appointments.length : 0;
     const lowStock = inventory.filter((product) => product.quantity <= product.minimumQuantity);
 
-    const professionals = appointments.reduce((acc: Record<string, number>, appointment: any) => {
+    const professionals = appointments.reduce<Record<string, number>>((acc, appointment) => {
       const name = appointment.professional?.name || 'Sem profissional';
       acc[name] = (acc[name] || 0) + Number(appointment.service?.price || 0);
       return acc;
