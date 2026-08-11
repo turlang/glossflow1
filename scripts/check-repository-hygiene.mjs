@@ -7,7 +7,7 @@ import { basename, join, relative } from 'node:path';
  * O objetivo não é substituir lint/testes. Este script impede que artefatos
  * removidos durante a higienização retornem silenciosamente ao repositório,
  * que arquivos sensíveis sejam versionados e que dívidas já eliminadas
- * reapareçam no backend ou nos componentes públicos.
+ * reapareçam no backend ou nos componentes React.
  */
 
 const repositoryRoot = process.cwd();
@@ -80,10 +80,11 @@ function walk(directory) {
       });
     }
 
-    if (repositoryPath.startsWith('frontend/src/components/public/') && repositoryPath.endsWith('.jsx')) {
+    const isReactComponent = repositoryPath.startsWith('frontend/src/components/') && repositoryPath.endsWith('.jsx');
+    if (isReactComponent) {
       const source = readFileSync(absolutePath, 'utf8');
       if (source.includes('<style>')) {
-        violations.push(`CSS público embutido deve ficar em folha de domínio: ${repositoryPath}`);
+        violations.push(`CSS embutido deve ficar em folha de domínio: ${repositoryPath}`);
       }
     }
 
@@ -104,4 +105,4 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log('✅ Repository hygiene gate aprovado. Estrutura, tipagem e CSS público estão dentro do padrão.');
+console.log('✅ Repository hygiene gate aprovado. Estrutura, tipagem e CSS de componentes estão dentro do padrão.');
