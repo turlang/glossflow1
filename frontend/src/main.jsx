@@ -7,11 +7,19 @@ import './styles.css';
 import './admin-mobile.css';
 import './booking-selection.css';
 
+/**
+ * Bootstrap do frontend GlossFlow.
+ *
+ * A página pública de gerenciamento de agendamento é isolada do App principal
+ * porque funciona com token próprio do cliente e não depende da sessão admin.
+ */
 const action = new URLSearchParams(window.location.search).get('action');
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {action === 'manage-booking' ? <PublicManageBooking /> : (
+    {action === 'manage-booking' ? (
+      <PublicManageBooking />
+    ) : (
       <>
         <App />
         <RecentBookingConfirmation />
@@ -20,7 +28,10 @@ createRoot(document.getElementById('root')).render(
   </React.StrictMode>
 );
 
-/** PWA real: registra service worker para cache básico e fallback offline. */
+/**
+ * PWA: o registro é deliberadamente não bloqueante. Falha do service worker
+ * não pode impedir a aplicação online de iniciar.
+ */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').catch(() => undefined);
