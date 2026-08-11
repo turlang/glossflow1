@@ -14,9 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      # Bloqueia retorno de artefatos legados, .env reais, backups e arquivos
-      # grandes acidentais antes de gastar tempo com os builds da aplicação.
+          node-version: 20.19.0
       - run: node scripts/check-repository-hygiene.mjs
 
   backend:
@@ -29,10 +27,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.19.0
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run prisma:generate
       - run: npm run lint
       - run: npm test
@@ -51,10 +50,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.19.0
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm test
       - run: npm run build
         env:
           VITE_API_URL: http://localhost:3333
