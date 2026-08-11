@@ -26,9 +26,13 @@ function functionCalls(response: AIResponse): ResponseFunctionCall[] {
     }));
 }
 
+function asksForHuman(text: string) {
+  return /\b(humano|atendente|pessoa)\b/i.test(text);
+}
+
 function fallbackReply(salon: AgentSalon, text: string, services: Awaited<ReturnType<typeof listServices>>) {
   const normalized = text.toLowerCase();
-  if (normalized.includes('humano') || normalized.includes('atendente') || normalized.includes('pessoa')) {
+  if (asksForHuman(text)) {
     return `Vou encaminhar sua conversa para a equipe do ${salon.name}.`;
   }
   if (normalized.includes('preço') || normalized.includes('preco') || normalized.includes('valor') || normalized.includes('serviço') || normalized.includes('servico')) {
@@ -36,6 +40,19 @@ function fallbackReply(salon: AgentSalon, text: string, services: Awaited<Return
     return `Estes são alguns serviços do ${salon.name}:\n${services.slice(0, 6).map((service) => `• ${service.name}: R$ ${service.price.toFixed(2).replace('.', ',')}`).join('\n')}\n\nSe quiser agendar, me diga o serviço e o dia que prefere.`;
   }
   return `Olá! Sou o atendimento virtual do ${salon.name}. Posso ajudar com serviços, valores e agendamentos. Qual atendimento você procura?`;
+}
+
+async function safeFallback(input: { salon: AgentSalon; phone: string; text: string }, services: Awaited<ReturnType<typeof listServices>>) {
+  if (asksForHuman(input.text)) {
+    await openHumanHandoff(input.salon.id, input.phone, 'Solicitação direta durante fallback do provider.');
+  }
+  return fallbackReply(input.salon, input.text, services);
+}
+
+function resultMessage(result: unknown) {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return '';
+  const message = (result as Record<string, unknown>).message;
+  return typeof message === 'string' ? message.trim() : '';
 }
 
 /**
@@ -53,10 +70,7 @@ export async function answerWhatsAppMessage(input: {
   const services = await listServices(input.salon.id);
 
   if (!runtime.configured) {
-    if (/\b(humano|atendente|pessoa)\b/i.test(input.text)) {
-      await openHumanHandoff(input.salon.id, input.phone, 'Solicitação direta sem IA configurada.');
-    }
-    return fallbackReply(input.salon, input.text, services);
+    return safeFallback(input, services);
   }
 
   const cleanHistory = [...history];
@@ -79,13 +93,20 @@ export async function answerWhatsAppMessage(input: {
   }));
   contextItems.push({ role: 'user', content: input.text });
 
-  let response = await requestAIResponse({
-    instructions,
-    input: contextItems,
-    tools,
-    tool_choice: 'auto',
-    parallel_tool_calls: false
-  });
+  let response: AIResponse;
+  try {
+    response = await requestAIResponse({
+      instructions,
+      input: contextItems,
+      tools,
+      tool_choice: 'auto',
+      parallel_tool_calls: false
+    });
+  } catch {
+    return safeFallback(input, services);
+  }
+
+  let lastToolMessage = '';
 
   for (let round = 0; round < 4; round += 1) {
     const calls = functionCalls(response);
@@ -103,18 +124,23 @@ export async function answerWhatsAppMessage(input: {
         args = {};
       }
       const result = await runTool(call.name, args, input.salon, input.phone);
+      lastToolMessage = resultMessage(result) || lastToolMessage;
       outputs.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result) });
     }
     contextItems.push(...outputs);
 
-    response = await requestAIResponse({
-      instructions,
-      input: contextItems,
-      tools,
-      tool_choice: 'auto',
-      parallel_tool_calls: false
-    });
+    try {
+      response = await requestAIResponse({
+        instructions,
+        input: contextItems,
+        tools,
+        tool_choice: 'auto',
+        parallel_tool_calls: false
+      });
+    } catch {
+      return lastToolMessage || await safeFallback(input, services);
+    }
   }
 
-  return responseText(response) || `Posso ajudar com os serviços e a agenda do ${input.salon.name}. O que você gostaria de fazer?`;
+  return responseText(response) || lastToolMessage || `Posso ajudar com os serviços e a agenda do ${input.salon.name}. O que você gostaria de fazer?`;
 }
