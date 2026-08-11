@@ -1,0 +1,31 @@
+name: Split Frontend CSS Once
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/split-frontend-css.yml
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+      - name: Split stylesheet layers
+        run: node scripts/split-frontend-css.mjs
+      - name: Commit CSS layers
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/styles.css frontend/src/public-showcase.css frontend/src/ui-primitives.css frontend/src/admin-shell.css frontend/src/admin-operations.css frontend/src/responsive.css frontend/src/agenda-enterprise.css frontend/src/admin-business.css frontend/src/admin-platform.css frontend/src/main.jsx
+          git commit -m "refactor: split frontend css by domain"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
