@@ -16,7 +16,7 @@ import {
   normalizePhone,
   saveWhatsAppMessage
 } from '../services/whatsapp-agent.service';
-import { sendWhatsAppMessage } from '../services/whatsapp.service';
+import { sendWhatsAppMessage, sendWhatsAppTemplateMessage } from '../services/whatsapp.service';
 
 type TwilioForm = Record<string, string>;
 
@@ -51,6 +51,12 @@ function stripServiceChoicePrompt(text: string) {
   return String(text || '')
     .replace(/\n\nSe quiser,\s*(?:escolha|me diga)[\s\S]*$/i, '')
     .trim();
+}
+
+function twilioTrialReplyEnabled() {
+  return String(process.env.WHATSAPP_PROVIDER || '').toLowerCase() === 'twilio'
+    && process.env.TWILIO_TRIAL_MODE === 'true'
+    && Boolean(String(process.env.TWILIO_TRIAL_CONTENT_SID || '').trim());
 }
 
 async function agentModulesEnabled(salonId: string) {
@@ -187,7 +193,20 @@ async function processTwilioInbound(app: FastifyInstance, form: TwilioForm) {
   });
   const replyText = guarded.replyText;
 
-  const result = await sendWhatsAppMessage({ to: from, message: replyText });
+  /**
+   * O Try out WhatsApp da Twilio não aceita Body livre: exige um ContentSid
+   * fornecido pela própria Twilio. Para QA do round-trip usamos o template
+   * fixo do Trial somente aqui, sem alterar waitlist/notificações de negócio.
+   * Em conta completa, a resposta livre volta automaticamente a usar Body.
+   */
+  const trialTemplateFallback = twilioTrialReplyEnabled();
+  const result = trialTemplateFallback
+    ? await sendWhatsAppTemplateMessage({
+        to: from,
+        templateName: String(process.env.TWILIO_TRIAL_CONTENT_SID || '').trim()
+      })
+    : await sendWhatsAppMessage({ to: from, message: replyText });
+
   const providerData = result as {
     messageId?: string;
     data?: { messages?: Array<{ id?: string }>; sid?: string };
@@ -202,8 +221,14 @@ async function processTwilioInbound(app: FastifyInstance, form: TwilioForm) {
       providerMessageId: outboundId,
       phone: from,
       direction: 'OUT',
-      text: replyText
+      text: trialTemplateFallback
+        ? '[Twilio Trial] Template fixo de QA enviado. A resposta livre do agente fica disponível após remover as limitações do Trial.'
+        : replyText
     });
+
+    if (trialTemplateFallback) {
+      app.log.info({ salonId: salon.id, phone: from, outboundId }, 'Resposta do webhook validada via ContentSid do Twilio Trial.');
+    }
   } else {
     app.log.error({ salonId: salon.id, phone: from, result }, 'Falha ao responder mensagem recebida pela Twilio.');
   }
