@@ -1,0 +1,40 @@
+1: /* =====================================================================
+9: /* 1. Tokens globais --------------------------------------------------- */
+21: /* 2. Base ------------------------------------------------------------ */
+24: /* 3. Header e vitrine pública --------------------------------------- */
+28: /* 4. Componentes reutilizáveis -------------------------------------- */
+32: /* 5. Admin Enterprise ----------------------------------------------- */
+35: /* 6. Onboarding e listas --------------------------------------------- */
+38: /* 7. Agenda, estoque e automações ----------------------------------- */
+42: /* 8. Skeleton e responsividade -------------------------------------- */
+49: /* =====================================================================
+70: /* Base tipográfica final: menor que as versões premium anteriores, mas ainda legível. */
+76: /* Header e navegação com densidade profissional. */
+81: /* Containers mais controlados para evitar leitura longa demais em telas grandes. */
+86: /* Hero com impacto sem ocupar espaço excessivo. */
+89: /* Cards padrão: todos com proporção estável e leitura vertical limpa. */
+92: /* Vitrine: layout editorial com cards consistentes. */
+95: /* Perfis: imagem menor e texto com hierarquia clara. */
+98: /* Formulários: altura uniforme, inputs menores e alinhados. */
+102: /* Admin shell: painel com densidade real de SaaS e sidebar estável. */
+108: /* Listas e tabelas simuladas: alinhamento previsível e ações sempre visíveis. */
+111: /* Agenda post-it: mantém sua proposta visual, mas com menos altura e mais organização. */
+114: /* Automações: cards legíveis, preview WhatsApp com escala correta. */
+117: /* Onboarding: leitura guiada, sem cards gigantes. */
+120: /* Responsividade final. */
+125: /* =========================================================
+147: /* =========================================================
+148: Fase 1 — Agenda Enterprise
+157: /* =========================================================
+158: Fase 2 — Central de Automações Visual
+220: /* =========================================================
+221: Fase 3 — Assistente IA Operacional
+229: /* =========================================================
+230: Fase 4 — Dashboard Executivo
+250: /* =========================================================
+251: v9.4 — Segurança, UX Premium e PWA
+259: /* =========================================================
+260: v9.5 — Polimento Enterprise: Ecossistema, Observabilidade e UX
+529: /* Fase Mercado — métricas avançadas, PWA e observabilidade operacional. */
+532: /* HOTFIX UX — menu recolhível funcional e implantação guiada isolada
+622: /* HOTFIX BRAND — mantém apenas a marca principal no topo da sidebar.
