@@ -73,6 +73,17 @@ function twilioConfig() {
   };
 }
 
+function twilioStatusCallbackUrl() {
+  const configured = String(process.env.TWILIO_STATUS_CALLBACK_URL || '').trim();
+  if (configured) return configured;
+
+  const inboundWebhook = String(process.env.TWILIO_WEBHOOK_URL || '').trim().replace(/\/$/, '');
+  if (inboundWebhook) return `${inboundWebhook}/status`;
+
+  const apiBase = String(process.env.PUBLIC_API_URL || '').trim().replace(/\/$/, '');
+  return apiBase ? `${apiBase}/webhooks/whatsapp/twilio/status` : '';
+}
+
 function whatsappAddress(phone: string) {
   const normalized = normalizePhone(phone);
   return normalized ? `whatsapp:+${normalized}` : '';
@@ -151,6 +162,9 @@ async function postTwilioMessage(input: {
   const form = new URLSearchParams();
   form.set('To', whatsappAddress(input.to));
   form.set('From', config.from);
+  const statusCallback = twilioStatusCallbackUrl();
+  if (statusCallback) form.set('StatusCallback', statusCallback);
+
   if (input.contentSid) {
     form.set('ContentSid', input.contentSid);
     if (input.contentVariables && Object.keys(input.contentVariables).length > 0) {
@@ -187,6 +201,8 @@ async function postTwilioMessage(input: {
       provider: 'twilio',
       statusCode: response.status,
       messageId: String(data?.sid || ''),
+      deliveryStatus: String(data?.status || ''),
+      statusCallbackConfigured: Boolean(statusCallback),
       data,
       ...(response.ok
         ? {}
@@ -366,6 +382,7 @@ export function whatsappRuntimeDiagnostics() {
           fromConfigured: Boolean(twilio.from),
           trialMode: twilio.trialMode,
           trialContentSidConfigured: Boolean(twilio.trialContentSid),
+          statusCallbackConfigured: Boolean(twilioStatusCallbackUrl()),
           defaultCountryCode: defaultCountryCode()
         }
       : undefined,
