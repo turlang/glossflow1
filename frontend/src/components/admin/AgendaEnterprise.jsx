@@ -62,9 +62,10 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
       appointments: visibleAppointments,
       professionals: visibleProfessionals,
       viewMode,
+      selectedDate,
       hours: AGENDA_HOURS
     }),
-    [visibleAppointments, visibleProfessionals, viewMode]
+    [selectedDate, visibleAppointments, visibleProfessionals, viewMode]
   );
 
   const { reschedule, message, busy } = useAgendaReschedule({ appointments, reload });
