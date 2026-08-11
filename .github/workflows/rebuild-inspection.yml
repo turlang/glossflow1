@@ -1,0 +1,55 @@
+name: Rebuild Inspection
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/rebuild-inspection.yml
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - name: Build targeted inspection reports
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          any_rows = []
+          any_pattern = re.compile(r'\b(?:as\s+any|any\s*\[\]|:\s*any\b|<any>|Record<[^>]*,\s*any>)')
+          for path in sorted(Path('backend/src').rglob('*.ts')):
+              for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+                  if any_pattern.search(line):
+                      any_rows.append(f'{path}:{number}: {line.strip()}')
+          Path('backend-any-report.txt').write_text('\n'.join(any_rows) + ('\n' if any_rows else 'ZERO_EXPLICIT_ANY\n'), encoding='utf-8')
+
+          css = Path('frontend/src/styles.css').read_text(encoding='utf-8').splitlines()
+          markers = []
+          for number, line in enumerate(css, 1):
+              stripped = line.strip()
+              if stripped.startswith('/*') or stripped.startswith('Fase ') or stripped.startswith('v9.') or stripped.startswith('v10.'):
+                  if any(token in stripped for token in ['/* ', 'Fase', 'v9.', 'v10.', 'Admin', 'Agenda', 'Respons', 'Pública', 'public']):
+                      markers.append(f'{number}: {stripped}')
+          Path('css-markers-report.txt').write_text('\n'.join(markers) + '\n', encoding='utf-8')
+
+          inline = []
+          for path in sorted(Path('frontend/src/components/public').glob('*.jsx')):
+              if '<style>' in path.read_text(encoding='utf-8'):
+                  inline.append(str(path))
+          Path('public-inline-style-report.txt').write_text('\n'.join(inline) + ('\n' if inline else 'ZERO_PUBLIC_INLINE_STYLE\n'), encoding='utf-8')
+          PY
+      - name: Commit reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend-any-report.txt css-markers-report.txt public-inline-style-report.txt
+          git commit -m "chore: capture rebuild hygiene inspection"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
