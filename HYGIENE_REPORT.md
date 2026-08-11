@@ -1,16 +1,26 @@
-# GlossFlow — Relatório de Higienização Reconstruído
+# GlossFlow — Relatório de Higienização Completo
 
 Data-base: 2026-08-11.
 
-## Contexto da reconstrução
+## Contexto
 
-O Marco 1 permanecia preservado no `main`, mas os artefatos correspondentes aos Marcos 2–9 descritos no relatório de higienização original não estavam presentes no GitHub. A reconstrução foi executada sobre a branch `agent/rebuild-hygiene-m2-9`, mantendo o `main` intacto e usando os Quality/Production Gates como critério de aceitação.
+O Marco 1 já permanecia preservado no `main`. Os Marcos 2–9 foram reconstruídos a partir do relatório original na branch `agent/rebuild-hygiene-m2-9`. Depois dessa reconstrução, o Marco 10 formalmente previsto e a dívida estrutural ainda aberta no mesmo relatório foram executados até o fechamento técnico.
 
-O objetivo continua sendo reduzir dívida técnica sem alterar os fluxos validados de Agenda, estoque, CRM e WhatsApp.
+Os Marcos 11–15 abaixo organizam essa dívida remanescente por risco e responsabilidade: backend crítico, cobertura de regressão, rotas/funções longas, documentação de usuário e validação final.
+
+O `main` permaneceu intacto durante todo o trabalho; a integração continua concentrada no PR de higienização.
+
+---
 
 ## Marco 1 — preservado
 
-O estado existente foi mantido: guard de higiene do repositório, documentação de engenharia, configuração extraída, proteção contra artefatos legados e separação inicial do bootstrap/configuração.
+Mantidos os guardrails iniciais:
+
+- hygiene gate do repositório;
+- documentação de engenharia;
+- configuração extraída;
+- proteção contra artefatos legados;
+- separação inicial de bootstrap/configuração.
 
 ## Marco 2 — reconstruído
 
@@ -23,31 +33,29 @@ O painel administrativo foi decomposto por responsabilidade:
 - `AdminIntelligence.jsx`;
 - `AdminPlatformModules.jsx`.
 
-`AdminDashboard.jsx` voltou a atuar como shell de navegação e composição.
+`AdminDashboard.jsx` passou a atuar como shell de navegação e composição.
 
-O frontend recuperou ESLint real com JavaScript, JSX, Hooks e Fast Refresh. O pipeline voltou a usar lint como gate, não build de desenvolvimento disfarçado.
-
-As dependências também foram alinhadas ao marco reconstruído:
+O frontend recuperou ESLint real com JavaScript, JSX, Hooks e Fast Refresh. Dependências e toolchain foram alinhados ao estado reconstruído:
 
 - Fastify `5.11.3`;
 - `@fastify/cors` `11.3.0`;
 - Vite `8.2.1`;
 - `@vitejs/plugin-react` `6.0.5`;
-- Node `20.19+` como mínimo do toolchain.
+- Node `20.19+`.
 
 ## Marco 3 — reconstruído
 
-A Agenda Enterprise voltou a ter domínio próprio. As regras de calendário foram extraídas para `agenda-enterprise.utils.js`, incluindo:
+A Agenda Enterprise voltou a ter domínio próprio. `agenda-enterprise.utils.js` concentra regras de:
 
 - datas locais sem deslocamento acidental por UTC;
 - grade semanal;
 - grade mensal;
 - filtros e ordenação;
-- métricas de ocupação/capacidade;
-- navegação entre dia, semana e mês;
+- capacidade/ocupação;
+- navegação entre períodos;
 - construção segura do horário de reagendamento.
 
-A capacidade mensal usa a quantidade real de dias do mês, inclusive fevereiro bissexto, e a navegação a partir do dia 31 limita corretamente a data no mês de destino.
+A capacidade mensal usa 28/29/30/31 dias reais e a navegação a partir do dia 31 limita corretamente a data no mês de destino.
 
 ## Marco 4 — reconstruído
 
@@ -60,33 +68,32 @@ A Agenda foi dividida em componentes específicos:
 - `AgendaMonthView.jsx`;
 - `AgendaProfessionalsView.jsx`.
 
-As grades semanal/mensal só são montadas quando visíveis. Tabs possuem semântica e navegação por teclado com setas, Home e End. Um único cartão de agendamento é reutilizado nas visualizações.
+Tabs possuem semântica e navegação por teclado. Grades custosas só são montadas na visualização correspondente e um cartão único é reutilizado nas diferentes visões.
 
 ## Marco 5 — reconstruído
 
 O reagendamento acessível foi restaurado com:
 
 - ação explícita `Reagendar`;
-- formulário operável por teclado;
+- operação completa por teclado;
 - foco inicial;
 - campos nativos de data/hora/profissional;
-- estado ocupado;
-- feedback de erro e sucesso;
-- formulário preservado quando ocorre conflito.
+- feedback de sucesso/erro;
+- formulário mantido aberto em conflito.
 
-`useAgendaReschedule.js` centraliza a persistência para formulário e drag-and-drop, eliminando caminhos divergentes.
+`useAgendaReschedule.js` centraliza persistência para formulário e drag-and-drop.
 
-O frontend possui novamente **17 testes em 3 arquivos**, cobrindo utilitários, interação da Agenda e reagendamento acessível.
+O frontend possui **17 testes em 3 arquivos**, cobrindo calendário, interação e reagendamento acessível.
 
 ## Marco 6 — reconstruído
 
-Foi restaurado `appointment-reschedule.service.ts`, centralizando:
+`appointment-reschedule.service.ts` centraliza:
 
 - detecção de alteração de data/profissional;
 - início, fim e profissional efetivos;
 - filtro tipado de conflito.
 
-A sobreposição usa novamente o contrato correto:
+Contrato correto de sobreposição:
 
 ```text
 existente.start < novo.fim
@@ -96,24 +103,19 @@ existente.end > novo.início
 
 O schema de atualização rejeita payload vazio e campos desconhecidos.
 
-O backend foi novamente higienizado para **zero ocorrência explícita de `any` em `backend/src`**. Delegates corporativos do Prisma são explícitos para autenticação, auditoria, LGPD, backup e observabilidade, fazendo o build falhar cedo se o Client não corresponder ao schema.
+O backend foi higienizado para **zero `any` explícito em `backend/src`**. Delegates corporativos do Prisma são explícitos para que incompatibilidade de Client/schema falhe cedo em build/teste.
 
 ## Marco 7 — reconstruído
 
-A criação do Fastify voltou para `backend/src/app.ts` através de `buildApp()`.
+A factory Fastify foi restaurada em `backend/src/app.ts` por meio de `buildApp()`.
 
-`server.ts` contém apenas efeitos de processo: validação de ambiente, bootstrap do Super Admin, `listen()` e scheduler.
+`server.ts` contém somente efeitos de processo: ambiente, bootstrap do Super Admin, `listen()` e scheduler.
 
-Os contratos HTTP com `Fastify.inject()` foram restaurados para:
-
-- autenticação/cabeçalhos de segurança;
-- RBAC antes de operações protegidas;
-- normalização Zod para HTTP 400;
-- isolamento multi-tenant pelo `salonId` assinado no JWT.
+`Fastify.inject()` cobre autenticação, cabeçalhos, RBAC, Zod HTTP 400 e isolamento pelo `salonId` assinado no JWT.
 
 ## Marco 8 — reconstruído
 
-`appointments.routes.ts` voltou a ser apenas agregador. O domínio Agenda foi separado em:
+`appointments.routes.ts` voltou a ser agregador. A Agenda backend foi separada em:
 
 - `appointments/public.routes.ts`;
 - `appointments/management.routes.ts`;
@@ -122,9 +124,9 @@ Os contratos HTTP com `Fastify.inject()` foram restaurados para:
 - `appointments/contracts.ts`;
 - `appointments/access.ts`.
 
-As URLs públicas foram preservadas. Testes confirmam o bloqueio do módulo antes de consultas e o isolamento do tenant nos caminhos habilitados.
+As URLs públicas foram preservadas.
 
-As folhas de estilo globais foram novamente divididas por domínio, preservando byte a byte a ordem original da cascata durante a migração:
+O CSS global também foi distribuído por domínio:
 
 - `styles.css`;
 - `public-showcase.css`;
@@ -138,7 +140,7 @@ As folhas de estilo globais foram novamente divididas por domínio, preservando 
 
 ## Marco 9 — reconstruído
 
-`whatsapp-agent.service.ts` voltou a ser uma fachada de compatibilidade. A implementação foi separada em:
+`whatsapp-agent.service.ts` virou fachada de compatibilidade. A implementação foi separada em:
 
 - `whatsapp-agent/contracts.ts`;
 - `whatsapp-agent/time.ts`;
@@ -147,71 +149,200 @@ As folhas de estilo globais foram novamente divididas por domínio, preservando 
 - `whatsapp-agent/tools.ts`;
 - `whatsapp-agent/orchestrator.service.ts`.
 
-Providers externos entram como `unknown` e são estreitados/validados antes do uso. Criação, cancelamento e reagendamento utilizam contratos de Agenda e isolamento de salão.
+Providers externos entram como `unknown` e são validados/estreitados antes do uso.
 
-O backend possui novamente **18 testes**, compostos por:
+Os blocos `<style>` dos componentes públicos foram removidos do JSX e consolidados em `public-booking.css`.
 
-- 2 testes de ambiente;
-- 5 testes de contrato de reagendamento;
-- 4 testes da factory/contratos HTTP;
-- 4 testes de isolamento e módulo Agenda;
-- 3 testes positivos de mutações de agendamento.
+Até esse marco, o backend possuía **18 testes**.
 
-Os blocos `<style>` dos componentes públicos de agendamento foram removidos do JSX e consolidados em `public-booking.css`, preservando precedência de importação.
+---
 
-## Proteções permanentes restauradas
+# Marcos restantes executados
 
-O `repository-hygiene` agora também impede:
+## Marco 10 — CSS administrativo + contratos do agente WhatsApp
 
-- retorno de `any` explícito em `backend/src`;
-- retorno de `<style>` dentro dos componentes públicos;
-- arquivos de ambiente reais;
-- backups/temporários;
-- artefatos legados já removidos;
+Os **9 componentes administrativos** que ainda continham `<style>` embutido foram migrados para `frontend/src/admin-component-styles.css`:
+
+- `ExternalCostControl.jsx`;
+- `NewClientWizard.jsx`;
+- `OperationalAgendaBoard.jsx`;
+- `OperationalNotificationsBell.jsx`;
+- `PlatformPlans.jsx`;
+- `ProfessionalCapabilitiesAdmin.jsx`;
+- `ProfessionalScheduleAdmin.jsx`;
+- `SmartFitAdmin.jsx`;
+- `WaitlistAdmin.jsx`.
+
+A nova folha é carregada depois das folhas compartilhadas para preservar a precedência visual que os blocos inline possuíam.
+
+O agente WhatsApp ganhou testes dedicados para:
+
+- despacho de ferramenta sem provider externo;
+- abertura de handoff humano;
+- fallback quando IA não está configurada;
+- fallback quando um provider configurado falha;
+- pedido direto por humano durante fallback;
+- abertura e fechamento de handoff no mesmo tenant.
+
+Também foi corrigida uma lacuna real: o orquestrador agora faz fallback seguro quando uma chamada ao provider configurado falha, inclusive durante rounds de function calling. Quando aplicável, preserva a última resposta útil da ferramenta em vez de derrubar a conversa.
+
+## Marco 11 — modularização do webhook Twilio
+
+`twilio-whatsapp-webhook.routes.ts`, antes concentrando transporte, assinatura, tenant, status e negócio, foi reduzido a um shell HTTP.
+
+Foram criados:
+
+- `twilio-whatsapp/security.ts` — URL canônica, HMAC e Trial;
+- `twilio-whatsapp/salon.service.ts` — módulos e resolução segura do salão;
+- `twilio-whatsapp/status.service.ts` — callback de entrega e alerta operacional;
+- `twilio-whatsapp/inbound.service.ts` — pipeline inbound.
+
+O pipeline inbound permanece:
+
+```text
+Deduplicação
+→ Tenant
+→ Entitlements
+→ Persistência inbound
+→ Handoff
+→ Reminder/Waitlist/Pending Booking
+→ Disponibilidade/Agente
+→ Response Guard
+→ Provider de saída
+→ Persistência outbound
+```
+
+A rota pública agora cuida apenas de parser, assinatura, ACK e delegação assíncrona.
+
+## Marco 12 — cobertura de regressão ampliada
+
+Além da cobertura anterior de Agenda e RBAC, foram acrescentados contratos para:
+
+### Estoque
+
+- criação de produto no tenant autenticado;
+- movimento inicial de estoque;
+- bloqueio de saída que produziria saldo negativo.
+
+### CRM
+
+- criação de cliente no tenant da sessão;
+- recusa de atualização quando o registro não pertence ao tenant.
+
+### Twilio
+
+- HMAC válido com ordenação determinística de parâmetros;
+- rejeição de payload alterado após assinatura.
+
+### Agente WhatsApp
+
+- ferramentas;
+- fallback;
+- handoff humano;
+- persistência de abertura/fechamento.
+
+O backend passou de **18 para 30 testes**.
+
+## Marco 13 — decomposição do domínio comercial
+
+`business.routes.ts`, que concentrava CRM, financeiro, comissões, fidelidade, assinatura, templates e inteligência, foi reduzido a agregador.
+
+Subdomínios criados:
+
+- `business/clients.routes.ts`;
+- `business/financial.routes.ts`;
+- `business/commissions.routes.ts`;
+- `business/loyalty.routes.ts`;
+- `business/subscription.routes.ts`;
+- `business/whatsapp-templates.routes.ts`;
+- `business/ai.routes.ts`;
+- `business/access.ts`.
+
+A lógica de inteligência saiu da camada HTTP para `business-intelligence.service.ts`, que concentra:
+
+- análise local de clientes;
+- financeiro/ticket;
+- estoque;
+- campanhas;
+- ranking de profissionais;
+- resumo executivo;
+- fallback local quando OpenAI não responde;
+- geração de insights operacionais.
+
+As URLs existentes foram preservadas.
+
+## Marco 14 — documentação de usuário concluída
+
+Os oito arquivos de `docs/usuario/` deixaram de ser placeholders e foram transformados em documentação operacional:
+
+1. `01_MANUAL_PROPRIETARIO.md`;
+2. `02_MANUAL_RECEPCIONISTA.md`;
+3. `03_MANUAL_FUNCIONARIO.md`;
+4. `04_GUIA_RAPIDO.md`;
+5. `05_FAQ.md`;
+6. `06_CURSO_COMPLETO.md`;
+7. `07_CHECKLIST_IMPLANTACAO.md`;
+8. `08_BOAS_PRATICAS.md`.
+
+O conteúdo cobre papéis, Agenda, reagendamento, CRM, estoque, WhatsApp, IA, handoff, segurança, treinamento e implantação.
+
+## Marco 15 — hygiene final e proteção contra regressão
+
+O `repository-hygiene` foi endurecido novamente. Agora ele impede:
+
+- `any` explícito em `backend/src`;
+- `<style>` em **qualquer** componente JSX dentro de `frontend/src/components/`;
+- arquivos `.env` reais;
+- arquivos backup/temporários;
+- artefatos legados removidos;
 - arquivos acidentais maiores que 5 MB.
 
-Os workflows permanentes são apenas:
+Todos os workflows e relatórios temporários usados para inspeção/migração foram removidos após uso.
+
+Os workflows permanentes são somente:
 
 - `GlossFlow Quality Gate`;
 - `Production Gate`.
 
-Ambos executam auditoria de dependências antes de lint/test/build.
+---
 
-## Validação da reconstrução
+# Estado final da higienização
 
-A reconstrução funcional dos Marcos 2–9 foi validada pelo GitHub Actions em 2026-08-11:
+## Frontend
 
-### Frontend
+- ESLint real: ativo;
+- zero `<style>` em componentes JSX;
+- CSS distribuído por domínio;
+- Agenda modular e acessível;
+- **17 testes**;
+- Vite build como gate.
 
-- `npm ci`: aprovado;
-- `npm audit --audit-level=high`: aprovado;
-- ESLint: aprovado;
-- **17 testes**: aprovados;
-- Vite build: aprovado.
+## Backend
 
-### Backend
-
-- `npm ci`: aprovado;
-- `npm audit --audit-level=high`: aprovado;
-- Prisma generate: aprovado;
-- TypeScript/lint: aprovado;
-- **18 testes**: aprovados;
-- build: aprovado.
-
-### Repositório
-
-- Repository Hygiene: aprovado;
+- Fastify 5 com `buildApp()` testável;
+- Agenda backend modular;
+- agente WhatsApp modular;
+- webhook Twilio modular;
+- domínio comercial modular;
+- regras executivas fora da camada HTTP;
 - zero `any` explícito em `backend/src`;
-- zero `<style>` nos componentes públicos de agendamento.
+- **30 testes**;
+- Prisma/TypeScript/build como gates.
 
-## Marco 10 — NÃO iniciado
+## CI / Segurança
 
-Conforme a decisão de reconstrução, o trabalho foi interrompido deliberadamente ao final do Marco 9.
+Cada integração passa por:
 
-O próximo marco continua sendo:
+1. repository hygiene;
+2. `npm ci`;
+3. `npm audit --audit-level=high`;
+4. Prisma generate no backend;
+5. lint/TypeScript;
+6. testes;
+7. build.
 
-1. migrar CSS embutido remanescente dos componentes administrativos por domínio;
-2. ampliar testes contratuais específicos do agente WhatsApp, incluindo fallback do provider e abertura/fechamento do handoff humano;
-3. selecionar e refatorar o próximo módulo longo do backend com base em risco e frequência de alteração.
+## Conclusão
 
-Nenhum item do Marco 10 faz parte desta reconstrução.
+A sequência de higienização do relatório original e a dívida estrutural remanescente foram executadas até o fechamento dos Marcos 10–15 derivados.
+
+Não restam marcos de higienização planejados nesta sequência. Novos trabalhos devem ser tratados como evolução funcional, performance, observabilidade, produto ou novo ciclo de refatoração — não como continuação desta higienização.
