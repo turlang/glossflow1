@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AgendaRescheduleForm } from './AgendaRescheduleForm.jsx';
 
@@ -17,6 +17,8 @@ const appointment = {
   service: { id: 's1', name: 'Corte' },
   startTime: '2026-08-11T09:00:00.000Z'
 };
+
+afterEach(() => cleanup());
 
 describe('AgendaRescheduleForm', () => {
   it('permite reagendar só pelo teclado e envia data, hora e profissional', async () => {
