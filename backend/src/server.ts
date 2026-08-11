@@ -1,53 +1,35 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
-import cors from '@fastify/cors';
 import { ZodError } from 'zod';
+import { registerCorsPolicy } from './config/cors';
+import { assertRequiredProductionEnv, buildId, isProduction } from './config/environment';
+import { registerInMemoryRateLimit } from './middlewares/rate-limit';
 import { appRoutes } from './routes/appRoutes';
 import { recordMetric } from './routes/metrics';
 import { captureOperationalError } from './services/sentry.service';
 import { ensureSuperAdminFromEnv } from './services/super-admin-bootstrap.service';
-import { scanAppointmentReminders } from './services/appointment-reminder.service';
-import { prisma } from './lib/prisma';
-
-const isProduction = process.env.NODE_ENV === 'production';
-const buildId = (
-  process.env.RENDER_GIT_COMMIT ||
-  process.env.GIT_COMMIT ||
-  process.env.COMMIT_SHA ||
-  'local'
-).slice(0, 12);
+import { startReminderScheduler } from './services/reminder-scheduler.service';
 
 /**
- * Validação mínima de variáveis críticas.
- * Em produção, a API não deve subir com configuração insegura ou incompleta.
+ * Bootstrap da API GlossFlow.
+ *
+ * Este arquivo apenas compõe infraestrutura transversal e inicia o servidor.
+ * Regras de ambiente, CORS, rate limit e agendadores ficam em módulos próprios
+ * para manter o entrypoint pequeno e auditável.
  */
-function assertRequiredProductionEnv() {
-  if (!isProduction) return;
-
-  const required = ['DATABASE_URL', 'JWT_SECRET', 'FRONTEND_ORIGIN'];
-  const missing = required.filter((key) => !process.env[key]?.trim());
-
-  if (missing.length > 0) {
-    throw new Error(`Variáveis obrigatórias ausentes em produção: ${missing.join(', ')}`);
-  }
-
-  if ((process.env.JWT_SECRET || '').length < 32) {
-    throw new Error('JWT_SECRET precisa ter pelo menos 32 caracteres em produção.');
-  }
-}
-
 assertRequiredProductionEnv();
 
 const app = Fastify({ logger: true });
 
 /**
- * Mantém o corpo JSON bruto para validar X-Hub-Signature-256 da Meta.
- * Depois da captura, o conteúdo continua sendo entregue às rotas como JSON normal.
+ * Mantém o corpo JSON bruto para validar X-Hub-Signature-256 da Meta quando
+ * esse provider estiver habilitado. Depois da captura, as rotas recebem JSON.
  */
 app.removeContentTypeParser('application/json');
 app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
   const rawBody = String(body || '');
   (request as typeof request & { rawBody?: string }).rawBody = rawBody;
+
   try {
     done(null, rawBody ? JSON.parse(rawBody) : {});
   } catch (error) {
@@ -55,89 +37,13 @@ app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, bo
   }
 });
 
-/**
- * Configuração de CORS.
- * - FRONTEND_ORIGIN mantém origens administrativas/demonstração explícitas.
- * - PUBLIC_ROOT_DOMAIN libera subdomínios white-label do GlossFlow.
- * - domínios próprios cadastrados no Salon são reconhecidos dinamicamente.
- */
-const allowedOrigins = (process.env.FRONTEND_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const developmentOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-const rootDomain = (process.env.PUBLIC_ROOT_DOMAIN || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-async function isAllowedOrigin(origin: string) {
-  if (allowedOrigins.includes(origin)) return true;
-  if (!isProduction && developmentOrigins.includes(origin)) return true;
-
-  let hostname = '';
-  try {
-    hostname = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
-  } catch {
-    return false;
-  }
-
-  if (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`))) {
-    return true;
-  }
-
-  if (isProduction && hostname) {
-    const salon = await prisma.salon.findFirst({ where: { customDomain: hostname }, select: { id: true } });
-    if (salon) return true;
-  }
-
-  return false;
-}
-
-app.register(cors, {
-  origin: (origin, callback) => {
-    /** Chamadas server-side, Postman e healthchecks podem não enviar Origin. */
-    if (!origin) return callback(null, true);
-
-    isAllowedOrigin(origin)
-      .then((allowed) => {
-        if (allowed) return callback(null, true);
-        return callback(new Error(`Origem não permitida pelo CORS: ${origin}`), false);
-      })
-      .catch((error) => callback(error, false));
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Salon-Slug', 'X-Salon-Host'],
-  exposedHeaders: ['X-GlossFlow-Build'],
-  credentials: true
-});
-
-/**
- * Rate limit simples em memória.
- * Não substitui soluções distribuídas como Redis, Cloudflare ou API Gateway,
- * mas reduz abuso em ambiente de MVP/piloto sem adicionar dependências.
- */
-const buckets = new Map<string, { count: number; resetAt: number }>();
-app.addHook('onRequest', async (request, reply) => {
-  const windowMs = 60_000;
-  const maxRequests = Number(process.env.RATE_LIMIT_PER_MINUTE || 180);
-  const now = Date.now();
-  const forwardedFor = request.headers['x-forwarded-for']?.toString().split(',')[0]?.trim();
-  const ip = forwardedFor || request.ip || 'unknown';
-  const current = buckets.get(ip);
-
-  if (!current || current.resetAt < now) {
-    buckets.set(ip, { count: 1, resetAt: now + windowMs });
-    return;
-  }
-
-  current.count += 1;
-  if (current.count > maxRequests) {
-    return reply.status(429).send({ message: 'Muitas requisições. Tente novamente em alguns instantes.' });
-  }
-});
+registerCorsPolicy(app);
+registerInMemoryRateLimit(app);
 
 /**
  * Cabeçalhos básicos de segurança.
- * X-GlossFlow-Build facilita confirmar se Render e GitHub estão no mesmo commit.
+ * `X-GlossFlow-Build` permite confirmar rapidamente se Render e GitHub estão
+ * executando o mesmo commit durante suporte e validação de deploy.
  */
 app.addHook('onSend', async (_request, reply, payload) => {
   reply.header('X-GlossFlow-Build', buildId);
@@ -150,10 +56,7 @@ app.addHook('onSend', async (_request, reply, payload) => {
   return payload;
 });
 
-/**
- * Observabilidade nativa: cada resposta registra latência, método, rota e status.
- * Em produção, este hook pode alimentar OpenTelemetry, Prometheus ou Sentry.
- */
+/** Registra latência, método, rota e status para observabilidade nativa. */
 app.addHook('onResponse', async (request, reply) => {
   recordMetric({
     method: request.method,
@@ -168,7 +71,11 @@ app.setNotFoundHandler((_request, reply) => {
   return reply.status(404).send({ message: 'Rota não encontrada.' });
 });
 
-app.setErrorHandler((error, _request, reply) => {
+/**
+ * Normaliza erros de validação e impede vazamento de detalhes internos em 5xx
+ * de produção. Erros inesperados continuam indo para log/observabilidade.
+ */
+app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {
     return reply.status(400).send({ message: 'Dados inválidos.', issues: error.issues });
   }
@@ -177,7 +84,7 @@ app.setErrorHandler((error, _request, reply) => {
 
   if (statusCode >= 500) {
     app.log.error(error);
-    captureOperationalError(error, { method: _request.method, url: _request.url });
+    captureOperationalError(error, { method: request.method, url: request.url });
   }
 
   const message = statusCode >= 500 && isProduction
@@ -189,38 +96,22 @@ app.setErrorHandler((error, _request, reply) => {
 
 app.register(appRoutes);
 
-function startReminderScheduler() {
-  const intervalMinutes = Math.max(5, Number(process.env.APPOINTMENT_REMINDER_SCAN_MINUTES || 10));
-  const run = () => {
-    void scanAppointmentReminders()
-      .then((result) => {
-        if (result.sent || result.failed) app.log.info({ reminders: result }, 'Varredura de lembretes concluída.');
-      })
-      .catch((error) => app.log.error(error, 'Falha na varredura automática de lembretes.'));
-  };
-
-  run();
-  const timer = setInterval(run, intervalMinutes * 60_000);
-  timer.unref();
-}
-
-const start = async () => {
+/**
+ * Inicialização controlada da API.
+ * O Super Admin é garantido de forma idempotente antes de aceitar tráfego.
+ */
+async function start() {
   const port = Number(process.env.PORT) || 3333;
 
-  /**
-   * O plano Free do Render não precisa de Shell para provisionar o Super Admin.
-   * Basta configurar SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD no Environment e
-   * disparar um novo deploy. A rotina é segura e idempotente.
-   */
   await ensureSuperAdminFromEnv({
     info: (message) => app.log.info(message),
     warn: (message) => app.log.warn(message)
   });
 
   await app.listen({ port, host: '0.0.0.0' });
-  startReminderScheduler();
-  console.log(`🚀 GlossFlow API rodando em http://localhost:${port} • build ${buildId}`);
-};
+  startReminderScheduler(app.log);
+  app.log.info(`GlossFlow API rodando na porta ${port} • build ${buildId}`);
+}
 
 start().catch((error) => {
   app.log.error(error);
