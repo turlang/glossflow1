@@ -1,0 +1,53 @@
+name: Remove Inferred Any
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/remove-inferred-any.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - name: Preserve Prisma inference in legacy route callbacks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          paths = [
+              Path('backend/src/routes/business.routes.ts'),
+              Path('backend/src/routes/growth.routes.ts'),
+              Path('backend/src/routes/platform-admin.routes.ts'),
+              Path('backend/src/routes/observability.routes.ts'),
+          ]
+
+          for path in paths:
+              text = path.read_text(encoding='utf-8')
+              text = re.sub(r'\((\w+): any\)', r'(\1)', text)
+              text = re.sub(r'\((\w+): any,\s*(\w+): any\)', r'(\1, \2)', text)
+              text = re.sub(r'\((\w+): any,\s*(\w+): number\)', r'(\1, \2)', text)
+              text = re.sub(r'\((\w+): number,\s*(\w+): any\)', r'(\1, \2)', text)
+              text = text.replace(' as any[]', '')
+              path.write_text(text, encoding='utf-8')
+
+          business = Path('backend/src/routes/business.routes.ts')
+          text = business.read_text(encoding='utf-8')
+          text = text.replace("[0] as any;", "[0];")
+          business.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit inferred typing cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/business.routes.ts backend/src/routes/growth.routes.ts backend/src/routes/platform-admin.routes.ts backend/src/routes/observability.routes.ts
+          git commit -m "refactor: preserve inferred route types"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
