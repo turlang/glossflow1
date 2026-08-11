@@ -8,13 +8,34 @@ node_modules/
 !frontend/.env.example
 !backend/.env.example
 
-# Builds
+# Builds, cobertura e caches
 dist/
 build/
 coverage/
+.vite/
+.eslintcache
+*.tsbuildinfo
+
+# Logs e arquivos temporários
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tmp
+*.temp
+
+# Ferramentas de deploy locais
+.vercel/
+.render/
 
 # Sistema operacional e editor
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# Arquivos de backup locais
+*.bak
+*.old
+*.orig
