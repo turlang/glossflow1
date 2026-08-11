@@ -1,0 +1,75 @@
+name: Extract Public CSS
+
+on:
+  push:
+    branches: [agent/rebuild-hygiene-m2-9]
+    paths:
+      - .github/workflows/extract-public-css.yml
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rebuild-hygiene-m2-9
+          fetch-depth: 0
+      - name: Extract inline public styles preserving file order
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          public_dir = Path('frontend/src/components/public')
+          blocks = []
+          changed = []
+          pattern = re.compile(r'\n\s*<style>\{`(.*?)`\}</style>', re.S)
+
+          for path in sorted(public_dir.glob('*.jsx')):
+              text = path.read_text(encoding='utf-8')
+              matches = pattern.findall(text)
+              if not matches:
+                  continue
+              for block in matches:
+                  blocks.append(f'/* {path.name} */\n{block.strip()}\n')
+              cleaned, count = pattern.subn('', text)
+              if count:
+                  path.write_text(cleaned, encoding='utf-8')
+                  changed.append(path)
+
+          if not blocks:
+              raise SystemExit('No inline public <style> blocks found')
+
+          target = Path('frontend/src/public-booking.css')
+          target.write_text(
+              '/* Public booking styles extracted from JSX during Marco 9 hygiene rebuild. */\n\n'
+              + '\n'.join(blocks),
+              encoding='utf-8'
+          )
+
+          main = Path('frontend/src/main.jsx')
+          text = main.read_text(encoding='utf-8')
+          marker = "import './booking-selection.css';"
+          addition = marker + "\nimport './public-booking.css';"
+          if "import './public-booking.css';" not in text:
+              if marker not in text:
+                  raise SystemExit('booking-selection.css import marker not found')
+              main.write_text(text.replace(marker, addition, 1), encoding='utf-8')
+
+          remaining = []
+          for path in public_dir.glob('*.jsx'):
+              if '<style>' in path.read_text(encoding='utf-8'):
+                  remaining.append(str(path))
+          if remaining:
+              raise SystemExit('Inline styles remain: ' + ', '.join(remaining))
+          PY
+      - name: Commit extraction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/components/public frontend/src/public-booking.css frontend/src/main.jsx
+          git commit -m "refactor: extract public booking css"
+          git push origin HEAD:agent/rebuild-hygiene-m2-9
