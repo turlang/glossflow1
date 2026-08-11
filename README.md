@@ -1,94 +1,114 @@
-# GlossFlow Enterprise
+# GlossFlow Smart
 
-SaaS para salões de beleza, barbearias e clínicas de estética, com foco em gestão operacional, relacionamento com clientes, agendamento online, financeiro, automações e estrutura multiempresa.
+SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de estética. O produto reúne vitrine pública, agenda, CRM, estoque, financeiro, fidelidade, automações e WhatsApp em uma única operação.
 
-## Preview
+## Estado atual
 
-![Preview do GlossFlow Enterprise](docs/preview.svg)
+O projeto está em fase de piloto comercial, com a Agenda e o fluxo principal de confirmação por WhatsApp já integrados ao backend.
 
-## Visão geral
+Fluxo validado:
 
-O GlossFlow foi criado para centralizar a rotina de negócios de beleza em uma única plataforma: vitrine pública, agenda, serviços, profissionais, clientes, estoque, financeiro, comissões, fidelidade, templates de WhatsApp, automações e painéis administrativos.
-
-Este projeto demonstra construção de produto SaaS Full Stack, com arquitetura pensada para múltiplos estabelecimentos, autenticação, regras de negócio e experiência premium.
-
-## Principais funcionalidades
-
-- Vitrine pública do salão.
-- Agendamento online.
-- Login administrativo.
-- Cadastro de serviços.
-- Gestão de profissionais.
-- Portfólio do salão.
-- CRM de clientes.
-- Controle de estoque.
-- Financeiro.
-- Comissão por profissional.
-- Programa de fidelidade.
-- Planos e assinatura SaaS.
-- Templates de WhatsApp.
-- Central de automações.
-- Dashboard executivo.
-- Multiempresa via `salonId`.
-- Observabilidade e health score.
-- Integrações preparadas para OpenAI, WhatsApp, Mercado Pago, Stripe, Google Calendar, Cloudinary, Sentry e Meta Ads.
+```text
+Agendamento público
+      |
+      v
+Fastify / regras de Agenda
+      |
+      +--> MongoDB / Prisma
+      |
+      +--> Twilio WhatsApp
+               |
+               +--> status: sent / delivered / read / failed / undelivered
+```
 
 ## Stack
 
-### Front-end
+### Frontend
 
-- React
-- Vite
+- React 18
+- Vite 5
 - CSS próprio / Design System
-- PWA básico
-
-### Back-end
-
-- Node.js
-- Fastify
-- TypeScript
-- JWT
-- Zod
-
-### Banco de dados
-
-- MongoDB
-- Prisma ORM
-
-### Infraestrutura e integrações
-
-- Render
+- PWA
 - Vercel
-- MongoDB Atlas
-- OpenAI opcional
-- WhatsApp API opcional
-- Mercado Pago / Stripe preparados
-- Google Calendar preparado
 
-## Arquitetura resumida
+### Backend
+
+- Node.js 20
+- Fastify 4
+- TypeScript `strict`
+- Zod
+- JWT / RBAC
+- Render
+
+### Dados e integrações
+
+- MongoDB Atlas
+- Prisma ORM
+- Groq como provider principal de IA
+- Twilio para WhatsApp
+- Sentry opcional
+- Mercado Pago / Stripe preparados
+
+## Arquitetura
 
 ```text
 frontend/
   src/
-  public/
-  .env.example
+    components/
+    config/
+    services/
+    utils/
 
 backend/
-  src/
-  prisma/
+  prisma/              # schema canônico
   scripts/
-  .env.example
+  src/
+    lib/
+    middlewares/
+    routes/
+    services/
+    server.ts
+  tests/
+
+docs/
+  engineering/
+  usuario/
 ```
 
-O sistema é separado em front-end e back-end, com API própria, autenticação por token, persistência em MongoDB e estrutura preparada para múltiplos salões.
+Detalhes:
+
+- [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
+- [`docs/engineering/CODING_STANDARDS.md`](docs/engineering/CODING_STANDARDS.md)
+- [`docs/engineering/HYGIENE_REPORT.md`](docs/engineering/HYGIENE_REPORT.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
+
+## Funcionalidades principais
+
+- vitrine pública white-label;
+- agendamento online;
+- capacidades por profissional;
+- jornada, pausas e bloqueios de equipe;
+- agenda operacional dia/semana;
+- Smart Fit para encaixes;
+- lista de espera;
+- confirmação, cancelamento e gerenciamento pelo cliente;
+- lembretes automáticos;
+- rastreamento de entrega do WhatsApp;
+- CRM de clientes;
+- controle de estoque e movimentações;
+- financeiro, comissões e fidelidade;
+- Super Admin separado do tenant;
+- módulos/entitlements por salão;
+- agente de IA com Groq;
+- auditoria e observabilidade.
 
 ## Como executar
 
-### Back-end
+### Backend
 
 ```bash
 cd backend
-npm install
+npm ci
 cp .env.example .env
 npm run prisma:generate
 npm run prisma:push
@@ -96,56 +116,63 @@ npm run seed
 npm run dev
 ```
 
-### Front-end
+### Frontend
 
 ```bash
 cd frontend
-npm install
+npm ci
 cp .env.example .env
 npm run dev
 ```
 
-## Login de teste
+Nunca use credenciais de demonstração fixas em produção. Crie o Super Admin por variáveis de ambiente ou pelo processo de bootstrap documentado.
 
-```text
-E-mail: admin@glossflow.com
-Senha: 123456
+## Qualidade
+
+Backend:
+
+```bash
+cd backend
+npm run prisma:generate
+npm run lint
+npm test
+npm run build
 ```
 
-> Troque a senha antes de qualquer uso real.
+Frontend:
 
-## Qualidade e produção
+```bash
+cd frontend
+npm run build
+```
 
-Arquivos importantes:
+Os mesmos passos principais são executados pelo GitHub Actions em `.github/workflows/quality.yml`.
 
-- `QUALITY_GATE.md`
-- `PRODUCTION_CHECKLIST.md`
-- `QA_TEST_PLAN.md`
-- `COMO_USAR_GLOSSFLOW.md`
+## Deploy canônico
 
-## Diferenciais técnicos
+- Backend: `render.yaml`
+- Frontend: `frontend/vercel.json`
+- Ambiente backend: `backend/.env.example`
+- Ambiente frontend: `frontend/.env.example`
 
-- Arquitetura SaaS com multiempresa.
-- Backend em TypeScript.
-- Prisma com MongoDB.
-- Autenticação com perfis de acesso.
-- Módulos de negócio reais.
-- Dashboard executivo.
-- Preparação para integrações externas.
-- Documentação de uso, QA e produção.
+A raiz não deve conter cópias alternativas do schema Prisma, scripts restauradores antigos ou blueprints duplicados de infraestrutura.
 
-## Status
+## Segurança
 
-Candidato de produção para piloto comercial e demonstração profissional.
+- isolamento por `salonId` nas operações privadas;
+- RBAC para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
+- validação Zod nas entradas HTTP;
+- tokens e segredos apenas em variáveis de ambiente;
+- webhooks externos validados quando o provider oferece assinatura;
+- respostas 5xx sanitizadas em produção.
 
-## Próximas melhorias
+## Documentação operacional
 
-- Conectar envio real de WhatsApp.
-- Finalizar integrações externas.
-- Ampliar testes automatizados.
-- Adicionar screenshots ao README.
-- Publicar demonstração estável.
+- [`COMO_USAR_GLOSSFLOW.md`](COMO_USAR_GLOSSFLOW.md)
+- [`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md)
+- [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md)
+- [`QUALITY_GATE.md`](QUALITY_GATE.md)
 
-## Posicionamento no portfólio
+## Convenção de desenvolvimento
 
-Este é o principal projeto de empregabilidade do portfólio, por demonstrar domínio de produto SaaS Full Stack, arquitetura, UX, back-end, banco de dados e regras de negócio reais.
+O GlossFlow prioriza comentários que expliquem contratos, regras de segurança, decisões e fallbacks. Comentários redundantes linha a linha não são adicionados, porque aumentam ruído e ficam desatualizados rapidamente.
