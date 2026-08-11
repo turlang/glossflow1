@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { availabilityClarification, unavailableServiceDecision } from '../services/agent-intent.service';
 import { guardAgentReply } from '../services/agent-response-guard.service';
+import { createOperationalNotification } from '../services/appointment-notification.service';
 import { handleAppointmentReminderReply } from '../services/appointment-reminder.service';
 import { directAvailabilityFromText } from '../services/direct-availability.service';
 import { hasSalonModule } from '../services/module-access.service';
@@ -25,8 +26,16 @@ function stripWhatsappAddress(value: string) {
 }
 
 function webhookUrl(request: FastifyRequest) {
-  const configured = String(process.env.TWILIO_WEBHOOK_URL || '').trim();
-  if (configured) return configured;
+  const path = request.url.split('?')[0];
+  const configuredInbound = String(process.env.TWILIO_WEBHOOK_URL || '').trim().replace(/\/$/, '');
+  const configuredStatus = String(process.env.TWILIO_STATUS_CALLBACK_URL || '').trim();
+
+  if (path === '/webhooks/whatsapp/twilio/status') {
+    if (configuredStatus) return configuredStatus;
+    if (configuredInbound) return `${configuredInbound}/status`;
+  } else if (configuredInbound) {
+    return configuredInbound;
+  }
 
   const forwardedProto = String(request.headers['x-forwarded-proto'] || '').split(',')[0].trim();
   const forwardedHost = String(request.headers['x-forwarded-host'] || '').split(',')[0].trim();
@@ -82,6 +91,62 @@ async function fallbackTwilioSalon(to: string) {
     where: { slug },
     select: { id: true, name: true, description: true, whatsapp: true, openingHours: true }
   });
+}
+
+async function processTwilioStatusCallback(app: FastifyInstance, form: TwilioForm) {
+  const messageSid = String(form.MessageSid || form.SmsSid || '').trim();
+  const status = String(form.MessageStatus || form.SmsStatus || '').trim().toLowerCase();
+  const errorCode = String(form.ErrorCode || '').trim();
+  const errorMessage = String(form.ChannelStatusMessage || form.ErrorMessage || '').trim();
+  if (!messageSid || !status) return;
+
+  const sentMessage = await prisma.auditLog.findFirst({
+    where: { resource: 'WhatsAppMessage', resourceId: messageSid },
+    orderBy: { createdAt: 'desc' },
+    select: { salonId: true, metadata: true }
+  });
+
+  let salonId = sentMessage?.salonId || '';
+  if (!salonId) {
+    const salon = await fallbackTwilioSalon(form.From || '');
+    salonId = salon?.id || '';
+  }
+
+  if (!salonId) {
+    app.log.warn({ messageSid, status }, 'Status Twilio recebido sem salão associado.');
+    return;
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'WHATSAPP_DELIVERY_STATUS',
+      resource: 'WhatsAppDeliveryStatus',
+      resourceId: messageSid,
+      method: 'WEBHOOK',
+      path: '/webhooks/whatsapp/twilio/status',
+      salonId,
+      metadata: {
+        status,
+        errorCode,
+        errorMessage,
+        to: normalizePhone(stripWhatsappAddress(form.To || '')),
+        from: normalizePhone(stripWhatsappAddress(form.From || ''))
+      }
+    }
+  });
+
+  app.log.info({ salonId, messageSid, status, errorCode, errorMessage }, 'Status de entrega WhatsApp atualizado pela Twilio.');
+
+  if (status === 'failed' || status === 'undelivered') {
+    const reason = [errorCode ? `código ${errorCode}` : '', errorMessage].filter(Boolean).join(' · ');
+    await createOperationalNotification({
+      salonId,
+      type: 'WHATSAPP_DELIVERY_FAILED',
+      title: 'WhatsApp não entregue',
+      message: `A Twilio aceitou a mensagem inicialmente, mas a entrega terminou como ${status.toUpperCase()}.${reason ? ` Provider: ${reason}` : ''}`,
+      severity: 'WARNING'
+    });
+  }
 }
 
 async function processTwilioInbound(app: FastifyInstance, form: TwilioForm) {
@@ -250,6 +315,30 @@ export async function twilioWhatsAppWebhookRoutes(app: FastifyInstance) {
       }
     });
   }
+
+  app.post('/webhooks/whatsapp/twilio/status', async (request: FastifyRequest, reply) => {
+    const params = (request.body || {}) as TwilioForm;
+    const signatureHeader = request.headers['x-twilio-signature'];
+    const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : String(signatureHeader || '');
+    const authToken = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
+    const url = webhookUrl(request);
+
+    if (!authToken && process.env.NODE_ENV === 'production') {
+      return reply.status(503).send({ message: 'TWILIO_AUTH_TOKEN é obrigatório para validar o callback.' });
+    }
+
+    if (authToken && !validTwilioSignature(url, params, signature, authToken)) {
+      app.log.warn({ url }, 'Assinatura X-Twilio-Signature inválida no callback de status.');
+      return reply.status(401).send({ message: 'Assinatura do callback Twilio inválida.' });
+    }
+
+    reply.status(200).send({ received: true });
+    setImmediate(() => {
+      void processTwilioStatusCallback(app, params)
+        .catch((error) => app.log.error(error, 'Erro ao processar status de entrega Twilio.'));
+    });
+    return reply;
+  });
 
   app.post('/webhooks/whatsapp/twilio', async (request: FastifyRequest, reply) => {
     const params = (request.body || {}) as TwilioForm;
