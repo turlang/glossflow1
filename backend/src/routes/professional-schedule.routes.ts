@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -88,7 +89,7 @@ export async function professionalScheduleRoutes(app: FastifyInstance) {
       where: { id },
       data: {
         workScheduleConfigured: data.workScheduleConfigured,
-        weeklySchedule: data.weeklySchedule as any
+        weeklySchedule: data.weeklySchedule as Prisma.InputJsonValue
       }
     });
   });
@@ -111,7 +112,7 @@ export async function professionalScheduleRoutes(app: FastifyInstance) {
     };
     const next = [...blocks, created].sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-    await prisma.professional.update({ where: { id }, data: { timeBlocks: next as any } });
+    await prisma.professional.update({ where: { id }, data: { timeBlocks: next as Prisma.InputJsonValue } });
     return reply.status(201).send(created);
   });
 
@@ -125,7 +126,7 @@ export async function professionalScheduleRoutes(app: FastifyInstance) {
     const blocks = parseTimeBlocks(professional);
     const next = blocks.filter((block) => block.id !== blockId);
     if (next.length === blocks.length) return reply.status(404).send({ message: 'Bloqueio não encontrado.' });
-    await prisma.professional.update({ where: { id }, data: { timeBlocks: next as any } });
+    await prisma.professional.update({ where: { id }, data: { timeBlocks: next as Prisma.InputJsonValue } });
     return reply.status(204).send();
   });
 }
