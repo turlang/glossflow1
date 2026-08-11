@@ -1,8 +1,27 @@
+/**
+ * Cliente HTTP central do frontend.
+ *
+ * Responsabilidades:
+ * - montar contexto público do tenant (slug/host);
+ * - anexar JWT administrativo quando existir;
+ * - renovar access token uma única vez em 401;
+ * - persistir o comprovante de agendamento público;
+ * - normalizar mensagens de erro da API.
+ *
+ * Regra importante: este módulo não decide permissão de negócio. O backend é
+ * a fonte de verdade para RBAC e isolamento multi-tenant.
+ */
+
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3333').replace(/\/+$/, '');
 
 const AUTH_EXPIRED_EVENT = 'glossflow:auth-expired';
 const BOOKING_CONFIRMED_EVENT = 'glossflow:booking-confirmed';
 
+/**
+ * Identifica o tenant público sem confiar em dados administrativos.
+ * Em domínios próprios enviamos `X-Salon-Host`; no host da plataforma usamos
+ * slug explícito para permitir múltiplas vitrines na mesma aplicação Vercel.
+ */
 function publicTenantHeaders() {
   if (typeof window === 'undefined') return {};
 
@@ -19,6 +38,7 @@ function publicTenantHeaders() {
   };
 }
 
+/** Converte erros Zod/API em uma mensagem curta para a interface. */
 function apiErrorMessage(data) {
   const firstIssue = Array.isArray(data?.issues) ? data.issues[0] : null;
   if (firstIssue?.message) {
@@ -30,14 +50,20 @@ function apiErrorMessage(data) {
   return data?.message || 'Não foi possível concluir a solicitação.';
 }
 
+/** Limpa a sessão local e avisa o App quando a autenticação realmente expirou. */
 function clearSession({ notify = true } = {}) {
   localStorage.removeItem('glossflow.token');
   localStorage.removeItem('glossflow.refreshToken');
+
   if (notify && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
   }
 }
 
+/**
+ * Renova o access token usando refresh token.
+ * Retorna `null` sem lançar quando a renovação não é mais possível.
+ */
 async function refreshAccessToken() {
   const refreshToken = localStorage.getItem('glossflow.refreshToken');
   if (!refreshToken) return null;
@@ -49,6 +75,7 @@ async function refreshAccessToken() {
   });
 
   if (!response.ok) return null;
+
   const data = await response.json();
   if (data.token) localStorage.setItem('glossflow.token', data.token);
   if (data.refreshToken) localStorage.setItem('glossflow.refreshToken', data.refreshToken);
@@ -59,9 +86,14 @@ function isAuthBootstrapPath(path) {
   return path === '/auth/login' || path === '/auth/refresh';
 }
 
+/**
+ * Salva o comprovante retornado pelo backend depois do POST /appointments.
+ * A UI lê esse snapshot para exibir protocolo e política sem recalcular regra.
+ */
 function persistBookingConfirmation(path, options, data) {
   const method = String(options?.method || 'GET').toUpperCase();
   if (path !== '/appointments' || method !== 'POST' || !data?.confirmation?.confirmed) return;
+
   const receipt = {
     appointmentId: data.id,
     startTime: data.startTime,
@@ -72,11 +104,15 @@ function persistBookingConfirmation(path, options, data) {
     clientNotification: data.confirmation.clientNotification,
     savedAt: new Date().toISOString()
   };
+
   localStorage.setItem('glossflow.lastBooking', JSON.stringify(receipt));
   window.dispatchEvent(new CustomEvent(BOOKING_CONFIRMED_EVENT, { detail: receipt }));
 }
 
-/** Cliente HTTP centralizado com refresh token e contexto público multi-tenant. */
+/**
+ * Executa uma chamada HTTP e tenta no máximo uma renovação de token.
+ * `retry=false` impede loop infinito se o endpoint continuar retornando 401.
+ */
 export async function request(path, options = {}, retry = true) {
   let token = localStorage.getItem('glossflow.token');
 
@@ -114,6 +150,7 @@ export async function request(path, options = {}, retry = true) {
   return data;
 }
 
+/** Inscreve um listener no evento de expiração e devolve a função de cleanup. */
 export function onAuthExpired(handler) {
   if (typeof window === 'undefined') return () => {};
   window.addEventListener(AUTH_EXPIRED_EVENT, handler);
