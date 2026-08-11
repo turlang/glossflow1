@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { hasSalonModule } from '../module-access.service';
-import { normalizePhone } from '../whatsapp-agent.service';
+import { normalizePhone } from '../whatsapp-agent/contracts';
 import { stripWhatsappAddress } from './security';
 
 /** Valida os três módulos exigidos pelo atendimento autônomo. */
