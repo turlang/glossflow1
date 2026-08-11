@@ -19,6 +19,14 @@ export const managementQuerySchema = z.object({
   token: z.string().min(32)
 }).strict();
 
+export const appointmentUpdateSchema = z.object({
+  startTime: z.string().datetime().optional(),
+  professionalId: objectIdSchema.optional(),
+  status: z.enum(['CONFIRMED', 'COMPLETED', 'CANCELED', 'NO_SHOW']).optional()
+}).strict().refine((value) => value.startTime !== undefined || value.professionalId !== undefined || value.status !== undefined, {
+  message: 'Informe ao menos um campo para atualizar o agendamento.'
+});
+
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido. Use HH:mm.');
 
 export const waitlistCreateSchema = z.object({
