@@ -105,7 +105,7 @@ function CapabilityCard({ professional, services, reload }) {
   );
 }
 
-export function ProfessionalCapabilitiesAdmin({ salon, services, professionals, reload, setPage }) {
+export function ProfessionalCapabilitiesAdmin({ services, professionals, reload, setPage }) {
   return (
     <main className="capability-page">
       <section className="capability-shell">

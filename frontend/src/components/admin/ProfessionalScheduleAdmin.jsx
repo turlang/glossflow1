@@ -10,13 +10,6 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function toLocalInput(iso) {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return '';
-  const pad = (value) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 function formatBlock(iso) {
   return new Intl.DateTimeFormat('pt-BR', {
