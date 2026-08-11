@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../../lib/prisma';
 import { createOperationalNotification } from '../appointment-notification.service';
-import { normalizePhone } from '../whatsapp-agent.service';
+import { normalizePhone } from '../whatsapp-agent/contracts';
 import { fallbackTwilioSalon } from './salon.service';
 import { stripWhatsappAddress, TwilioForm } from './security';
 
