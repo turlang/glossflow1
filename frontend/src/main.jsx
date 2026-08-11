@@ -6,6 +6,7 @@ import { RecentBookingConfirmation } from './components/public/RecentBookingConf
 import './styles.css';
 import './admin-mobile.css';
 import './booking-selection.css';
+import './public-booking.css';
 
 /**
  * Bootstrap do frontend GlossFlow.
