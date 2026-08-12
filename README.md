@@ -1,71 +1,24 @@
 # GlossFlow Smart
 
-SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de estética. O GlossFlow centraliza vitrine pública, agenda, CRM, estoque, financeiro, fidelidade, automações, WhatsApp e apoio operacional com IA.
+SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de estética. O GlossFlow centraliza vitrine pública, Agenda, CRM, Estoque, financeiro, fidelidade, automações, WhatsApp e apoio operacional com IA.
 
 ## Estado atual
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-A sequência estrutural e comercial dos **Marcos 1–19 está concluída e validada em produção**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel, o Marco 17 consolidou a Agenda como central operacional, o Marco 18 transformou o Estoque em fluxo diário de reposição e conciliação, e o Marco 19 transformou o CRM em uma central de retenção acionável.
+Os **Marcos 1–19 estão concluídos e validados em produção**. O **Marco 20 — Assistente IA e WhatsApp em produção** está concluído funcionalmente no PR, aguardando merge e smoke para receber a validação oficial de produção.
 
-O código possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
+Resultados acumulados:
 
-Fluxos principais já operacionais:
+- higienização e modularização estrutural concluídas;
+- RBAC e multi-tenant homologados;
+- Agenda comercial operacional;
+- Estoque operacional com reposição e conciliação;
+- CRM de retenção com consentimento e reativação;
+- agente WhatsApp com base factual do tenant, confirmação server-side de mutações, handoff com contexto e política de envio por janela/template;
+- gates, testes automatizados e smoke pós-deploy permanentes.
 
-```text
-Agendamento público
-      |
-      v
-Fastify / regras de Agenda
-      |
-      +--> MongoDB / Prisma
-      |
-      +--> Twilio WhatsApp
-               |
-               +--> status: sent / delivered / read / failed / undelivered
-```
-
-```text
-Agenda comercial
-      |
-      +--> Planejamento Enterprise
-      |      +--> Dia / Semana / Mês / Profissionais
-      |      +--> filtros por profissional / serviço / status
-      |
-      +--> Operação do Dia
-      +--> Smart Fit
-      +--> Lista de Espera
-      +--> Jornada da Equipe
-      |
-      +--> confirmação / lembretes / cancelamento / WhatsApp
-```
-
-```text
-Estoque operacional
-      |
-      +--> Produtos / mínimo / custo / fornecedor
-      +--> Entrada / Saída / Ajuste físico
-      +--> Histórico por produto
-      +--> Ruptura e estoque baixo
-      +--> Plano de reposição
-      +--> Capital imobilizado / venda potencial
-```
-
-```text
-CRM e retenção
-      |
-      +--> Aniversário / Inatividade / Frequência
-      +--> Motivos explicáveis por cliente
-      +--> Histórico de atendimentos
-      +--> Opt-in / Opt-out de marketing
-      +--> Template ou fallback de follow-up
-      +--> Abrir WhatsApp
-              |
-              +--> Auditoria de follow-up iniciado
-              +--> Métrica de reativação em até 30 dias
-```
-
-## Stack atual
+## Stack
 
 ### Frontend
 
@@ -93,141 +46,147 @@ CRM e retenção
 - MongoDB Atlas
 - Prisma ORM
 - Groq como provider principal de IA
-- Twilio para WhatsApp
+- OpenAI como fallback opcional
+- Twilio / Meta / provider HTTP para WhatsApp
 - Sentry opcional
-- Mercado Pago / Stripe preparados para evolução de billing
 
-## Arquitetura
+## Arquitetura resumida
 
 ```text
-frontend/
-  src/
-    components/
-      admin/
-        agenda/
-        inventory/
-        crm/
-      public/
-      ui/
-    config/
-    services/
-    utils/
-    styles por domínio
-
-backend/
-  prisma/                  # schema canônico
-  scripts/
-  src/
-    config/
-    lib/
-    middlewares/
-    routes/
-      appointments/
-      business/
-      inventory-operations.routes.ts
-      twilio-whatsapp/
-    services/
-      whatsapp-agent/
-      client-retention.service.ts
-    app.ts                 # buildApp() testável
-    server.ts              # bootstrap/processo
-  tests/
-
-docs/
-  engineering/
-  usuario/
+Cliente WhatsApp
+      |
+      v
+Webhook / tenant / módulos
+      |
+      +--> histórico + handoff
+      |
+      +--> Assistente IA
+             |
+             +--> Base factual do tenant
+             +--> Ferramentas de consulta
+             +--> Proposta de mutação
+                       |
+                       v
+              Ação pendente no servidor
+                       |
+                 nova mensagem
+                       |
+           CONFIRMAR / CANCELAR AÇÃO
+                       |
+                       v
+            revalidação + execução
 ```
 
-Documentação técnica:
-
-- [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
-- [`docs/engineering/CODING_STANDARDS.md`](docs/engineering/CODING_STANDARDS.md)
-- [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
-- [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- [`ROADMAP.md`](ROADMAP.md)
+```text
+Follow-up CRM
+      |
+      +--> opt-out / tenant / módulo
+      +--> conteúdo interno
+      +--> janela de atendimento
+             |
+             +--> aberta  -> texto livre
+             |
+             +--> fechada -> template oficial obrigatório
+      |
+      +--> provider
+             |
+             +--> sucesso -> registra outbound/follow-up
+             +--> falha   -> erro real, sem sucesso falso
+```
 
 ## Funcionalidades principais
 
 - vitrine pública white-label;
 - agendamento online;
-- capacidades, jornada, pausas e bloqueios de profissionais;
-- central de Agenda comercial para `ADMIN`/`RECEPTION`;
-- Agenda Enterprise com filtros combinados;
-- criação rápida, reagendamento e validação de conflitos;
+- Agenda Enterprise e central comercial;
 - Smart Fit, lista de espera e reaproveitamento de vagas;
 - confirmação, cancelamento, lembretes e rastreamento WhatsApp;
-- agente WhatsApp com fallback e handoff humano;
-- CRM de clientes;
-- **CRM de retenção** com segmentos explicáveis de aniversário, inatividade e frequência;
-- histórico de até 50 atendimentos por cliente sob demanda;
-- preferência de marketing registrada por `LgpdConsent`;
-- opt-out bloqueando preparação de follow-up;
-- templates de retenção com fallback local seguro;
-- preparação de contato via deep-link do WhatsApp sem alegar envio automático;
-- auditoria somente quando a equipe inicia o contato;
-- métrica de reativação em até 30 dias após follow-up iniciado;
-- **Estoque operacional** com entrada, saída e ajuste físico;
-- bloqueio de saldo negativo e conciliação até zero;
-- filtros, alertas de estoque baixo e ruptura;
-- painel de reposição com quantidade e custo estimados;
-- capital imobilizado, venda potencial e histórico por produto;
+- CRM com segmentação por aniversário, inatividade e frequência;
+- histórico de cliente e preferência de marketing;
+- follow-up manual e por provider;
+- Estoque operacional com entrada, saída, ajuste físico, histórico e reposição;
 - financeiro, comissões e fidelidade;
-- dashboard executivo;
 - Super Admin separado do tenant;
 - módulos/entitlements por salão;
-- Site & Marca white-label por cliente;
-- agente de IA com Groq e fallback local;
-- auditoria, segurança e observabilidade;
-- PWA.
+- Site & Marca white-label;
+- agente IA com Groq/fallback;
+- PWA, auditoria, segurança e observabilidade.
 
-## Marcos 1–19 concluídos
+## Marco 20 — Assistente IA e WhatsApp em produção
 
-Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel. O Marco 17 tornou a Agenda o principal fluxo operacional. O Marco 18 tornou o Estoque utilizável para operação diária. O Marco 19 tornou o CRM utilizável para decisão de retenção e follow-up com consentimento e rastreabilidade.
+O Marco 20 fecha os principais riscos de automação do canal.
 
-Principais resultados acumulados:
+### Base factual por salão
 
-- `AdminDashboard.jsx` decomposto por domínio;
-- Agenda, Estoque e CRM de retenção em módulos operacionais dedicados;
-- `buildApp()` extraído para testes HTTP com `Fastify.inject()`;
-- agente WhatsApp e webhook Twilio modularizados;
-- domínio comercial separado em CRM, financeiro, comissões, fidelidade, assinatura, templates e IA;
-- zero `<style>` dentro de componentes JSX;
-- zero `any` explícito em `backend/src`;
-- repository hygiene impedindo regressões estruturais;
-- RBAC alinhado entre frontend e backend;
-- `SUPER_ADMIN` isolado da operação tenant;
-- `PROFESSIONAL` sem acesso às mutações de Agenda, Estoque e CRM;
-- Agenda comercial com jornada cliente → salão → WhatsApp;
-- Estoque com trilha de movimentações, reposição e indicadores econômicos;
-- CRM com segmentação explicável, consentimento, histórico, follow-up e reativação;
-- documentação operacional por papel e por domínio.
+O prompt é montado com fatos cadastrados no tenant: nome, descrição, horário, endereço, telefone, Instagram e catálogo ativo. Disponibilidade e profissionais são obtidos por ferramentas. Informação ausente não deve ser inventada.
 
-Relatórios e guias:
+### Mutações com confirmação server-side
 
-- [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
-- [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
-- [`docs/usuario/10_AGENDA_COMERCIAL.md`](docs/usuario/10_AGENDA_COMERCIAL.md)
-- [`docs/usuario/11_ESTOQUE_OPERACIONAL.md`](docs/usuario/11_ESTOQUE_OPERACIONAL.md)
-- [`docs/usuario/12_CRM_RETENCAO.md`](docs/usuario/12_CRM_RETENCAO.md)
+Criar, cancelar e reagendar não são executados diretamente por function calling. A ferramenta exposta ao modelo cria uma **proposta pendente**. Somente uma mensagem posterior reconhecida pelo servidor como confirmação explícita pode executar a mutação.
 
-## Testes e qualidade
+Ações pendentes:
+
+- são auditadas;
+- possuem TTL configurável;
+- aceitam cancelamento explícito;
+- permanecem pendentes em mensagens ambíguas;
+- são revalidadas contra a Agenda antes da execução.
+
+### Handoff com contexto
+
+O handoff humano registra motivo e contexto recente da conversa quando disponível. Uma falha ao recuperar contexto não impede o encaminhamento.
+
+### Política de WhatsApp
+
+Mensagens iniciadas pelo salão são controladas no servidor:
+
+- janela de atendimento aberta: texto livre;
+- janela fechada: exige identificador de template oficial configurado;
+- falha do provider: gera evento de falha e não persiste mensagem como enviada;
+- follow-up do CRM só entra na métrica depois de sucesso confirmado pela API do provider.
+
+### Métricas
+
+O read model `/admin/whatsapp/metrics` acompanha:
+
+- contatos e mensagens;
+- falhas do provider;
+- handoffs;
+- ações propostas, confirmadas, canceladas, expiradas e com falha;
+- taxa operacional de resolução automática;
+- taxa de sucesso do provider.
+
+A tela **WhatsApp · Homologação** mostra esses indicadores e continua sem enviar mensagem real ao provider.
+
+## Testes e qualidade — head funcional do Marco 20
 
 ### Backend
 
-**57 testes automatizados**, cobrindo entre outros:
+**68/68 testes automatizados**.
+
+Cobertura inclui:
 
 - autenticação, RBAC e isolamento multi-tenant;
-- validação Zod;
-- Agenda comercial e conflitos;
-- estoque operacional, reposição e conciliação;
-- segmentação de retenção;
-- aniversário, inatividade e frequência;
-- histórico de cliente tenant-scoped;
-- opt-out e evidência de consentimento;
-- bloqueio de follow-up em opt-out;
-- separação entre mensagem preparada e follow-up iniciado;
-- Twilio e agente WhatsApp;
-- fallbacks e handoff humano.
+- Agenda, conflito e reagendamento;
+- Estoque e CRM;
+- agente IA e fallbacks;
+- proposta server-side e confirmação posterior;
+- mensagem ambígua sem mutação;
+- cancelamento de proposta;
+- base factual do tenant;
+- handoff com contexto;
+- janela de atendimento;
+- template obrigatório fora da janela;
+- falha do provider sem `WHATSAPP_SENT` falso;
+- métricas operacionais por tenant.
+
+### Frontend
+
+**54/54 testes automatizados**.
+
+Cobertura inclui Agenda, Estoque, CRM de retenção e envio de follow-up pelo provider somente após confirmação do operador.
+
+### Gates
 
 ```bash
 cd backend
@@ -238,21 +197,6 @@ npm test
 npm run build
 ```
 
-### Frontend
-
-**53 testes automatizados**, cobrindo:
-
-- Agenda Enterprise e calendário;
-- central comercial e filtros da Agenda;
-- matriz de menu e endpoints por papel;
-- Estoque operacional, filtros, reposição e histórico;
-- filtros e indicadores do CRM de retenção;
-- explicação de segmentação;
-- bloqueio visual de follow-up em opt-out;
-- preparação de mensagem;
-- registro de follow-up somente ao abrir o WhatsApp;
-- histórico de atendimentos sob demanda.
-
 ```bash
 cd frontend
 npm ci
@@ -260,18 +204,6 @@ npm run lint
 npm test
 npm run build
 ```
-
-## Gates de CI/CD
-
-A integração contínua valida:
-
-1. repository hygiene;
-2. `npm ci`;
-3. `npm audit --audit-level=high`;
-4. Prisma generate no backend;
-5. lint / TypeScript;
-6. testes;
-7. build.
 
 Workflows permanentes:
 
@@ -279,69 +211,36 @@ Workflows permanentes:
 - `Production Gate`;
 - `Production Smoke Validation`.
 
-O smoke pós-deploy valida de forma read-only frontend, saúde do backend, salão público, catálogo e read model público de agendamentos.
+## Configuração de WhatsApp do Marco 20
 
-## Como executar
+Consulte `backend/.env.example`. Variáveis adicionais incluem:
 
-### Backend
-
-```bash
-cd backend
-npm ci
-cp .env.example .env
-npm run prisma:generate
-npm run prisma:push
-npm run seed
-npm run dev
+```text
+WHATSAPP_ACTION_CONFIRMATION_TTL_MINUTES
+WHATSAPP_TEMPLATE_RETENTION_BIRTHDAY
+WHATSAPP_TEMPLATE_RETENTION_INACTIVE
+WHATSAPP_TEMPLATE_RETENTION_FREQUENT
+WHATSAPP_TEMPLATE_RETENTION_FOLLOWUP
 ```
 
-### Frontend
+Nunca versionar credenciais reais e nunca desativar `WHATSAPP_DRY_RUN` apenas porque o playground local funciona.
 
-```bash
-cd frontend
-npm ci
-cp .env.example .env
-npm run dev
-```
+## Documentação
 
-Nunca use credenciais de demonstração fixas em produção. Crie o Super Admin por variáveis de ambiente ou pelo processo de bootstrap documentado.
-
-## Deploy canônico
-
-- Backend: `render.yaml`
-- Frontend: `frontend/vercel.json`
-- Ambiente backend: `backend/.env.example`
-- Ambiente frontend: `frontend/.env.example`
-
-## Segurança
-
-- isolamento por `salonId` nas operações privadas;
-- RBAC para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
-- módulos contratados aplicados por tenant;
-- validação Zod nas entradas HTTP;
-- preferência de marketing persistida sem apagar histórico anterior;
-- follow-up bloqueado quando o consentimento mais recente é opt-out;
-- preparação de mensagem não é contabilizada como contato iniciado;
-- tokens e segredos somente em variáveis de ambiente;
-- validação de assinatura em webhook Twilio;
-- fallbacks controlados para providers externos;
-- respostas 5xx sanitizadas em produção;
-- hygiene gate contra `.env`, backups, arquivos grandes e artefatos legados.
-
-## Documentação operacional
-
-- [`COMO_USAR_GLOSSFLOW.md`](COMO_USAR_GLOSSFLOW.md)
+- [`ROADMAP.md`](ROADMAP.md)
+- [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md)
-- [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md)
 - [`QUALITY_GATE.md`](QUALITY_GATE.md)
-- [`docs/usuario/`](docs/usuario/)
+- [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
+- [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
+- [`docs/usuario/10_AGENDA_COMERCIAL.md`](docs/usuario/10_AGENDA_COMERCIAL.md)
+- [`docs/usuario/11_ESTOQUE_OPERACIONAL.md`](docs/usuario/11_ESTOQUE_OPERACIONAL.md)
+- [`docs/usuario/12_CRM_RETENCAO.md`](docs/usuario/12_CRM_RETENCAO.md)
+- [`docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`](docs/usuario/13_IA_WHATSAPP_PRODUCAO.md)
 
-## Próxima fase
+## Próximo marco
 
-O próximo marco oficial é o **Marco 20 — Assistente IA e WhatsApp em produção**, voltado a atendimento comercial confiável, ações confirmadas e automação segura por provider.
+Após merge e smoke do Marco 20, o próximo marco oficial é o **Marco 21 — Super Admin, planos e ciclo de vida SaaS**.
 
-A sequência oficial está em [`ROADMAP.md`](ROADMAP.md).
-
-## Convenção de desenvolvimento
-
-O GlossFlow prioriza comentários que expliquem contratos, regras de segurança, decisões e fallbacks. Comentários redundantes linha a linha não são adicionados, porque aumentam ruído e ficam desatualizados rapidamente.
+A sequência canônica está em [`ROADMAP.md`](ROADMAP.md).

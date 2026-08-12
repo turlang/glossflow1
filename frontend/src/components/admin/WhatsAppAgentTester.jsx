@@ -4,6 +4,7 @@ import { Input, SectionTitle } from '../ui/Forms.jsx';
 
 export function WhatsAppAgentTester({ setPage }) {
   const [status, setStatus] = useState(null);
+  const [metrics, setMetrics] = useState(null);
   const [phone, setPhone] = useState('5511999999999');
   const [clientName, setClientName] = useState('Cliente Teste');
   const [message, setMessage] = useState('');
@@ -13,7 +14,12 @@ export function WhatsAppAgentTester({ setPage }) {
 
   async function loadStatus() {
     try {
-      setStatus(await request('/admin/whatsapp/agent-status'));
+      const [agentStatus, operationalMetrics] = await Promise.all([
+        request('/admin/whatsapp/agent-status'),
+        request('/admin/whatsapp/metrics?days=30')
+      ]);
+      setStatus(agentStatus);
+      setMetrics(operationalMetrics);
     } catch (error) {
       setFeedback(error.message);
     }
@@ -49,6 +55,8 @@ export function WhatsAppAgentTester({ setPage }) {
         aiProviderLabel: result.providerLabel || current.aiProviderLabel,
         aiModel: result.model || current.aiModel
       } : current);
+      const updatedMetrics = await request('/admin/whatsapp/metrics?days=30');
+      setMetrics(updatedMetrics);
     } catch (error) {
       setChat((items) => items.filter((item) => item.id !== pendingId));
       setMessage(text);
@@ -63,6 +71,7 @@ export function WhatsAppAgentTester({ setPage }) {
     try {
       await request(`/admin/whatsapp/handoffs/${encodeURIComponent(phone)}/close`, { method: 'POST' });
       setFeedback('Atendimento humano encerrado. O salão pode voltar a responder automaticamente este telefone.');
+      setMetrics(await request('/admin/whatsapp/metrics?days=30'));
     } catch (error) {
       setFeedback(error.message);
     }
@@ -80,6 +89,15 @@ export function WhatsAppAgentTester({ setPage }) {
     ['Assinatura Meta', status.webhookSignatureConfigured]
   ] : [];
 
+  const operationalStats = metrics ? [
+    ['Resolução automática', `${metrics.automaticResolutionRate || 0}%`],
+    ['Contatos recebidos', metrics.uniqueInboundContacts || 0],
+    ['Mensagens enviadas', metrics.messagesOut || 0],
+    ['Falhas do provider', metrics.providerFailures || 0],
+    ['Ações confirmadas', metrics.actionsCompleted || 0],
+    ['Handoffs', metrics.handoffsOpened || 0]
+  ] : [];
+
   const salonName = status?.salon?.name || 'Salão';
 
   return (
@@ -87,7 +105,7 @@ export function WhatsAppAgentTester({ setPage }) {
       <SectionTitle
         label="WhatsApp · Homologação"
         title={`Teste o atendimento do ${salonName}`}
-        text="Esta prévia simula como o salão responderá no WhatsApp usando os dados reais de serviços e agenda. Nenhuma mensagem é enviada para a Meta nesta tela."
+        text="Esta prévia simula o atendimento com dados reais do tenant. Mutações de Agenda viram propostas pendentes e só são executadas depois de uma confirmação explícita em mensagem posterior. Nenhuma mensagem é enviada para o provider nesta tela."
       />
 
       <section className="panel-card" style={{ marginBottom: 24 }}>
@@ -114,6 +132,19 @@ export function WhatsAppAgentTester({ setPage }) {
         {status && <p className="panel-help">Modo atual: <strong>{status.dryRun ? 'dry-run / homologação' : 'produção'}</strong> • Webhook: <code>{status.webhookPath}</code></p>}
       </section>
 
+      {metrics && (
+        <section className="panel-card" style={{ marginBottom: 24 }} aria-label="Métricas de WhatsApp">
+          <div className="hero-actions" style={{ justifyContent: 'space-between' }}>
+            <div><span className="eyebrow">Últimos {metrics.periodDays || 30} dias</span><h2>Operação real do WhatsApp</h2></div>
+            <button className="secondary" type="button" onClick={loadStatus}>Atualizar métricas</button>
+          </div>
+          <div className="mini-stats full-span" style={{ marginTop: 18 }}>
+            {operationalStats.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+          </div>
+          <p className="panel-help">Sucesso do provider: <strong>{metrics.providerSuccessRate || 0}%</strong> • propostas: {metrics.actionsProposed || 0} • canceladas: {metrics.actionsCanceled || 0} • falhas de ação: {metrics.actionsFailed || 0}.</p>
+        </section>
+      )}
+
       <div className="inventory-layout">
         <form className="panel-card form-grid" onSubmit={send}>
           <h2>Cliente simulado</h2>
@@ -138,7 +169,7 @@ export function WhatsAppAgentTester({ setPage }) {
           <span className="eyebrow">Conversa</span>
           <h2>Prévia do WhatsApp</h2>
           <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            {chat.length === 0 && <p className="panel-help">Comece perguntando por um serviço, preço ou horário.</p>}
+            {chat.length === 0 && <p className="panel-help">Comece perguntando por um serviço, preço ou horário. Para validar uma ação, siga o fluxo proposta → CONFIRMAR.</p>}
             {chat.map((item, index) => (
               <div key={item.id || `${item.role}-${index}`} style={{ justifySelf: item.role === 'client' ? 'end' : 'start', maxWidth: '88%' }}>
                 <div className={item.role === 'client' ? 'feedback' : 'panel-help'} style={{ padding: 14, borderRadius: 16, margin: 0, whiteSpace: 'pre-wrap' }}>

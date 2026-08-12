@@ -29,6 +29,6 @@ export async function fallbackTwilioSalon(to: string) {
     || 'glossflow';
   return prisma.salon.findUnique({
     where: { slug },
-    select: { id: true, name: true, description: true, whatsapp: true, openingHours: true }
+    select: { id: true, name: true, description: true, whatsapp: true, openingHours: true, address: true, phone: true, instagram: true }
   });
 }

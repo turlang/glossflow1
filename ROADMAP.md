@@ -2,379 +2,317 @@
 
 Data-base: 2026-08-12.
 
-Este documento é a fonte canônica para a evolução do GlossFlow após o encerramento do ciclo de higienização estrutural.
+Este documento é a fonte canônica para a evolução do GlossFlow.
 
 ## Estado do produto
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-A base técnica, a homologação por papel e as evoluções comerciais dos **Marcos 1–19 estão concluídas e validadas em produção**. Os próximos marcos representam IA/WhatsApp, ciclo de vida SaaS, confiabilidade, performance, segurança e escala.
+Os **Marcos 1–19 estão concluídos e validados em produção**. O **Marco 20 — Assistente IA e WhatsApp em produção** está **CONCLUÍDO NO PR**, com código, documentação e gates funcionais verdes. A validação oficial de produção será registrada somente depois do merge, deploy e `Production Smoke Validation`.
 
-Estado automatizado após o Marco 19:
+Estado automatizado do head funcional do Marco 20:
 
-- backend: **57 testes**;
-- frontend: **53 testes**;
-- RBAC homologado para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
-- Agenda comercial validada em produção no Marco 17;
-- Estoque operacional validado em produção no Marco 18;
-- CRM com segmentação explicável, histórico, preferência de marketing, follow-up e métrica de reativação;
-- merge de produção: `87dba94852dadec4db0e7c27bbc56ceb905cbc6f`;
-- GlossFlow Quality Gate pós-merge: **success**;
-- Production Gate pós-merge: **success**;
-- deploy Vercel de produção: **READY**;
+- backend: **68/68 testes**;
+- frontend: **54/54 testes**;
+- `npm audit` backend/frontend: **0 vulnerabilidades**;
+- TypeScript/ESLint: **success**;
+- builds backend/frontend: **success**;
+- confirmação de mutações de Agenda validada no servidor;
+- política de janela/template validada por testes;
+- falha de provider sem sucesso falso;
+- handoff com contexto;
+- métricas operacionais de IA/WhatsApp.
+
+---
+
+# Ciclo concluído em produção — Marcos 1–19
+
+## Marco 1 — Higienização estrutural inicial — CONCLUÍDO
+
+Artefatos legados removidos, schema Prisma canônico, documentação de engenharia e repository hygiene.
+
+## Marco 2 — Decomposição do Admin — CONCLUÍDO
+
+Dashboard dividido por domínio, ESLint real e atualização da base Fastify/Vite.
+
+## Marco 3 — Agenda Enterprise e regras de data — CONCLUÍDO
+
+Calendário isolado, datas locais corrigidas, capacidade mensal real e Vitest.
+
+## Marco 4 — Componentização da Agenda — CONCLUÍDO
+
+Toolbar, cards, visões e navegação acessível separados.
+
+## Marco 5 — Reagendamento acessível — CONCLUÍDO
+
+Formulário explícito, persistência unificada e feedback de conflito/sucesso.
+
+## Marco 6 — Tipagem e serviço de reagendamento backend — CONCLUÍDO
+
+Serviço dedicado, payload estrito, sobreposição correta e zero `any` explícito em `backend/src`.
+
+## Marco 7 — Fastify testável — CONCLUÍDO
+
+`buildApp()` testável e `server.ts` restrito ao bootstrap.
+
+## Marco 8 — Rotas de Agenda modularizadas — CONCLUÍDO
+
+Público, gestão, lista de espera, admin, contratos e acesso separados.
+
+## Marco 9 — Agente WhatsApp modularizado — CONCLUÍDO
+
+Contratos, repositório, ferramentas, orquestrador e fallback seguro.
+
+## Marco 10 — CSS administrativo + contratos do agente — CONCLUÍDO
+
+Estilos extraídos e contratos/fallback/handoff cobertos.
+
+## Marco 11 — Webhook Twilio modularizado — CONCLUÍDO
+
+Segurança, tenant, status e pipeline inbound separados.
+
+## Marco 12 — Cobertura de regressão ampliada — CONCLUÍDO
+
+Estoque, CRM, Twilio e agente WhatsApp protegidos por testes.
+
+## Marco 13 — Domínio comercial modularizado — CONCLUÍDO
+
+CRM, financeiro, comissões, fidelidade, assinatura, templates e IA separados.
+
+## Marco 14 — Documentação de usuário — CONCLUÍDO
+
+Manuais por papel, FAQ, curso, implantação e boas práticas.
+
+## Marco 15 — Hygiene final — CONCLUÍDO
+
+Gates permanentes, zero `<style>` em JSX e zero `any` explícito no backend.
+
+## Marco 16 — Homologação funcional completa por papel — CONCLUÍDO
+
+RBAC homologado para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`.
+
+## Marco 17 — Agenda comercial e jornada do cliente — CONCLUÍDO
+
+Agenda transformada em central de operação diária com Smart Fit, lista de espera, jornada, confirmações e comunicação. Merge de produção `84eac1541f722be4beef473281785eda09ba950e`; gates e smoke verdes.
+
+## Marco 18 — Estoque operacional e reposição — CONCLUÍDO
+
+Movimentação, conciliação, ruptura, histórico, capital e plano de reposição. Merge de produção `6eb20a878e5f55c9df5cf73348228b0ada4b610f`; gates e smoke verdes.
+
+## Marco 19 — CRM, retenção e automações — CONCLUÍDO
+
+CRM de retenção com aniversário, inatividade, frequência, histórico, consentimento, opt-out, follow-up e métrica de reativação.
+
+Validação final do Marco 19:
+
+- backend: **57/57 testes**;
+- frontend: **53/53 testes**;
+- merge em `main`: `87dba94852dadec4db0e7c27bbc56ceb905cbc6f`;
+- Quality Gate: **success**;
+- Production Gate: **success**;
+- Vercel produção: **READY**;
 - Production Smoke Validation: **success**.
 
 ---
 
-# Ciclo concluído — Marcos 1–19
+# Marco 20 — Assistente IA e WhatsApp em produção — CONCLUÍDO NO PR
 
-## Marco 1 — Higienização estrutural inicial — CONCLUÍDO
+Objetivo cumprido no código: transformar o agente em atendimento comercial controlado por fatos e regras do servidor, impedindo que o modelo execute mutações sensíveis ou declare sucesso de provider sem evidência.
 
-- remoção de artefatos legados e duplicados;
-- schema Prisma único;
-- documentação de engenharia;
-- repository hygiene;
-- configuração e bootstrap separados.
+## Base factual do tenant
 
-## Marco 2 — Decomposição do Admin — CONCLUÍDO
+- contexto institucional por salão;
+- serviços ativos, preço, duração e descrição;
+- disponibilidade e profissionais consultados por ferramentas;
+- informação ausente tratada como não cadastrada, sem completar lacunas por suposição.
 
-- `AdminDashboard.jsx` reduzido a shell;
-- módulos administrativos separados por domínio;
-- ESLint real no frontend;
-- Fastify 5 e Vite 8.
+## Confirmação server-side de Agenda
 
-## Marco 3 — Agenda Enterprise e regras de data — CONCLUÍDO
+Criar, cancelar e reagendar seguem o fluxo:
 
-- utilitários de calendário isolados;
-- correções de UTC/data local;
-- capacidade mensal real;
-- Vitest introduzido.
-
-## Marco 4 — Componentização da Agenda — CONCLUÍDO
-
-- toolbar, cards e visões separados;
-- navegação acessível por teclado;
-- Testing Library e User Event.
-
-## Marco 5 — Reagendamento acessível — CONCLUÍDO
-
-- formulário explícito;
-- persistência unificada com drag-and-drop;
-- feedback de conflito e sucesso.
-
-## Marco 6 — Tipagem e serviço de reagendamento backend — CONCLUÍDO
-
-- serviço dedicado;
-- regra correta de sobreposição;
-- payload estrito;
-- zero `any` explícito em `backend/src`.
-
-## Marco 7 — Fastify testável — CONCLUÍDO
-
-- `buildApp()` testável;
-- `server.ts` apenas bootstrap;
-- testes HTTP com `Fastify.inject()`.
-
-## Marco 8 — Rotas de Agenda modularizadas — CONCLUÍDO
-
-- público;
-- gestão;
-- lista de espera;
-- admin;
-- contratos e acesso separados.
-
-## Marco 9 — Agente WhatsApp modularizado — CONCLUÍDO
-
-- contratos;
-- repositório;
-- ferramentas;
-- orquestrador;
-- fallback seguro.
-
-## Marco 10 — CSS administrativo + contratos do agente — CONCLUÍDO
-
-- estilos extraídos dos componentes;
-- testes de ferramenta, fallback e handoff.
-
-## Marco 11 — Webhook Twilio modularizado — CONCLUÍDO
-
-- segurança/HMAC;
-- tenant;
-- callbacks de status;
-- pipeline inbound.
-
-## Marco 12 — Cobertura de regressão ampliada — CONCLUÍDO
-
-- Estoque;
-- CRM;
-- Twilio;
-- agente WhatsApp.
-
-## Marco 13 — Domínio comercial modularizado — CONCLUÍDO
-
-- CRM;
-- financeiro;
-- comissões;
-- fidelidade;
-- assinatura;
-- templates;
-- IA e inteligência executiva.
-
-## Marco 14 — Documentação de usuário — CONCLUÍDO
-
-- proprietário;
-- recepção;
-- profissional;
-- guia rápido;
-- FAQ;
-- curso;
-- implantação;
-- boas práticas.
-
-## Marco 15 — Hygiene final — CONCLUÍDO
-
-- bloqueio automático de regressões estruturais;
-- zero `<style>` em componentes JSX;
-- zero `any` explícito em `backend/src`;
-- gates permanentes.
-
-## Marco 16 — Homologação funcional completa por papel — CONCLUÍDO
-
-- matriz canônica de UX por papel;
-- `SUPER_ADMIN` isolado da operação tenant;
-- `ADMIN` com operação completa dentro dos módulos contratados;
-- `RECEPTION` limitada à operação autorizada;
-- `PROFESSIONAL` com Agenda somente leitura;
-- RBAC frontend/backend alinhado;
-- backend: **41 testes** nessa etapa;
-- frontend: **29 testes** nessa etapa;
-- Quality Gate, Production Gate e smoke: **success**.
-
-Observação arquitetural: ainda não existe vínculo persistente `User → Professional`; por isso o perfil `PROFESSIONAL` possui Agenda tenant somente leitura e não finge filtragem individual inexistente.
-
-## Marco 17 — Agenda comercial e jornada do cliente — CONCLUÍDO
-
-Objetivo cumprido: transformar a Agenda no principal ponto de operação diária e conectar planejamento, execução, encaixe e comunicação com o cliente.
+```text
+Pedido do cliente
+   ↓
+IA consulta/valida
+   ↓
+Proposta pendente
+   ↓
+NOVA mensagem do cliente
+   ├─ CONFIRMAR      → revalida Agenda → executa
+   ├─ CANCELAR AÇÃO  → cancela proposta
+   └─ ambígua        → mantém pendente, sem mutação
+```
 
 Entregue:
 
-- `AgendaCommercialHub`;
-- Operação do Dia, Smart Fit, Lista de Espera e Jornada da Equipe;
-- filtros por profissional, serviço e status;
-- criação rápida, conflito, reagendamento e cancelamento cobertos por testes;
-- confirmação, lembretes e presença consolidados;
-- guia `docs/usuario/10_AGENDA_COMERCIAL.md`;
-- backend: **46 testes**;
-- frontend: **35 testes**;
-- merge de produção: `84eac1541f722be4beef473281785eda09ba950e`;
-- Quality Gate, Production Gate, deploy Vercel e Production Smoke: **success**.
+- `confirmed=true` removido do contrato exposto ao modelo;
+- ação pendente persistida em AuditLog;
+- TTL configurável;
+- parser de confirmação conservador;
+- revalidação de serviço, profissional, jornada e conflito antes da execução;
+- proposta encerrada imediatamente no turno de tool calling para impedir encadeamento proposta + execução;
+- estados auditados `PENDING`, `COMPLETED`, `CANCELED`, `FAILED` e `EXPIRED`.
 
-Critério operacional atingido: a equipe possui os recursos necessários para operar a Agenda sem agenda paralela.
+## Handoff humano
 
-## Marco 18 — Estoque operacional e reposição — CONCLUÍDO
+- motivo persistido;
+- telefone normalizado;
+- até seis mensagens recentes anexadas quando disponíveis;
+- falha de leitura do contexto não impede o handoff.
 
-Objetivo cumprido: tornar o estoque confiável para uso diário, conciliação física e decisão de compra.
+## Política de envio WhatsApp
 
-Entregue:
+A decisão de canal é do servidor, não da IA:
 
-- central `InventoryOperations`;
-- entrada, saída e ajuste físico;
-- conciliação inclusive para saldo zero;
-- saldo negativo bloqueado;
-- read model `/admin/inventory/overview` por tenant;
-- indicadores de estoque e valor econômico;
-- filtros por busca, categoria, fornecedor e situação;
-- painel **O que comprar agora**;
-- reposição sugerida até `2 × estoque mínimo`;
-- histórico por produto com até 100 eventos;
-- guia `docs/usuario/11_ESTOQUE_OPERACIONAL.md`;
-- backend: **51 testes**;
-- frontend: **44 testes**;
-- merge de produção: `6eb20a878e5f55c9df5cf73348228b0ada4b610f`;
-- Quality Gate, Production Gate, Vercel e Production Smoke: **success**.
+- janela de atendimento aberta → mensagem livre;
+- janela fechada → template oficial do provider obrigatório;
+- ausência de template → bloqueio antes da chamada externa;
+- falha do provider → `WHATSAPP_PROVIDER_FAILED`, sem `WHATSAPP_SENT` falso;
+- outbound persistido somente após sucesso confirmado pela API do provider.
 
-Critério operacional atingido: a equipe consegue identificar ruptura, justificar compra, registrar movimentos, reconciliar saldo físico e consultar a trilha sem planilha paralela.
+O CRM ganhou `POST /admin/clients/:id/follow-up/send` com:
 
-## Marco 19 — CRM, retenção e automações — CONCLUÍDO
+- tenant e módulo WhatsApp revalidados;
+- opt-out preservado;
+- confirmação explícita do operador no frontend;
+- política de janela/template;
+- follow-up registrado somente depois de sucesso do provider.
 
-Objetivo cumprido: transformar o cadastro de clientes em uma fila operacional de retenção explicável, mensurável e compatível com preferência de comunicação.
+## Templates
 
-Entregue:
+O CRUD interno aceita também:
 
-- `CRMRetentionHub` como central do domínio Clientes;
-- serviço `client-retention.service.ts` separado da camada HTTP;
-- read model `GET /admin/clients/retention` por tenant;
-- segmentação determinística por aniversário, inatividade e frequência;
-- aniversário nos próximos **14 dias**;
-- inatividade de **60+** e **120+ dias**;
-- cliente frequente a partir de **3 atendimentos em 90 dias**;
-- `CANCELLED` e `NO_SHOW` fora da contagem de visitas;
-- múltiplas tags por cliente com segmento principal priorizado;
-- motivo textual visível para cada classificação;
-- busca e filtro por segmento/opt-out;
-- histórico sob demanda em `GET /admin/clients/:id/history`, limitado a 50 atendimentos;
-- `LgpdConsent` `MARKETING` reutilizado para registrar mudança de preferência sem apagar histórico anterior;
-- follow-up bloqueado quando o consentimento mais recente indica opt-out;
-- templates internos `RETENTION_BIRTHDAY`, `RETENTION_INACTIVE`, `RETENTION_FREQUENT` e `RETENTION_FOLLOWUP` reutilizados quando ativos;
-- placeholders de cliente e salão no template;
-- fallback local seguro quando não existe template configurado;
-- preparação da mensagem separada do evento de contato iniciado;
-- deep-link do WhatsApp sem afirmar envio ou entrega pelo GlossFlow;
-- auditoria `RETENTION_FOLLOWUP_INITIATED` somente quando a equipe aciona **Abrir WhatsApp**;
-- métrica de reativação baseada em retorno para atendimento válido em até **30 dias** depois de um follow-up iniciado;
-- reativação calculada por qualquer follow-up elegível no período, sem depender apenas do evento mais recente;
-- `ADMIN` e `RECEPTION` com acesso operacional; `PROFESSIONAL` permanece sem CRM;
-- layout responsivo dedicado em `crm-retention.css`;
-- guia `docs/usuario/12_CRM_RETENCAO.md`;
-- backend totalizando **57 testes**;
-- frontend totalizando **53 testes**.
+- `RETENTION_BIRTHDAY`;
+- `RETENTION_INACTIVE`;
+- `RETENTION_FREQUENT`;
+- `RETENTION_FOLLOWUP`.
 
-Validação automatizada:
+O ambiente documenta os identificadores de template oficial correspondentes para o provider.
+
+## Métricas
+
+Novo read model `/admin/whatsapp/metrics` com:
+
+- mensagens inbound/outbound;
+- falhas do provider;
+- handoffs abertos/fechados;
+- ações propostas, concluídas, canceladas, falhas e expiradas;
+- contatos inbound únicos;
+- taxa operacional de resolução automática;
+- taxa de sucesso do provider.
+
+A taxa de resolução automática é um proxy operacional — resposta outbound sem handoff no período — e não uma prova de satisfação do cliente.
+
+## Interface
+
+- `WhatsAppAgentTester` mostra status e métricas de 30 dias;
+- playground continua sem enviar mensagem real ao provider;
+- CRM oferece fluxo manual e envio controlado por provider;
+- presets de retenção adicionados à Central de Automações.
+
+## Configuração
+
+`backend/.env.example` documenta:
+
+- `WHATSAPP_ACTION_CONFIRMATION_TTL_MINUTES`;
+- templates de retenção do provider;
+- relação entre dry-run, sender, webhook e templates.
+
+## Documentação
+
+- `docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`.
+
+## Validação automatizada do head funcional
 
 - repository hygiene: **success**;
 - `npm audit` backend/frontend: **0 vulnerabilidades**;
 - TypeScript/ESLint: **success**;
-- backend: **57/57 testes**;
-- frontend: **53/53 testes**;
-- builds backend/frontend: **success**;
-- preview Vercel: **READY**;
-- merge em `main`: `87dba94852dadec4db0e7c27bbc56ceb905cbc6f`;
-- GlossFlow Quality Gate pós-merge: **success**;
-- Production Gate pós-merge: **success**;
-- deploy Vercel de produção: **READY**;
-- Production Smoke Validation: **success**.
+- backend: **68/68 testes**;
+- frontend: **54/54 testes**;
+- builds backend/frontend: **success**.
 
-Critério operacional atingido: a equipe consegue identificar quem merece follow-up, entender por que o cliente foi classificado, consultar o histórico, respeitar opt-out, preparar a mensagem e iniciar a ação dentro do GlossFlow sem planilha paralela.
+Critério de saída funcional atingido:
 
-Limite intencional: o Marco 19 **não envia campanhas automaticamente por Meta/Twilio**. Abertura do deep-link não equivale a confirmação de envio ou entrega. Templates oficiais, janela de atendimento, execução automática pelo provider, confirmação de ações e métricas de resolução/entrega pertencem ao Marco 20.
+- o agente não recebe autoridade para inventar fatos fora da base/tooling;
+- qualquer mutação de Agenda exige confirmação explícita posterior validada pelo servidor;
+- mensagem ambígua não altera Agenda;
+- falha do provider não produz sucesso falso;
+- handoff preserva contexto recente;
+- follow-up respeita opt-out e política de janela/template;
+- operação possui métricas de automação, handoff e provider.
 
----
-
-# Homologação visual pós-higienização — CONCLUÍDA
-
-- contraste correto de controles nativos no tema escuro;
-- controles legados do Super Admin padronizados;
-- correção de campos de plano, status, data e white-label;
-- correção do stretch vertical do shell;
-- telas com pouco conteúdo sem cabeçalhos gigantes;
-- deploy validado por smoke automático.
+**Pendência para conclusão oficial:** merge no `main`, deploy de produção e `Production Smoke Validation` verdes.
 
 ---
 
 # Próximo ciclo — Evolução comercial
 
-## Marco 20 — Assistente IA e WhatsApp em produção — PRÓXIMO
-
-Objetivo: evoluir o agente para atendimento comercial confiável e executar automações de WhatsApp sem inventar dados nem agir sem confirmação quando a ação for sensível.
-
-Escopo:
-
-- base de conhecimento por salão;
-- respostas limitadas ao catálogo, disponibilidade e regras do tenant;
-- qualificação de intenção;
-- consulta de disponibilidade;
-- criação/reagendamento/cancelamento com confirmação explícita;
-- handoff humano com contexto completo;
-- fallback de provider;
-- templates oficiais e regras de janela do WhatsApp quando aplicáveis;
-- execução segura de follow-ups/casos automatizados pelo provider;
-- métricas de resolução automática, envio e falha;
-- proteção contra alucinação e ação sem confirmação.
-
-Critério de saída:
-
-- o agente automatiza casos previstos sem inventar preço, serviço, horário ou política;
-- qualquer ação que altere Agenda possui confirmação explícita do cliente;
-- falha do provider não produz sucesso falso;
-- handoff preserva o contexto necessário para a equipe humana;
-- Quality Gate, Production Gate e smoke específicos ficam verdes.
-
-## Marco 21 — Super Admin, planos e ciclo de vida SaaS — PLANEJADO
+## Marco 21 — Super Admin, planos e ciclo de vida SaaS — PRÓXIMO
 
 Objetivo: permitir operação comercial multi-tenant sem intervenção técnica manual.
 
-Escopo planejado:
+Escopo:
 
 - onboarding de novo cliente;
 - planos e módulos contratados;
-- trial/active/past-due/canceled;
+- estados `TRIAL`, `ACTIVE`, `PAST_DUE` e `CANCELED`;
 - ativação/desativação segura;
 - white-label e domínio;
 - custos externos por tenant;
 - preparação de billing real;
 - auditoria de alterações sensíveis.
 
-Critério de saída: um novo salão pode ser provisionado e administrado pelo Super Admin sem edição manual de banco.
+Critério de saída: um novo salão pode ser provisionado, configurado e administrado pelo Super Admin sem edição manual de banco.
 
 ## Marco 22 — Observabilidade, performance e confiabilidade — PLANEJADO
 
-Objetivo: operar múltiplos salões com diagnóstico rápido e comportamento previsível.
-
-Escopo planejado:
-
 - métricas de API e latência;
 - erros por rota/provider;
-- monitoramento de webhooks e WhatsApp;
-- filas/tarefas assíncronas quando necessário;
+- monitoramento de webhooks;
+- tarefas assíncronas quando necessário;
 - índices MongoDB;
-- paginação;
-- redução de N+1;
-- bundle/performance frontend;
+- paginação e redução de N+1;
+- performance de frontend;
 - alertas operacionais.
-
-Critério de saída: falhas relevantes podem ser detectadas e diagnosticadas sem depender de relato do cliente.
 
 ## Marco 23 — Segurança e LGPD comercial — PLANEJADO
 
-Objetivo: elevar proteção antes de escala comercial maior.
-
-Escopo planejado:
-
 - revisão final de RBAC;
-- trilha de auditoria;
-- retenção de dados;
-- exportação/eliminação conforme contrato;
+- auditoria;
+- retenção, exportação e eliminação de dados;
 - sessões/refresh tokens;
-- rate limits;
-- secrets;
+- rate limits e secrets;
 - backup/restore testado;
 - procedimento de incidente.
 
-Critério de saída: controles de segurança e privacidade possuem evidência técnica e procedimento operacional.
-
 ## Marco 24 — Release comercial estável — PLANEJADO
-
-Objetivo: fechar o piloto e promover uma versão comercial estável.
 
 Critérios mínimos:
 
-- Marcos 16–23 avaliados e itens críticos encerrados;
-- checklist de produção concluído;
+- Marcos 16–23 encerrados;
+- checklist de produção completo;
 - homologação desktop/mobile;
-- Agenda, Estoque e CRM reais validados;
-- WhatsApp real validado;
+- Agenda, Estoque, CRM e WhatsApp reais validados;
 - backup e recuperação documentados;
 - Quality Gate verde;
 - Production Gate verde;
 - Production Smoke Validation verde;
-- documentação de implantação e suporte atualizada.
+- implantação e suporte atualizados.
 
 Resultado esperado:
 
-**GlossFlow apto a ser vendido e operado como SaaS multi-tenant com processo de implantação repetível.**
+**GlossFlow apto a ser vendido e operado como SaaS multi-tenant com implantação repetível.**
 
 ---
 
 # Prioridade de execução
 
 ```text
-Marco 20 — IA + WhatsApp
-   ↓
-Marco 21 — Super Admin / planos / billing
+Marco 21 — Super Admin / planos / ciclo de vida SaaS
    ↓
 Marco 22 — Observabilidade e performance
    ↓
-Marco 23 — Segurança/LGPD
+Marco 23 — Segurança / LGPD
    ↓
 Marco 24 — Release comercial estável
 ```
@@ -384,15 +322,13 @@ Marco 24 — Release comercial estável
 Um marco somente é considerado concluído quando:
 
 1. código e documentação estão atualizados;
-2. testes relevantes foram adicionados ou ajustados;
+2. testes relevantes estão verdes;
 3. `GlossFlow Quality Gate` está verde;
 4. `Production Gate` está verde quando houver impacto de produção;
-5. smoke/homologação específica do fluxo foi executada;
+5. smoke/homologação específica foi executada;
 6. nenhuma regressão crítica conhecida permanece aberta.
 
----
-
-# Referências
+## Referências
 
 - [`README.md`](README.md)
 - [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
@@ -400,7 +336,5 @@ Um marco somente é considerado concluído quando:
 - [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md)
 - [`QUALITY_GATE.md`](QUALITY_GATE.md)
 - [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
-- [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
-- [`docs/usuario/10_AGENDA_COMERCIAL.md`](docs/usuario/10_AGENDA_COMERCIAL.md)
-- [`docs/usuario/11_ESTOQUE_OPERACIONAL.md`](docs/usuario/11_ESTOQUE_OPERACIONAL.md)
 - [`docs/usuario/12_CRM_RETENCAO.md`](docs/usuario/12_CRM_RETENCAO.md)
+- [`docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`](docs/usuario/13_IA_WHATSAPP_PRODUCAO.md)

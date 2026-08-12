@@ -12,6 +12,7 @@ import { operationalAgendaRoutes } from './operational-agenda.routes';
 import { tenantRoutes } from './tenant.routes';
 import { businessRoutes } from './business.routes';
 import { whatsappAgentRoutes } from './whatsapp-agent.routes';
+import { whatsappOperationsRoutes } from './whatsapp-operations.routes';
 import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
 import { platformAdminRoutes } from './platform-admin.routes';
@@ -90,6 +91,7 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(analyticsRoutes);
     business.register(growthRoutes);
     business.register(whatsappAgentRoutes);
+    business.register(whatsappOperationsRoutes);
   });
 
   /** Segurança do próprio tenant continua disponível apenas ao ADMIN do salão. */

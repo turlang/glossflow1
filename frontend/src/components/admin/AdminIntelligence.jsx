@@ -7,7 +7,11 @@ const AUTOMATION_PRESETS = [
   { name: 'Confirmação automática', event: 'APPOINTMENT_CREATED', message: 'Olá {nome}! Seu horário para {servico} foi confirmado para {data} às {hora}.' },
   { name: 'Lembrete de horário', event: 'REMINDER', message: 'Olá {nome}, lembrando do seu atendimento em {data} às {hora}.' },
   { name: 'Pós-atendimento', event: 'AFTER_SERVICE', message: 'Oi {nome}! Como foi sua experiência? Sua opinião é muito importante.' },
-  { name: 'Cliente inativo', event: 'INACTIVE_CLIENT', message: 'Sentimos sua falta, {nome}! Quer reservar um novo horário?' }
+  { name: 'Cliente inativo', event: 'INACTIVE_CLIENT', message: 'Sentimos sua falta, {nome}! Quer reservar um novo horário?' },
+  { name: 'Retenção — aniversário', event: 'RETENTION_BIRTHDAY', message: 'Olá, {{cliente}}! A equipe {{salao}} lembrou do seu aniversário. Quando quiser, podemos ajudar a encontrar um horário.' },
+  { name: 'Retenção — inatividade', event: 'RETENTION_INACTIVE', message: 'Olá, {{cliente}}! Sentimos sua falta na {{salao}}. Podemos ajudar a organizar seu próximo atendimento.' },
+  { name: 'Retenção — frequente', event: 'RETENTION_FREQUENT', message: 'Olá, {{cliente}}! Obrigado por fazer parte da rotina da {{salao}}. Quando quiser planejar o próximo atendimento, estamos por aqui.' },
+  { name: 'Retenção — follow-up', event: 'RETENTION_FOLLOWUP', message: 'Olá, {{cliente}}! Aqui é a equipe {{salao}}. Quando quiser organizar seu próximo atendimento, podemos ajudar.' }
 ];
 
 export function AutomationsAdmin({ whatsappTemplates, insights, reload }) {
@@ -37,7 +41,7 @@ export function AutomationsAdmin({ whatsappTemplates, insights, reload }) {
   return (
     <div className="automation-center">
       <section className="automation-hero panel-card full-span">
-        <div><span className="eyebrow">Central inteligente</span><h2>Automações do relacionamento</h2><p>Templates editáveis e preparados para o provider de WhatsApp do tenant.</p></div>
+        <div><span className="eyebrow">Central inteligente</span><h2>Automações do relacionamento</h2><p>Templates editáveis do tenant. O envio oficial fora da janela de atendimento exige também o identificador de template configurado no provider.</p></div>
         <div className="automation-scoreboard"><article><strong>{whatsappTemplates.length}</strong><span>templates</span></article><article><strong>{whatsappTemplates.filter((template) => template.active !== false).length}</strong><span>ativos</span></article><article><strong>{(insights?.suggestions || []).length}</strong><span>insights</span></article></div>
       </section>
       <section className="automation-presets panel-card full-span">
