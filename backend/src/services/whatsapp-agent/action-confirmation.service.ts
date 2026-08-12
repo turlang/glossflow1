@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { normalizePhone, ToolArgs } from './contracts';
 
@@ -19,6 +20,10 @@ function asRecord(value: unknown): AuditMetadata {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as AuditMetadata
     : {};
+}
+
+function jsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
 }
 
 function ttlMinutes() {
@@ -94,7 +99,7 @@ export async function createPendingAction(input: {
       salonId: input.salonId,
       metadata: {
         type: input.type,
-        payload: input.payload,
+        payload: jsonValue(input.payload),
         summary: input.summary.slice(0, 1000),
         expiresAt: expiresAt.toISOString()
       }
@@ -163,7 +168,7 @@ export async function recordPendingActionState(input: {
         pendingActionId: input.pendingActionId,
         type: input.type,
         summary: input.summary.slice(0, 1000),
-        ...(input.result === undefined ? {} : { result: input.result })
+        ...(input.result === undefined ? {} : { result: jsonValue(input.result) })
       }
     }
   });
