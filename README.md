@@ -6,7 +6,17 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-Os **Marcos 1–19 estão concluídos e validados em produção**. O **Marco 20 — Assistente IA e WhatsApp em produção** está concluído funcionalmente no PR, aguardando merge e smoke para receber a validação oficial de produção.
+Os **Marcos 1–20 estão concluídos e validados em produção**. O Marco 20 fechou o assistente IA/WhatsApp com base factual por tenant, confirmação server-side de mutações de Agenda, handoff com contexto, política de janela/template, follow-up seguro por provider e métricas operacionais.
+
+Validação do Marco 20:
+
+- merge em `main`: `238fdd4c2401424f12af26e5feb660a6f1cb1e1c`;
+- backend: **68/68 testes**;
+- frontend: **54/54 testes**;
+- Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- checks Vercel: **success**;
+- Production Smoke Validation: **success**.
 
 Resultados acumulados:
 
@@ -158,33 +168,15 @@ O read model `/admin/whatsapp/metrics` acompanha:
 
 A tela **WhatsApp · Homologação** mostra esses indicadores e continua sem enviar mensagem real ao provider.
 
-## Testes e qualidade — head funcional do Marco 20
+## Testes e qualidade
 
 ### Backend
 
-**68/68 testes automatizados**.
-
-Cobertura inclui:
-
-- autenticação, RBAC e isolamento multi-tenant;
-- Agenda, conflito e reagendamento;
-- Estoque e CRM;
-- agente IA e fallbacks;
-- proposta server-side e confirmação posterior;
-- mensagem ambígua sem mutação;
-- cancelamento de proposta;
-- base factual do tenant;
-- handoff com contexto;
-- janela de atendimento;
-- template obrigatório fora da janela;
-- falha do provider sem `WHATSAPP_SENT` falso;
-- métricas operacionais por tenant.
+**68/68 testes automatizados** cobrindo autenticação, RBAC, Agenda, Estoque, CRM, agente IA, confirmação posterior, janela de atendimento, templates, falha de provider, handoff e métricas.
 
 ### Frontend
 
-**54/54 testes automatizados**.
-
-Cobertura inclui Agenda, Estoque, CRM de retenção e envio de follow-up pelo provider somente após confirmação do operador.
+**54/54 testes automatizados** cobrindo Agenda, Estoque, CRM de retenção e envio de follow-up pelo provider somente após confirmação do operador.
 
 ### Gates
 
@@ -239,8 +231,8 @@ Nunca versionar credenciais reais e nunca desativar `WHATSAPP_DRY_RUN` apenas po
 - [`docs/usuario/12_CRM_RETENCAO.md`](docs/usuario/12_CRM_RETENCAO.md)
 - [`docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`](docs/usuario/13_IA_WHATSAPP_PRODUCAO.md)
 
-## Próximo marco
+## Próximo marco oficial
 
-Após merge e smoke do Marco 20, o próximo marco oficial é o **Marco 21 — Super Admin, planos e ciclo de vida SaaS**.
+**Marco 21 — Super Admin, planos e ciclo de vida SaaS**.
 
 A sequência canônica está em [`ROADMAP.md`](ROADMAP.md).
