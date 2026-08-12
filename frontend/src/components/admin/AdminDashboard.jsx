@@ -3,7 +3,8 @@ import { currency } from '../../utils/format.js';
 import { dashboardMenuForRole, defaultDashboardTabForRole } from '../../config/role-access.js';
 import { OnboardingChecklist, ExecutiveDashboard, AdvancedMetricsAdmin } from './AdminOverview.jsx';
 import { ServicesAdmin, ProfessionalsAdmin, PortfolioAdmin } from './AdminCatalog.jsx';
-import { UsersAdmin, InventoryAdmin, ClientsAdmin } from './AdminOperations.jsx';
+import { UsersAdmin, ClientsAdmin } from './AdminOperations.jsx';
+import { InventoryAdmin } from './inventory/InventoryOperations.jsx';
 import { FinancialAdmin, CommissionsAdmin, LoyaltyAdmin, SubscriptionAdmin } from './AdminFinance.jsx';
 import { AutomationsAdmin, AIAssistantAdmin } from './AdminIntelligence.jsx';
 import { SecurityAdmin, EcosystemAdmin, ObservabilityAdmin, UXPremiumAdmin, PWAAdmin } from './AdminPlatformModules.jsx';
@@ -17,7 +18,7 @@ const MENU = [
   { key: 'professionals', label: 'Profissionais', description: 'Equipe e especialidades', icon: '♛' },
   { key: 'portfolio', label: 'Vitrine', description: 'Galeria pública', icon: '◐' },
   { key: 'appointments', label: 'Agenda', description: 'Operação, encaixes e jornada do cliente', icon: '▦' },
-  { key: 'inventory', label: 'Estoque', description: 'Produtos e reposição', icon: '▣' },
+  { key: 'inventory', label: 'Estoque', description: 'Reposição, custos e conciliação física', icon: '▣' },
   { key: 'users', label: 'Usuários', description: 'Acessos e permissões', icon: '◉' },
   { key: 'clients', label: 'Clientes', description: 'CRM e fidelidade', icon: '◎' },
   { key: 'financial', label: 'Financeiro', description: 'Caixa, receita e despesa', icon: 'R$' },

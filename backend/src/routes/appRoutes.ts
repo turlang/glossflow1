@@ -6,6 +6,7 @@ import { whatsappWebhookRoutes } from './whatsapp-webhook.routes';
 import { twilioWhatsAppWebhookRoutes } from './twilio-whatsapp-webhook.routes';
 import { dashboardRoutes } from './dashboard.routes';
 import { adminCrudRoutes } from './admin-crud.routes';
+import { inventoryOperationsRoutes } from './inventory-operations.routes';
 import { professionalScheduleRoutes } from './professional-schedule.routes';
 import { operationalAgendaRoutes } from './operational-agenda.routes';
 import { tenantRoutes } from './tenant.routes';
@@ -64,6 +65,7 @@ export async function appRoutes(app: FastifyInstance) {
     operational.addHook('onResponse', writeAuditLog);
     operational.register(dashboardRoutes);
     operational.register(adminCrudRoutes);
+    operational.register(inventoryOperationsRoutes);
     operational.register(professionalScheduleRoutes);
     operational.register(operationalAgendaRoutes);
     operational.register(tenantRoutes);

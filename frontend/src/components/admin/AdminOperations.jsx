@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { request } from '../../services/api.js';
-import { currency } from '../../utils/format.js';
-import { AdminCrud, EditableList, ImageInput, Input, Select, Textarea } from '../ui/Forms.jsx';
+import { AdminCrud, EditableList, Input, Select, Textarea } from '../ui/Forms.jsx';
 
-/** Operação administrativa fora do domínio de Agenda. */
+/** Operação administrativa fora dos domínios especializados de Agenda e Estoque. */
 export function UsersAdmin({ users, reload }) {
   const emptyForm = { name: '', email: '', password: '', role: 'RECEPTION', active: true };
   const [form, setForm] = useState(emptyForm);
@@ -44,95 +43,6 @@ export function UsersAdmin({ users, reload }) {
         onDelete={async (id) => { await request(`/admin/users/${id}`, { method: 'DELETE' }); await reload(); }}
       />
     </AdminCrud>
-  );
-}
-
-export function InventoryAdmin({ inventory, reload }) {
-  const emptyForm = { name: '', category: '', supplier: '', unit: 'un', quantity: '', minimumQuantity: '', costPrice: '', salePrice: '', imageUrl: '' };
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [movement, setMovement] = useState({ productId: '', type: 'IN', quantity: '', reason: '' });
-
-  const lowStock = inventory.filter((product) => Number(product.quantity) <= Number(product.minimumQuantity));
-  const totalCostValue = inventory.reduce((sum, product) => sum + Number(product.quantity || 0) * Number(product.costPrice || 0), 0);
-
-  function startEdit(product) {
-    setEditingId(product.id);
-    setForm({
-      name: product.name || '',
-      category: product.category || '',
-      supplier: product.supplier || '',
-      unit: product.unit || 'un',
-      quantity: String(product.quantity ?? ''),
-      minimumQuantity: String(product.minimumQuantity ?? ''),
-      costPrice: String(product.costPrice ?? ''),
-      salePrice: product.salePrice == null ? '' : String(product.salePrice),
-      imageUrl: product.imageUrl || ''
-    });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setForm(emptyForm);
-  }
-
-  async function saveProduct() {
-    await request(editingId ? `/admin/inventory/${editingId}` : '/admin/inventory', {
-      method: editingId ? 'PUT' : 'POST',
-      body: JSON.stringify(form)
-    });
-    cancelEdit();
-    await reload();
-  }
-
-  async function createMovement(event) {
-    event.preventDefault();
-    await request('/admin/inventory/movements', { method: 'POST', body: JSON.stringify(movement) });
-    setMovement({ productId: '', type: 'IN', quantity: '', reason: '' });
-    await reload();
-  }
-
-  return (
-    <div className="inventory-layout">
-      <section className="panel-card inventory-summary">
-        <h2>Controle de estoque</h2>
-        <p className="panel-help">Monitore produtos, custos e pontos de reposição.</p>
-        <div className="mini-stats full-span">
-          <div><span>Produtos</span><strong>{inventory.length}</strong></div>
-          <div><span>Estoque baixo</span><strong>{lowStock.length}</strong></div>
-          <div><span>Valor em custo</span><strong>{currency(totalCostValue)}</strong></div>
-        </div>
-      </section>
-
-      <AdminCrud title={editingId ? 'Editar produto' : 'Cadastrar produto'} onSubmit={saveProduct} submitLabel={editingId ? 'Atualizar produto' : 'Salvar produto'}>
-        <ImageInput label="Imagem do produto" value={form.imageUrl} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} />
-        <Input label="Produto" value={form.name} onChange={(name) => setForm((current) => ({ ...current, name }))} required />
-        <Input label="Categoria" value={form.category} onChange={(category) => setForm((current) => ({ ...current, category }))} required />
-        <Input label="Fornecedor" value={form.supplier} onChange={(supplier) => setForm((current) => ({ ...current, supplier }))} />
-        <Input label="Unidade" value={form.unit} onChange={(unit) => setForm((current) => ({ ...current, unit }))} required />
-        <Input label="Quantidade atual" type="number" value={form.quantity} onChange={(quantity) => setForm((current) => ({ ...current, quantity }))} required />
-        <Input label="Quantidade mínima" type="number" value={form.minimumQuantity} onChange={(minimumQuantity) => setForm((current) => ({ ...current, minimumQuantity }))} required />
-        <Input label="Preço de custo" type="number" value={form.costPrice} onChange={(costPrice) => setForm((current) => ({ ...current, costPrice }))} required />
-        <Input label="Preço de venda opcional" type="number" value={form.salePrice} onChange={(salePrice) => setForm((current) => ({ ...current, salePrice }))} />
-        {editingId && <button type="button" className="ghost-button full" onClick={cancelEdit}>Cancelar edição</button>}
-        <EditableList
-          items={inventory}
-          render={(product) => `${product.name} • ${product.quantity} ${product.unit} • mínimo ${product.minimumQuantity} • ${Number(product.quantity) <= Number(product.minimumQuantity) ? '⚠️ baixo' : 'ok'}`}
-          thumbnail={(product) => product.imageUrl}
-          onEdit={startEdit}
-          onDelete={async (id) => { await request(`/admin/inventory/${id}`, { method: 'DELETE' }); await reload(); }}
-        />
-      </AdminCrud>
-
-      <form className="panel-card form-grid" onSubmit={createMovement}>
-        <h2>Movimentar estoque</h2>
-        <Select label="Produto" value={movement.productId} onChange={(productId) => setMovement((current) => ({ ...current, productId }))} options={inventory.map((product) => ({ value: product.id, label: `${product.name} - ${product.quantity} ${product.unit}` }))} required />
-        <Select label="Tipo" value={movement.type} onChange={(type) => setMovement((current) => ({ ...current, type }))} options={[{ value: 'IN', label: 'Entrada' }, { value: 'OUT', label: 'Saída' }, { value: 'ADJUSTMENT', label: 'Ajuste para quantidade exata' }]} required />
-        <Input label="Quantidade" type="number" value={movement.quantity} onChange={(quantity) => setMovement((current) => ({ ...current, quantity }))} required />
-        <Input label="Motivo" value={movement.reason} onChange={(reason) => setMovement((current) => ({ ...current, reason }))} required />
-        <button className="primary full" type="submit">Registrar movimentação</button>
-      </form>
-    </div>
   );
 }
 

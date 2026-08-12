@@ -95,8 +95,16 @@ export const inventoryProductSchema = z.object({
 export const inventoryMovementSchema = z.object({
   productId: objectIdSchema,
   type: z.enum(['IN', 'OUT', 'ADJUSTMENT']),
-  quantity: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().int().min(0),
   reason: z.string().min(3)
+}).superRefine((value, ctx) => {
+  if (value.type !== 'ADJUSTMENT' && value.quantity <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['quantity'],
+      message: 'Entradas e saídas devem possuir quantidade maior que zero.'
+    });
+  }
 });
 
 export const appointmentSchema = z.object({

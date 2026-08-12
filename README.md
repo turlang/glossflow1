@@ -6,9 +6,9 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-A sequência estrutural e comercial dos **Marcos 1–17 foi concluída**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel (`SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`) e o Marco 17 consolidou a Agenda como central operacional do salão.
+A sequência estrutural e comercial dos **Marcos 1–18 está concluída no PR do Marco 18**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel, o Marco 17 consolidou a Agenda como central operacional e o Marco 18 transformou o Estoque em um fluxo diário de reposição, custo e conciliação física.
 
-O código atual possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
+O código possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
 
 Fluxos principais já operacionais:
 
@@ -26,20 +26,6 @@ Fastify / regras de Agenda
 ```
 
 ```text
-WhatsApp inbound
-      |
-      v
-Webhook Twilio
-      |
-      +--> Tenant / Entitlements
-      +--> Persistência
-      +--> Handoff humano
-      +--> Agenda / Lista de espera / Agente IA
-      +--> Guards / Fallback
-      +--> Resposta ao cliente
-```
-
-```text
 Agenda comercial
       |
       +--> Planejamento Enterprise
@@ -47,8 +33,6 @@ Agenda comercial
       |      +--> filtros por profissional / serviço / status
       |
       +--> Operação do Dia
-      |      +--> criar / mover / presença / status
-      |
       +--> Smart Fit
       +--> Lista de Espera
       +--> Jornada da Equipe
@@ -56,7 +40,17 @@ Agenda comercial
       +--> confirmação / lembretes / cancelamento / WhatsApp
 ```
 
-A homologação visual pós-higienização corrigiu o contraste de controles nativos no tema escuro e o comportamento de telas administrativas com pouco conteúdo. A homologação funcional seguinte corrigiu permissões e affordances por papel, incluindo Agenda somente leitura para `PROFESSIONAL` e mutações operacionais restritas a `ADMIN`/`RECEPTION`.
+```text
+Estoque operacional
+      |
+      +--> Produtos / mínimo / custo / fornecedor
+      +--> Entrada / Saída / Ajuste físico
+      +--> Histórico por produto
+      +--> Filtros por categoria / fornecedor / situação
+      +--> Ruptura e estoque baixo
+      +--> Plano de reposição
+      +--> Capital imobilizado / venda potencial
+```
 
 ## Stack atual
 
@@ -97,6 +91,8 @@ frontend/
   src/
     components/
       admin/
+        agenda/
+        inventory/
       public/
       ui/
     config/
@@ -114,6 +110,7 @@ backend/
     routes/
       appointments/
       business/
+      inventory-operations.routes.ts
       twilio-whatsapp/
     services/
       whatsapp-agent/
@@ -138,21 +135,22 @@ Documentação técnica:
 
 - vitrine pública white-label;
 - agendamento online;
-- capacidades por profissional;
-- jornada, pausas e bloqueios de equipe;
+- capacidades, jornada, pausas e bloqueios de profissionais;
 - central de Agenda comercial para `ADMIN`/`RECEPTION`;
-- Agenda Enterprise com visões dia/semana/mês/profissionais;
-- filtros combinados por profissional, serviço e status;
-- reagendamento acessível e validação de conflitos no backend;
-- Agenda Operacional para criação rápida e acompanhamento do dia;
-- Smart Fit para encaixe inteligente;
-- lista de espera e reaproveitamento de vagas;
-- confirmação, cancelamento e gerenciamento pelo cliente;
-- lembretes automáticos;
-- rastreamento de entrega do WhatsApp;
+- Agenda Enterprise com filtros combinados;
+- criação rápida, reagendamento e validação de conflitos;
+- Smart Fit, lista de espera e reaproveitamento de vagas;
+- confirmação, cancelamento, lembretes e rastreamento WhatsApp;
 - agente WhatsApp com fallback e handoff humano;
 - CRM de clientes;
-- controle de estoque e movimentações;
+- **Estoque operacional** com entrada, saída e ajuste físico;
+- bloqueio de saldo negativo;
+- conciliação de estoque inclusive para saldo zero;
+- filtros por produto, categoria, fornecedor e situação;
+- alertas de estoque baixo e ruptura;
+- painel de reposição com quantidade e custo estimados;
+- capital imobilizado e venda potencial;
+- histórico de até 100 movimentações por produto sob demanda;
 - financeiro, comissões e fidelidade;
 - dashboard executivo;
 - Super Admin separado do tenant;
@@ -162,58 +160,52 @@ Documentação técnica:
 - auditoria, segurança e observabilidade;
 - PWA.
 
-## Marcos 1–17 concluídos
+## Marcos 1–18 concluídos
 
-Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel. O Marco 17 transformou os recursos já existentes de Agenda em um fluxo comercial integrado.
+Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel. O Marco 17 tornou a Agenda o principal fluxo operacional. O Marco 18 tornou o Estoque utilizável para operação diária, conciliação física e decisão de compra.
 
-Principais resultados:
+Principais resultados acumulados:
 
 - `AdminDashboard.jsx` decomposto por domínio;
-- Agenda frontend e backend modularizadas;
+- Agenda e Estoque separados em módulos operacionais dedicados;
 - `buildApp()` extraído para testes HTTP com `Fastify.inject()`;
-- agente WhatsApp separado em contratos, repositório, ferramentas e orquestrador;
-- webhook Twilio separado por segurança, tenant, status e inbound;
+- agente WhatsApp e webhook Twilio modularizados;
 - domínio comercial separado em CRM, financeiro, comissões, fidelidade, assinatura, templates e IA;
-- CSS administrativo e público distribuído por domínio;
 - zero `<style>` dentro de componentes JSX;
 - zero `any` explícito em `backend/src`;
 - repository hygiene impedindo regressões estruturais;
-- matriz frontend de acesso por papel alinhada ao backend;
+- RBAC alinhado entre frontend e backend;
 - `SUPER_ADMIN` isolado da operação tenant;
-- `RECEPTION` limitado aos módulos operacionais autorizados;
-- `PROFESSIONAL` com Agenda somente leitura e sem affordances de mutação;
-- mutações de Agenda, lista de espera e mesa operacional restritas a `ADMIN`/`RECEPTION`;
-- Agenda comercial com atalhos para Operação do Dia, Smart Fit, Lista de Espera e Jornada da Equipe;
-- filtros consolidados por profissional, serviço e status;
-- testes de jornada cobrindo criação, conflito, reagendamento, cancelamento, presença, confirmação e lembretes;
-- documentação operacional e checklists por papel e por fluxo de Agenda.
+- `PROFESSIONAL` sem acesso às mutações de Agenda e à operação de Estoque;
+- Agenda comercial com jornada cliente → salão → WhatsApp;
+- Estoque com trilha de movimentações, reposição e indicadores econômicos;
+- documentação operacional por papel e por domínio.
 
 Relatórios e guias:
 
 - [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
 - [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
 - [`docs/usuario/10_AGENDA_COMERCIAL.md`](docs/usuario/10_AGENDA_COMERCIAL.md)
+- [`docs/usuario/11_ESTOQUE_OPERACIONAL.md`](docs/usuario/11_ESTOQUE_OPERACIONAL.md)
 
 ## Testes e qualidade
 
 ### Backend
 
-**46 testes automatizados**, cobrindo entre outros:
+**51 testes automatizados**, cobrindo entre outros:
 
-- autenticação e RBAC;
-- isolamento multi-tenant;
+- autenticação, RBAC e isolamento multi-tenant;
 - validação Zod;
-- reagendamento e conflito de Agenda;
-- mutações de agendamento;
-- criação rápida da Agenda comercial;
-- conflito antes da persistência;
-- cancelamento com notificação e reaproveitamento de vaga;
-- presença, confirmação e lembretes operacionais;
+- Agenda comercial e conflitos;
 - CRM;
-- estoque e saldo negativo;
-- assinatura HMAC do Twilio;
-- agente WhatsApp, ferramentas, fallback e handoff humano;
-- contratos específicos de `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`.
+- estoque e bloqueio de saldo negativo;
+- overview operacional de estoque por tenant;
+- plano de reposição e capital imobilizado;
+- histórico por produto;
+- conciliação física para saldo zero;
+- RBAC específico do Estoque;
+- Twilio e agente WhatsApp;
+- fallbacks e handoff humano.
 
 ```bash
 cd backend
@@ -226,16 +218,18 @@ npm run build
 
 ### Frontend
 
-**35 testes automatizados**, cobrindo:
+**44 testes automatizados**, cobrindo:
 
 - Agenda Enterprise e calendário;
-- interação e reagendamento;
-- filtros por profissional, serviço e status;
+- interação, reagendamento e filtros da Agenda;
 - central comercial de Agenda;
-- Agenda somente leitura;
 - matriz de menu por papel;
-- navegação direta e normalização de página;
-- matriz de endpoints carregados por papel.
+- carregamento de endpoints por papel;
+- classificação de estoque;
+- filtros combinados de estoque;
+- indicadores e plano de reposição;
+- preparação de entrada sugerida;
+- histórico de movimentações sob demanda.
 
 ```bash
 cd frontend
@@ -263,13 +257,7 @@ Workflows permanentes:
 - `Production Gate`;
 - `Production Smoke Validation`.
 
-O smoke pós-deploy valida de forma read-only:
-
-- frontend de produção;
-- health do backend;
-- salão público;
-- catálogo público;
-- read model público de agendamentos.
+O smoke pós-deploy valida de forma read-only frontend, saúde do backend, salão público, catálogo e read model público de agendamentos.
 
 ## Como executar
 
@@ -303,14 +291,11 @@ Nunca use credenciais de demonstração fixas em produção. Crie o Super Admin 
 - Ambiente backend: `backend/.env.example`
 - Ambiente frontend: `frontend/.env.example`
 
-A raiz não deve conter cópias alternativas do schema Prisma, scripts restauradores antigos ou blueprints duplicados de infraestrutura.
-
 ## Segurança
 
 - isolamento por `salonId` nas operações privadas;
 - RBAC para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
-- matriz visual de acesso alinhada ao RBAC do servidor;
-- mutações operacionais de Agenda restritas por papel;
+- módulos contratados aplicados por tenant;
 - validação Zod nas entradas HTTP;
 - tokens e segredos somente em variáveis de ambiente;
 - validação de assinatura em webhook Twilio;
@@ -328,7 +313,7 @@ A raiz não deve conter cópias alternativas do schema Prisma, scripts restaurad
 
 ## Próxima fase
 
-O próximo marco oficial é o **Marco 18 — Estoque operacional e reposição**. O objetivo é tornar o estoque confiável para uso diário, conciliação física e decisão de compra.
+Após a integração e o smoke de produção do Marco 18, o próximo marco oficial é o **Marco 19 — CRM, retenção e automações**, voltado a retorno de clientes e redução de trabalho manual.
 
 A sequência oficial está em [`ROADMAP.md`](ROADMAP.md).
 

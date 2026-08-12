@@ -8,6 +8,7 @@ import './public-showcase.css';
 import './ui-primitives.css';
 import './admin-shell.css';
 import './admin-operations.css';
+import './inventory-operations.css';
 import './responsive.css';
 import './agenda-enterprise.css';
 import './agenda-commercial.css';
