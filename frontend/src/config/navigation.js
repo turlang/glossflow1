@@ -1,4 +1,5 @@
 import { isSuperAdmin } from '../utils/auth';
+import { canAccessTenantPage } from './role-access.js';
 
 /**
  * Páginas que representam operação autenticada do salão.
@@ -14,19 +15,11 @@ export const TENANT_BACKOFFICE_PAGES = Object.freeze([
   'waitlist'
 ]);
 
-const TENANT_ACTIONS = new Set([
-  'agent-test',
-  'professional-services',
-  'professional-schedule',
-  'operational-agenda',
-  'smart-fit',
-  'waitlist'
-]);
+const TENANT_ACTIONS = new Set(TENANT_BACKOFFICE_PAGES.filter((page) => page !== 'admin'));
 
 /**
  * Traduz `?action=` para uma página inicial única.
- * Mantemos esse parser fora do App para impedir múltiplos `setPage` encadeados
- * e tornar os redirecionamentos por papel previsíveis.
+ * A matriz por papel evita abrir uma tela que o backend rejeitará por RBAC.
  */
 export function resolveInitialPage({ action, authenticated, role }) {
   if (action === 'booking') return 'booking';
@@ -38,11 +31,14 @@ export function resolveInitialPage({ action, authenticated, role }) {
 
   if (action === 'admin' || action === 'site-settings') {
     if (!authenticated) return 'login';
-    return isSuperAdmin(role) ? 'platform-admin' : 'admin';
+    if (isSuperAdmin(role)) return 'platform-admin';
+    return canAccessTenantPage(role, 'admin') ? 'admin' : 'login';
   }
 
   if (TENANT_ACTIONS.has(action)) {
-    return authenticated && !isSuperAdmin(role) ? action : 'login';
+    return authenticated && !isSuperAdmin(role) && canAccessTenantPage(role, action)
+      ? action
+      : 'login';
   }
 
   return 'public';
@@ -58,7 +54,11 @@ export function normalizePageForRole({ page, authenticated, role }) {
   }
 
   if (authenticated && !isSuperAdmin(role) && page === 'platform-admin') {
-    return 'admin';
+    return canAccessTenantPage(role, 'admin') ? 'admin' : 'login';
+  }
+
+  if (authenticated && !isSuperAdmin(role) && TENANT_BACKOFFICE_PAGES.includes(page) && !canAccessTenantPage(role, page)) {
+    return canAccessTenantPage(role, 'admin') ? 'admin' : 'login';
   }
 
   return page;
