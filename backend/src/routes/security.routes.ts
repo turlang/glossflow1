@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { getTenant } from './helpers';
+import { eraseClientPersonalData, exportClientPersonalData } from '../services/lgpd.service';
 import { z } from 'zod';
 
 /** Segurança corporativa com delegates explícitos do schema canônico. */
@@ -16,7 +17,7 @@ export async function securityRoutes(app: FastifyInstance) {
     ]);
 
     return {
-      score: Math.min(98, 72 + Math.min(10, auditCount) + Math.min(8, activeSessions) + Math.min(8, consents)),
+      score: Math.min(98, 74 + Math.min(8, auditCount) + Math.min(8, activeSessions) + Math.min(8, consents)),
       auditCount,
       activeSessions,
       consents,
@@ -26,8 +27,8 @@ export async function securityRoutes(app: FastifyInstance) {
       controls: [
         { name: 'Auditoria', status: 'Ativa', description: 'Registra alterações administrativas importantes.' },
         { name: 'Rate limit', status: 'Ativo', description: 'Reduz abuso de API e tentativa de força bruta.' },
-        { name: 'LGPD', status: consents ? 'Em uso' : 'Pronto', description: 'Permite registrar consentimentos e exportar dados.' },
-        { name: 'Sessões', status: activeSessions ? 'Monitorando' : 'Sem sessões extras', description: 'Permite encerrar sessões administrativas.' }
+        { name: 'LGPD', status: consents ? 'Em uso' : 'Pronto', description: 'Exporta, registra consentimentos e permite eliminação controlada de dados pessoais.' },
+        { name: 'Sessões', status: activeSessions ? 'Monitorando' : 'Sem sessões extras', description: 'Access tokens são vinculados a sessões revogáveis e refresh tokens rotacionam a cada uso.' }
       ]
     };
   });
@@ -50,23 +51,66 @@ export async function securityRoutes(app: FastifyInstance) {
   app.post('/admin/security/sessions/:id/revoke', async (request) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    return prisma.userSession.updateMany({ where: { id, salonId: tenant.salonId }, data: { revokedAt: new Date() } });
+    return prisma.userSession.updateMany({
+      where: { id, salonId: tenant.salonId, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+  });
+
+  /** Resposta de incidente: encerra todas as demais sessões do tenant. */
+  app.post('/admin/security/sessions/revoke-all', async (request) => {
+    const tenant = getTenant(request);
+    const body = z.object({ includeCurrent: z.coerce.boolean().default(false) }).parse(request.body || {});
+    return prisma.userSession.updateMany({
+      where: {
+        salonId: tenant.salonId,
+        revokedAt: null,
+        ...(!body.includeCurrent && tenant.sessionId ? { id: { not: tenant.sessionId } } : {})
+      },
+      data: { revokedAt: new Date() }
+    });
   });
 
   app.get('/admin/security/lgpd/export/:clientId', async (request, reply) => {
     const tenant = getTenant(request);
     const { clientId } = z.object({ clientId: z.string() }).parse(request.params);
-    const client = await prisma.client.findFirst({
-      where: { id: clientId, salonId: tenant.salonId },
-      include: { appointments: true, loyaltyEntries: true, consents: true }
+    const bundle = await exportClientPersonalData(tenant.salonId, clientId);
+    if (!bundle) return reply.status(404).send({ message: 'Cliente não encontrado.' });
+    return bundle;
+  });
+
+  app.post('/admin/security/lgpd/erase/:clientId', async (request, reply) => {
+    const tenant = getTenant(request);
+    const { clientId } = z.object({ clientId: z.string() }).parse(request.params);
+    const body = z.object({
+      confirmation: z.literal('EXCLUIR DADOS'),
+      reason: z.string().trim().min(10).max(500)
+    }).parse(request.body);
+
+    const result = await eraseClientPersonalData({
+      salonId: tenant.salonId,
+      clientId,
+      requestedByUserId: tenant.id,
+      reason: body.reason
     });
-    if (!client) return reply.status(404).send({ message: 'Cliente não encontrado.' });
-    return client;
+    if (!result) return reply.status(404).send({ message: 'Cliente não encontrado.' });
+    return result;
   });
 
   app.post('/admin/security/lgpd/consents', async (request, reply) => {
     const tenant = getTenant(request);
-    const body = z.object({ clientId: z.string().optional(), type: z.string().min(2), granted: z.coerce.boolean().default(true), evidence: z.string().optional().default('') }).parse(request.body);
+    const body = z.object({
+      clientId: z.string().optional(),
+      type: z.string().min(2),
+      granted: z.coerce.boolean().default(true),
+      evidence: z.string().max(1000).optional().default('')
+    }).parse(request.body);
+
+    if (body.clientId) {
+      const subject = await prisma.client.findFirst({ where: { id: body.clientId, salonId: tenant.salonId }, select: { id: true } });
+      if (!subject) return reply.status(404).send({ message: 'Cliente não encontrado no salão atual.' });
+    }
+
     return reply.status(201).send(await prisma.lgpdConsent.create({ data: { ...body, salonId: tenant.salonId } }));
   });
 
