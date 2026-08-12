@@ -6,16 +6,20 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-Os **Marcos 1–20 estão concluídos e validados em produção**. O **Marco 21 — Super Admin, planos e ciclo de vida SaaS** está **concluído funcionalmente no PR**, aguardando merge e smoke pós-deploy para receber a validação oficial de produção.
+Os **Marcos 1–21 estão concluídos e validados em produção**. O Marco 21 fechou o provisionamento e o ciclo de vida comercial dos tenants no Super Admin, sem edição manual no banco e sem destruir dados para suspender ou reativar um cliente.
 
-Estado automatizado do Marco 21:
+Validação final do Marco 21:
 
+- merge em `main`: `8b8aa0f2a07061b84aaa72db96c1511dae62a369`;
 - backend: **76/76 testes**;
 - frontend: **58/58 testes**;
 - `npm audit --audit-level=high`: **0 vulnerabilidades** no backend e frontend;
 - TypeScript/ESLint: **success**;
 - builds backend/frontend: **success**;
-- Production Gate do head funcional: **success**.
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- checks Vercel: **success**;
+- Production Smoke Validation: **success**.
 
 ## Stack
 
@@ -98,7 +102,7 @@ O estado comercial é aplicado antes do entitlement de módulo. `SalonSubscripti
 
 ### Provisionamento sem edição manual no banco
 
-O novo fluxo **Provisionar salão completo** possui cinco etapas: Salão, Administrador, Contrato, Módulos e Revisão. Em uma única operação lógica, o backend cria:
+O fluxo **Provisionar salão completo** possui cinco etapas: Salão, Administrador, Contrato, Módulos e Revisão. Em uma única operação lógica, o backend cria:
 
 - tenant `Salon`;
 - primeiro usuário `ADMIN` com senha bcrypt;
@@ -217,7 +221,7 @@ Esses valores são defaults do servidor quando o Super Admin não informa datas 
 - [`docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`](docs/usuario/13_IA_WHATSAPP_PRODUCAO.md)
 - [`docs/usuario/14_SUPER_ADMIN_SAAS.md`](docs/usuario/14_SUPER_ADMIN_SAAS.md)
 
-## Próximo marco após a validação de produção
+## Próximo marco oficial
 
 **Marco 22 — Observabilidade, performance e confiabilidade**.
 
