@@ -4,7 +4,7 @@ import { registerCorsPolicy } from './config/cors';
 import { buildId, isProduction } from './config/environment';
 import { registerInMemoryRateLimit } from './middlewares/rate-limit';
 import { appRoutes } from './routes/appRoutes';
-import { recordMetric } from './routes/metrics';
+import { markRequestStarted, recordMetric } from './routes/metrics';
 import { captureOperationalError } from './services/sentry.service';
 
 /**
@@ -28,6 +28,11 @@ export function buildApp() {
   registerCorsPolicy(app);
   registerInMemoryRateLimit(app);
 
+  app.addHook('onRequest', async (request, reply) => {
+    markRequestStarted();
+    reply.header('X-Request-Id', request.id);
+  });
+
   app.addHook('onSend', async (_request, reply, payload) => {
     reply.header('X-GlossFlow-Build', buildId);
     reply.header('X-Content-Type-Options', 'nosniff');
@@ -40,13 +45,28 @@ export function buildApp() {
   });
 
   app.addHook('onResponse', async (request, reply) => {
+    const elapsed = Math.round(reply.elapsedTime || 0);
+    const routePath = request.routeOptions?.url || request.url;
     recordMetric({
       method: request.method,
-      path: request.url,
+      path: routePath,
       statusCode: reply.statusCode,
-      responseTimeMs: Math.round(reply.elapsedTime || 0),
+      responseTimeMs: elapsed,
+      requestId: request.id,
       createdAt: new Date().toISOString()
     });
+
+    const slowThresholdMs = Math.max(100, Number(process.env.OBSERVABILITY_SLOW_REQUEST_MS || 750));
+    if (elapsed >= slowThresholdMs) {
+      request.log.warn({
+        requestId: request.id,
+        method: request.method,
+        route: routePath,
+        statusCode: reply.statusCode,
+        responseTimeMs: elapsed,
+        slowThresholdMs
+      }, 'slow request');
+    }
   });
 
   app.setNotFoundHandler((_request, reply) => reply.status(404).send({ message: 'Rota não encontrada.' }));
@@ -59,8 +79,13 @@ export function buildApp() {
     const normalized = error instanceof Error ? error : new Error('Erro interno do servidor.');
     const statusCode = Number((normalized as Error & { statusCode?: number }).statusCode || 500);
     if (statusCode >= 500) {
-      app.log.error(normalized);
-      captureOperationalError(normalized, { method: request.method, url: request.url });
+      app.log.error({ err: normalized, requestId: request.id, method: request.method, url: request.url });
+      captureOperationalError(normalized, {
+        requestId: request.id,
+        method: request.method,
+        url: request.url,
+        route: request.routeOptions?.url || request.url
+      });
     }
 
     const message = statusCode >= 500 && isProduction ? 'Erro interno do servidor.' : normalized.message;
