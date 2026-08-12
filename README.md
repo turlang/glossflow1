@@ -4,28 +4,47 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 ## Estado atual
 
-O projeto está em **piloto comercial com ambiente de produção ativo**.
+O projeto está em **produção ativa e Release Candidate comercial do Marco 24**.
 
-Os **Marcos 1–22 estão concluídos e validados em produção**. O **Marco 23 — Segurança e LGPD comercial** está **concluído funcionalmente no PR #17**, aguardando merge e `Production Smoke Validation` para receber a marca oficial de produção.
+Os **Marcos 1–23 estão concluídos e validados em produção**. O **Marco 24 — Release comercial estável** está **CONCLUÍDO FUNCIONALMENTE / PENDENTE SOMENTE DA VALIDAÇÃO FINAL DE PRODUÇÃO** na Issue #19 e no PR #20.
 
-### Validação do Marco 22
+A Issue #19 é a evidência canônica de encerramento. Quando o merge final estiver no Vercel/Render, o `Production Smoke Validation` confirmar o **Build ID exato do merge** e a Issue #19 for fechada como `completed`, o Marco 24 é considerado oficialmente validado em produção **sem exigir um commit documental adicional que alteraria novamente o SHA da release**.
 
-O Marco 22 revelou que o backend do Render estava preso em um build antigo. Depois da correção do serviço, o smoke de produção passou exigindo rastreabilidade real do backend:
+### Validação final do Marco 23
 
-- commit/build validado: `f61ba1268bb135d1e5cab4f85bf28acfb011d196`;
+O Marco 23 foi homologado somente depois que o smoke passou a exigir o SHA exato de `main` no Render.
+
+- build/commit validado: `afc22563d54645a8555cbafc53b1a9b6b31f2713`;
+- Build ID servido pelo Render: `afc22563d546`;
 - `/health`: `ok=true`, Build ID no body e em `X-GlossFlow-Build`;
 - `/ready`: mesmo Build ID e `database.ok=true`;
-- frontend e endpoints públicos: **success**;
-- `Production Smoke Validation`: **success**.
+- frontend de produção: **success**;
+- endpoints públicos: **success**;
+- `Production Smoke Validation` estrito: **success** no rerun do workflow `31639887820`;
+- Issue #14 encerrada como `completed`.
 
-### Estado automatizado do Marco 23
+### Release Candidate do Marco 24
+
+Evidência funcional já concluída antes do merge:
 
 - backend: **100/100 testes**;
 - frontend: **61/61 testes**;
-- `npm audit --audit-level=high`: **0 vulnerabilidades** no backend e frontend;
+- `npm audit --audit-level=high`: sem vulnerabilidade bloqueadora nas dependências do produto;
 - TypeScript/ESLint: **success**;
 - builds backend/frontend: **success**;
-- Production Gate do head funcional: **success**.
+- `GlossFlow Quality Gate`: **success** no candidato;
+- `Production Gate`: **success** no candidato;
+- homologação pública real em Chromium: **15/15 PASS**;
+- páginas homologadas: vitrine, booking e landing comercial;
+- viewports: 1366×768, 1920×1080, 768×1024, 430×932 e 360×800;
+- 0 overflow horizontal bloqueador;
+- 0 `pageerror` nas 15 combinações;
+- nenhum erro visível de API/agendamento indisponível;
+- runtime isolado de navegador auditado antes da execução;
+- nenhuma issue P0/P1 conhecida aberta;
+- documentação de produção, implantação, suporte, incidente e recuperação revisada.
+
+A única pendência de promoção é operacional: **merge do PR #20 → Vercel/Render no SHA exato → `/ready` com MongoDB → Production Smoke final verde → fechamento da Issue #19**.
 
 ## Stack
 
@@ -55,53 +74,96 @@ O Marco 22 revelou que o backend do Render estava preso em um build antigo. Depo
 - MongoDB Atlas
 - Prisma ORM
 - Groq como provider principal de IA
-- OpenAI como fallback opcional
+- OpenAI como fallback/opção de IA
 - Twilio / Meta / provider HTTP para WhatsApp
 - Mercado Pago / Stripe preparados como providers opcionais
 - métricas Prometheus e observabilidade interna
+
+## Agenda comercial
+
+O domínio de Agenda cobre:
+
+- agendamento público;
+- capacidade por profissional/serviço;
+- jornada, pausa e bloqueio;
+- detecção de conflito no backend;
+- reagendamento com revalidação;
+- Agenda Operacional;
+- Smart Fit;
+- lista de espera;
+- confirmação, cancelamento e comunicação.
+
+A jornada comercial permanece protegida por testes dedicados, inclusive conflito e reagendamento.
+
+## Estoque operacional
+
+O sistema mantém:
+
+- entradas, saídas e ajustes;
+- bloqueio de saldo negativo;
+- histórico de movimentação;
+- mínimo/ruptura;
+- conciliação e reposição;
+- desativação lógica quando o histórico precisa ser preservado.
+
+## CRM, retenção e automações
+
+O CRM inclui:
+
+- cadastro e histórico por cliente;
+- segmentação;
+- consentimento e opt-out;
+- follow-ups;
+- automações de retenção;
+- isolamento por tenant e RBAC.
+
+## IA e WhatsApp
+
+O agente usa base factual do salão, confirmação server-side para ações de negócio, handoff humano, política de janela/template e guards/fallbacks.
+
+Durante homologações automáticas, **nenhuma mensagem real é enviada**. Provider/sender/callback devem ser validados apenas em sandbox ou ambiente autorizado quando fizerem parte do escopo do tenant.
+
+## Super Admin e ciclo de vida SaaS
+
+A plataforma mantém:
+
+- provisionamento de tenants;
+- estados `TRIAL`, `ACTIVE`, `PAST_DUE` e `CANCELED`;
+- módulos/entitlements;
+- planos e billing preparado;
+- white-label;
+- auditoria;
+- separação entre `SUPER_ADMIN` e operação do salão.
 
 ## Segurança e sessões — Marco 23
 
 ### Access token vinculado à sessão
 
-O login cria uma `UserSession` revogável e inclui `sessionId` no JWT. Em produção, o backend só aceita um access token quando a sessão ainda existe, não foi revogada, não expirou e o usuário continua ativo.
-
-`role`, `email` e `salonId` usados na autorização são revalidados a partir do usuário persistido. Redução de privilégio ou revogação passa a valer sem aguardar o TTL do JWT antigo.
+O login cria `UserSession` revogável e inclui `sessionId` no JWT. Em produção, o backend só aceita o token quando a sessão existe, não foi revogada, não expirou e o usuário continua ativo. `role`, `email` e `salonId` são revalidados a partir do usuário persistido.
 
 ### Refresh token de uso único
 
-Cada `/auth/refresh` rotaciona o refresh token. O token anterior deixa de funcionar, inclusive em tentativas concorrentes/replay.
+Cada `/auth/refresh` rotaciona o refresh token. O token anterior deixa de funcionar, inclusive em replay concorrente.
 
 ### Resposta a incidente
 
-O ADMIN pode:
-
-- encerrar uma sessão específica;
-- encerrar todas as demais sessões do tenant preservando a sessão atual por padrão;
-- correlacionar auditoria com `requestId` e `sessionId`.
+O ADMIN pode encerrar sessão específica ou demais sessões do tenant. Auditoria correlaciona `requestId` e `sessionId` sem armazenar conteúdo sensível do body.
 
 ## LGPD operacional
 
-### Exportação do titular
+### Exportação
 
-`GET /admin/security/lgpd/export/:clientId` gera um pacote isolado por tenant contendo perfil, atendimentos, lista de espera, fidelidade, consentimentos e eventos operacionais relacionados ao titular. A resposta usa `Cache-Control: no-store`.
+`GET /admin/security/lgpd/export/:clientId` gera pacote tenant-safe com perfil, atendimentos, lista de espera, fidelidade, consentimentos e eventos relacionados. A resposta usa `Cache-Control: no-store`.
 
 ### Eliminação/anônimização
 
-`POST /admin/security/lgpd/erase/:clientId` exige a confirmação exata `EXCLUIR DADOS` e um motivo documentado.
+`POST /admin/security/lgpd/erase/:clientId` exige `EXCLUIR DADOS` e motivo documentado. O histórico de atendimento é preservado sem PII e fila/fidelidade/consentimentos/perfil são removidos conforme o contrato implementado.
 
-A transação:
-
-- redige eventos relacionados ao titular;
-- anonimiza PII dos atendimentos históricos;
-- remove fila, fidelidade, consentimentos e perfil do cliente;
-- mantém uma trilha anônima `LGPD_SUBJECT_ERASED`.
-
-Essa operação não deve ser usada como simples correção de cadastro.
+Essa operação não deve ser usada como simples correção cadastral nem como teste em cliente real.
 
 ## Retenção de dados
 
-O Marco 23 introduz política explícita e **manual/controlada**, sem cron destrutivo silencioso:
+Política explícita e manual/controlada:
 
 ```text
 SESSION_RECORD_RETENTION_DAYS=30
@@ -110,106 +172,86 @@ AUDIT_LOG_RETENTION_DAYS=730
 BACKUP_METADATA_RETENTION_DAYS=180
 ```
 
-Fluxo:
+A execução exige preview e confirmação `APLICAR RETENCAO`. Não existe cron destrutivo habilitado silenciosamente.
 
-1. `GET /admin/security/retention/preview`;
-2. revisar candidatos;
-3. confirmar `APLICAR RETENCAO`;
-4. executar `/admin/security/retention/run`.
+## Backup lógico e restore controlado
 
-Conteúdo antigo de WhatsApp é redigido antes da expiração final do audit log.
-
-## Rate limit
-
-O backend aplica limites por IP/superfície e por tenant autenticado. Defaults por minuto:
-
-- login: 12;
-- refresh: 60;
-- escrita pública: 90;
-- webhooks: 600;
-- tráfego geral: 180;
-- tenant autenticado: 600;
-- operações de Segurança do tenant: 30.
-
-Respostas excedentes usam HTTP `429`, `Retry-After`, `RATE_LIMITED` e a superfície atingida.
-
-## Backup lógico assinado e restore controlado
-
-A tela Segurança gera um snapshot `glossflow-tenant-backup/v1` assinado com HMAC SHA-256. O snapshot contém o domínio operacional do tenant, como serviços, profissionais, clientes, Agenda, estoque, financeiro, fidelidade, templates e consentimentos.
-
-Não inclui usuários, senhas, sessões, lifecycle SaaS, domínio nem audit logs.
-
-O restore:
+O snapshot `glossflow-tenant-backup/v1` é assinado com HMAC SHA-256. O restore:
 
 - valida schema, tenant e assinatura;
-- é `REPLACE` somente para o domínio operacional incluído;
-- exige `BACKUP_RESTORE_ENABLED=true`;
-- exige confirmação explícita `RESTAURAR BACKUP`;
-- gera auditoria `TENANT_BACKUP_RESTORED`;
-- deve voltar para `BACKUP_RESTORE_ENABLED=false` imediatamente após o procedimento.
+- fica bloqueado por `BACKUP_RESTORE_ENABLED=false` na operação normal;
+- exige confirmação `RESTAURAR BACKUP` quando habilitado;
+- restaura apenas o domínio operacional previsto;
+- gera auditoria.
 
-## Auditoria sensível
+Usuários, senhas, sessões, lifecycle SaaS, domínio e audit logs ficam fora do snapshot operacional.
 
-Mutações administrativas registram ação, recurso, path, IP, user-agent, `requestId`, `sessionId`, status HTTP e outcome. O sistema não persiste valores do body e exclui até os nomes de campos sensíveis como senha, token, segredo, API key, refresh token e snapshot.
-
-## Secrets de produção
-
-`backend/scripts/check-env.js` bloqueia configurações inseguras, incluindo:
-
-- `JWT_SECRET` ausente, curto ou placeholder;
-- `BACKUP_SIGNING_SECRET` curto quando configurado;
-- `DATABASE_URL` não MongoDB em produção;
-- `FRONTEND_ORIGIN` ausente em produção;
-- restore habilitado em produção sem `BACKUP_SIGNING_SECRET` explícito.
-
-Segredos reais nunca devem ser versionados.
-
-## Observabilidade — Marco 22
+## Observabilidade e deploy rastreável
 
 A API mantém:
 
 - `X-Request-Id`;
-- Build ID rastreável em `/health` e `/ready`;
-- readiness com ping MongoDB;
+- Build ID em `/health` e `/ready`;
+- readiness com ping real do MongoDB;
 - métricas p50/p95/p99, erros, slow requests, memória e dependências;
-- endpoint Prometheus;
-- observabilidade global para `SUPER_ADMIN`;
+- exportação Prometheus;
+- painel de observabilidade para `SUPER_ADMIN`;
 - índices MongoDB idempotentes;
 - paginação CRM;
 - code splitting e budget de bundle.
 
-O bundle principal foi reduzido de aproximadamente 405,82 kB para 192,67 kB no Marco 22.
+O `Production Smoke Validation` **falha se o Render não estiver servindo exatamente os 12 primeiros caracteres do SHA de `main` que disparou o Production Gate**.
+
+## Release comercial — Marco 24
+
+O gate comercial separa:
+
+- **AUTO-BLOCKER**: CI, build, testes, exact-build smoke, banco, isolamento e contratos críticos;
+- **MANUAL-TENANT**: marca, conteúdo, dados iniciais e homologação humana por cliente;
+- **SANDBOX-EXTERNO**: WhatsApp, billing e providers que dependem de ambiente autorizado;
+- **N/A**: integrações opcionais não incluídas no plano vendido.
+
+Mercado Pago/Stripe não bloqueiam a release base quando cobrança automática não faz parte do escopo vendido. Sentry permanece hardening opcional enquanto não fizer parte de SLA contratado; sua ausência nunca é apresentada como integração ativa.
 
 ## Testes e qualidade
 
 ### Backend
 
-**100/100 testes automatizados** no head funcional do Marco 23, incluindo autenticação, RBAC, Agenda, Estoque, CRM, IA/WhatsApp, observabilidade, lifecycle SaaS, sessões revogáveis, refresh rotation, LGPD, retenção, rate limit, auditoria e backup/restore.
+**100/100 testes automatizados**, incluindo autenticação, RBAC, Agenda, Estoque, CRM, IA/WhatsApp, observabilidade, lifecycle SaaS, sessões revogáveis, refresh rotation, LGPD, retenção, rate limit, auditoria e backup/restore.
 
 ### Frontend
 
-**61/61 testes automatizados**, incluindo controles do painel Segurança/LGPD.
+**61/61 testes automatizados**, incluindo Agenda, CRM, estoque, navegação por papel, provisionamento e Segurança/LGPD.
 
 ### Gates permanentes
 
 - `GlossFlow Quality Gate`;
 - `Production Gate`;
-- `Production Smoke Validation`.
+- `Production Smoke Validation` com SHA exato.
+
+### Gate responsivo do Marco 24
+
+O workflow `Marco 24 Public Responsive Validation` usa Chromium real, audita o runtime isolado e valida vitrine, booking e landing comercial em cinco viewports. Screenshots e `report.json` são publicados como artefato de CI.
 
 ## Documentação
 
 - [`ROADMAP.md`](ROADMAP.md)
 - [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
 - [`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md)
+- [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md)
 - [`QUALITY_GATE.md`](QUALITY_GATE.md)
+- [`DEPLOY_RENDER_VERCEL.md`](DEPLOY_RENDER_VERCEL.md)
+- [`docs/RUNBOOK_OPERACIONAL.md`](docs/RUNBOOK_OPERACIONAL.md)
 - [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
 - [`docs/engineering/OBSERVABILITY.md`](docs/engineering/OBSERVABILITY.md)
 - [`docs/engineering/SECURITY_LGPD.md`](docs/engineering/SECURITY_LGPD.md)
+- [`docs/engineering/MARCO24_RELEASE_VALIDATION.md`](docs/engineering/MARCO24_RELEASE_VALIDATION.md)
+- [`docs/usuario/07_CHECKLIST_IMPLANTACAO.md`](docs/usuario/07_CHECKLIST_IMPLANTACAO.md)
 - [`docs/usuario/14_SUPER_ADMIN_SAAS.md`](docs/usuario/14_SUPER_ADMIN_SAAS.md)
 - [`docs/usuario/15_SEGURANCA_LGPD.md`](docs/usuario/15_SEGURANCA_LGPD.md)
 
-## Próximo marco após a validação de produção
+## Marco atual
 
-**Marco 24 — Release comercial estável**.
+**Marco 24 — Release comercial estável — RELEASE CANDIDATE.**
 
-A sequência canônica está em [`ROADMAP.md`](ROADMAP.md).
+Decisão funcional: **GO para promoção**. Validação oficial de produção: **pendente exclusivamente do merge e do exact-build smoke final**.
