@@ -199,7 +199,7 @@ test('follow-up Ã© bloqueado quando o cliente fez opt-out', async () => {
 
 test('follow-up registra contato e devolve mensagem preparada sem disparo automÃ¡tico', async () => {
   const app = buildApp();
-  let audit = null;
+  const audits = [];
   try {
     await withMocks({
       salon: { findUnique: async () => enabledSalon() },
@@ -218,8 +218,8 @@ test('follow-up registra contato e devolve mensagem preparada sem disparo automÃ
       whatsAppTemplate: { findFirst: async () => null },
       auditLog: {
         create: async ({ data }) => {
-          audit = data;
-          return { id: 'log-1', ...data, createdAt: now };
+          audits.push(data);
+          return { id: `log-${audits.length}`, ...data, createdAt: now };
         }
       }
     }, async () => {
@@ -233,9 +233,10 @@ test('follow-up registra contato e devolve mensagem preparada sem disparo automÃ
       assert.equal(body.ok, true);
       assert.match(body.whatsappUrl, /^https:\/\/wa\.me\//);
       assert.match(body.message, /Faz um tempo/i);
-      assert.equal(audit.resource, 'RetentionFollowUp');
-      assert.equal(audit.resourceId, clientId);
-      assert.equal(audit.metadata.segment, 'INACTIVE_120');
+      const retentionAudit = audits.find((item) => item.resource === 'RetentionFollowUp');
+      assert.ok(retentionAudit, 'evento RetentionFollowUp deve ser auditado');
+      assert.equal(retentionAudit.resourceId, clientId);
+      assert.equal(retentionAudit.metadata.segment, 'INACTIVE_120');
     });
   } finally {
     await app.close();
