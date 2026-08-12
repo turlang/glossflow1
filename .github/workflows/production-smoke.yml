@@ -29,21 +29,46 @@ jobs:
             --max-time 45 "$WEB_URL/" > /tmp/frontend.html
           grep -q 'GlossFlow' /tmp/frontend.html
 
-      - name: Wake and check backend health
+      - name: Wait for traced backend health contract
         run: |
-          curl --fail-with-body --silent --show-error \
-            --retry 10 --retry-all-errors --retry-delay 10 \
-            --max-time 45 "$API_URL/health" | tee /tmp/health.json
-          jq -e 'type == "object" and .ok == true' /tmp/health.json > /dev/null
+          HEALTH_READY=false
+          for attempt in $(seq 1 12); do
+            echo "Health build attempt $attempt/12"
+            if curl --silent --show-error --max-time 45 \
+              --dump-header /tmp/health.headers \
+              "$API_URL/health" > /tmp/health.json; then
+              cat /tmp/health.json
+              BUILD_HEADER="$(awk 'BEGIN{IGNORECASE=1} /^x-glossflow-build:/ {gsub(/\r/, "", $2); print $2}' /tmp/health.headers | tail -1)"
+              BUILD_BODY="$(jq -r '.build // empty' /tmp/health.json)"
+              echo "X-GlossFlow-Build: ${BUILD_HEADER:-missing}"
+              echo "Health build: ${BUILD_BODY:-missing}"
+              if jq -e 'type == "object" and .ok == true and (.build | type == "string") and (.build | length > 0)' /tmp/health.json > /dev/null 2>&1 \
+                && [ -n "$BUILD_HEADER" ] \
+                && [ "$BUILD_HEADER" = "$BUILD_BODY" ]; then
+                HEALTH_READY=true
+                break
+              fi
+            fi
+            sleep 10
+          done
+
+          if [ "$HEALTH_READY" != "true" ]; then
+            echo "Backend did not converge to the build-traceable Marco 22 health contract."
+            cat /tmp/health.json || true
+            exit 1
+          fi
 
       - name: Wait for backend readiness contract and MongoDB
         run: |
           READY=false
+          HEALTH_BUILD="$(jq -r '.build' /tmp/health.json)"
           for attempt in $(seq 1 12); do
             echo "Readiness attempt $attempt/12"
             if curl --silent --show-error --max-time 45 "$API_URL/ready" > /tmp/ready.json; then
               cat /tmp/ready.json
-              if jq -e 'type == "object" and .ok == true and .database.ok == true' /tmp/ready.json > /dev/null 2>&1; then
+              READY_BUILD="$(jq -r '.build // empty' /tmp/ready.json)"
+              if jq -e 'type == "object" and .ok == true and .database.ok == true and (.build | type == "string") and (.build | length > 0)' /tmp/ready.json > /dev/null 2>&1 \
+                && [ "$READY_BUILD" = "$HEALTH_BUILD" ]; then
                 READY=true
                 break
               fi
@@ -52,7 +77,7 @@ jobs:
           done
 
           if [ "$READY" != "true" ]; then
-            echo "Backend did not converge to the Marco 22 readiness contract."
+            echo "Backend did not converge to the Marco 22 readiness contract with MongoDB and matching build ID."
             cat /tmp/ready.json || true
             exit 1
           fi
@@ -83,6 +108,7 @@ jobs:
       - name: Summary
         run: |
           echo "Frontend: OK"
+          echo "Backend build: $(jq -r '.build' /tmp/health.json)"
           echo "Backend health: OK"
           echo "Backend readiness + MongoDB: OK"
           echo "Public salon: OK"
