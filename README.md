@@ -6,7 +6,7 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-A sequência estrutural e comercial dos **Marcos 1–18 está concluída no PR do Marco 18**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel, o Marco 17 consolidou a Agenda como central operacional e o Marco 18 transformou o Estoque em um fluxo diário de reposição, custo e conciliação física.
+A sequência estrutural e comercial dos **Marcos 1–19 está concluída no PR do Marco 19**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel, o Marco 17 consolidou a Agenda como central operacional, o Marco 18 transformou o Estoque em fluxo diário de reposição e conciliação, e o Marco 19 transformou o CRM em uma central de retenção acionável.
 
 O código possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
 
@@ -46,10 +46,23 @@ Estoque operacional
       +--> Produtos / mínimo / custo / fornecedor
       +--> Entrada / Saída / Ajuste físico
       +--> Histórico por produto
-      +--> Filtros por categoria / fornecedor / situação
       +--> Ruptura e estoque baixo
       +--> Plano de reposição
       +--> Capital imobilizado / venda potencial
+```
+
+```text
+CRM e retenção
+      |
+      +--> Aniversário / Inatividade / Frequência
+      +--> Motivos explicáveis por cliente
+      +--> Histórico de atendimentos
+      +--> Opt-in / Opt-out de marketing
+      +--> Template ou fallback de follow-up
+      +--> Abrir WhatsApp
+              |
+              +--> Auditoria de follow-up iniciado
+              +--> Métrica de reativação em até 30 dias
 ```
 
 ## Stack atual
@@ -93,6 +106,7 @@ frontend/
       admin/
         agenda/
         inventory/
+        crm/
       public/
       ui/
     config/
@@ -114,6 +128,7 @@ backend/
       twilio-whatsapp/
     services/
       whatsapp-agent/
+      client-retention.service.ts
     app.ts                 # buildApp() testável
     server.ts              # bootstrap/processo
   tests/
@@ -143,14 +158,19 @@ Documentação técnica:
 - confirmação, cancelamento, lembretes e rastreamento WhatsApp;
 - agente WhatsApp com fallback e handoff humano;
 - CRM de clientes;
+- **CRM de retenção** com segmentos explicáveis de aniversário, inatividade e frequência;
+- histórico de até 50 atendimentos por cliente sob demanda;
+- preferência de marketing registrada por `LgpdConsent`;
+- opt-out bloqueando preparação de follow-up;
+- templates de retenção com fallback local seguro;
+- preparação de contato via deep-link do WhatsApp sem alegar envio automático;
+- auditoria somente quando a equipe inicia o contato;
+- métrica de reativação em até 30 dias após follow-up iniciado;
 - **Estoque operacional** com entrada, saída e ajuste físico;
-- bloqueio de saldo negativo;
-- conciliação de estoque inclusive para saldo zero;
-- filtros por produto, categoria, fornecedor e situação;
-- alertas de estoque baixo e ruptura;
+- bloqueio de saldo negativo e conciliação até zero;
+- filtros, alertas de estoque baixo e ruptura;
 - painel de reposição com quantidade e custo estimados;
-- capital imobilizado e venda potencial;
-- histórico de até 100 movimentações por produto sob demanda;
+- capital imobilizado, venda potencial e histórico por produto;
 - financeiro, comissões e fidelidade;
 - dashboard executivo;
 - Super Admin separado do tenant;
@@ -160,14 +180,14 @@ Documentação técnica:
 - auditoria, segurança e observabilidade;
 - PWA.
 
-## Marcos 1–18 concluídos
+## Marcos 1–19 concluídos
 
-Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel. O Marco 17 tornou a Agenda o principal fluxo operacional. O Marco 18 tornou o Estoque utilizável para operação diária, conciliação física e decisão de compra.
+Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel. O Marco 17 tornou a Agenda o principal fluxo operacional. O Marco 18 tornou o Estoque utilizável para operação diária. O Marco 19 tornou o CRM utilizável para decisão de retenção e follow-up com consentimento e rastreabilidade.
 
 Principais resultados acumulados:
 
 - `AdminDashboard.jsx` decomposto por domínio;
-- Agenda e Estoque separados em módulos operacionais dedicados;
+- Agenda, Estoque e CRM de retenção em módulos operacionais dedicados;
 - `buildApp()` extraído para testes HTTP com `Fastify.inject()`;
 - agente WhatsApp e webhook Twilio modularizados;
 - domínio comercial separado em CRM, financeiro, comissões, fidelidade, assinatura, templates e IA;
@@ -176,9 +196,10 @@ Principais resultados acumulados:
 - repository hygiene impedindo regressões estruturais;
 - RBAC alinhado entre frontend e backend;
 - `SUPER_ADMIN` isolado da operação tenant;
-- `PROFESSIONAL` sem acesso às mutações de Agenda e à operação de Estoque;
+- `PROFESSIONAL` sem acesso às mutações de Agenda, Estoque e CRM;
 - Agenda comercial com jornada cliente → salão → WhatsApp;
 - Estoque com trilha de movimentações, reposição e indicadores econômicos;
+- CRM com segmentação explicável, consentimento, histórico, follow-up e reativação;
 - documentação operacional por papel e por domínio.
 
 Relatórios e guias:
@@ -187,23 +208,24 @@ Relatórios e guias:
 - [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
 - [`docs/usuario/10_AGENDA_COMERCIAL.md`](docs/usuario/10_AGENDA_COMERCIAL.md)
 - [`docs/usuario/11_ESTOQUE_OPERACIONAL.md`](docs/usuario/11_ESTOQUE_OPERACIONAL.md)
+- [`docs/usuario/12_CRM_RETENCAO.md`](docs/usuario/12_CRM_RETENCAO.md)
 
 ## Testes e qualidade
 
 ### Backend
 
-**51 testes automatizados**, cobrindo entre outros:
+**57 testes automatizados**, cobrindo entre outros:
 
 - autenticação, RBAC e isolamento multi-tenant;
 - validação Zod;
 - Agenda comercial e conflitos;
-- CRM;
-- estoque e bloqueio de saldo negativo;
-- overview operacional de estoque por tenant;
-- plano de reposição e capital imobilizado;
-- histórico por produto;
-- conciliação física para saldo zero;
-- RBAC específico do Estoque;
+- estoque operacional, reposição e conciliação;
+- segmentação de retenção;
+- aniversário, inatividade e frequência;
+- histórico de cliente tenant-scoped;
+- opt-out e evidência de consentimento;
+- bloqueio de follow-up em opt-out;
+- separação entre mensagem preparada e follow-up iniciado;
 - Twilio e agente WhatsApp;
 - fallbacks e handoff humano.
 
@@ -218,18 +240,18 @@ npm run build
 
 ### Frontend
 
-**44 testes automatizados**, cobrindo:
+**53 testes automatizados**, cobrindo:
 
 - Agenda Enterprise e calendário;
-- interação, reagendamento e filtros da Agenda;
-- central comercial de Agenda;
-- matriz de menu por papel;
-- carregamento de endpoints por papel;
-- classificação de estoque;
-- filtros combinados de estoque;
-- indicadores e plano de reposição;
-- preparação de entrada sugerida;
-- histórico de movimentações sob demanda.
+- central comercial e filtros da Agenda;
+- matriz de menu e endpoints por papel;
+- Estoque operacional, filtros, reposição e histórico;
+- filtros e indicadores do CRM de retenção;
+- explicação de segmentação;
+- bloqueio visual de follow-up em opt-out;
+- preparação de mensagem;
+- registro de follow-up somente ao abrir o WhatsApp;
+- histórico de atendimentos sob demanda.
 
 ```bash
 cd frontend
@@ -297,6 +319,9 @@ Nunca use credenciais de demonstração fixas em produção. Crie o Super Admin 
 - RBAC para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
 - módulos contratados aplicados por tenant;
 - validação Zod nas entradas HTTP;
+- preferência de marketing persistida sem apagar histórico anterior;
+- follow-up bloqueado quando o consentimento mais recente é opt-out;
+- preparação de mensagem não é contabilizada como contato iniciado;
 - tokens e segredos somente em variáveis de ambiente;
 - validação de assinatura em webhook Twilio;
 - fallbacks controlados para providers externos;
@@ -313,7 +338,7 @@ Nunca use credenciais de demonstração fixas em produção. Crie o Super Admin 
 
 ## Próxima fase
 
-Após a integração e o smoke de produção do Marco 18, o próximo marco oficial é o **Marco 19 — CRM, retenção e automações**, voltado a retorno de clientes e redução de trabalho manual.
+Após integração e smoke do Marco 19, o próximo marco oficial é o **Marco 20 — Assistente IA e WhatsApp em produção**, voltado a atendimento comercial confiável, ações confirmadas e automação segura por provider.
 
 A sequência oficial está em [`ROADMAP.md`](ROADMAP.md).
 
