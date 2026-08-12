@@ -13,22 +13,26 @@ export function AgendaAppointmentCard({ appointment, compact = false, onDragStar
   const end = appointment.endTime ? new Date(appointment.endTime) : null;
   const startLabel = Number.isNaN(start.getTime()) ? '--:--' : start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const endLabel = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+  const draggable = typeof onDragStart === 'function';
+  const canReschedule = typeof onReschedule === 'function';
 
   return (
     <article
       className={`enterprise-event ${colorFor(appointment)} ${compact ? 'compact' : ''}`}
-      draggable
-      onDragStart={() => onDragStart?.(appointment.id)}
-      onDragEnd={() => onDragEnd?.()}
-      title="Arraste para outro horário ou use Reagendar"
+      draggable={draggable}
+      onDragStart={draggable ? () => onDragStart(appointment.id) : undefined}
+      onDragEnd={draggable ? () => onDragEnd?.() : undefined}
+      title={draggable || canReschedule ? 'Arraste para outro horário ou use Reagendar' : 'Visualização somente leitura'}
     >
       <time>{startLabel}{endLabel ? ` - ${endLabel}` : ''}</time>
       <strong>{appointment.clientName || appointment.client?.name || 'Cliente'}</strong>
       <span>{appointment.service?.name || 'Serviço'}</span>
       {!compact && <small>{appointment.professional?.name || 'Profissional'} • {appointment.status || 'CONFIRMED'}</small>}
-      <button type="button" className="agenda-reschedule-trigger" onClick={() => onReschedule?.(appointment)} aria-label={`Reagendar ${appointment.clientName || appointment.client?.name || 'cliente'}`}>
-        Reagendar
-      </button>
+      {canReschedule && (
+        <button type="button" className="agenda-reschedule-trigger" onClick={() => onReschedule(appointment)} aria-label={`Reagendar ${appointment.clientName || appointment.client?.name || 'cliente'}`}>
+          Reagendar
+        </button>
+      )}
     </article>
   );
 }
