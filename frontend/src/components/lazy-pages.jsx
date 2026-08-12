@@ -15,5 +15,4 @@ export const ProfessionalScheduleAdmin = namedLazy(() => import('./admin/Profess
 export const OperationalAgendaBoard = namedLazy(() => import('./admin/OperationalAgendaBoard.jsx'), 'OperationalAgendaBoard');
 export const SmartFitAdmin = namedLazy(() => import('./admin/SmartFitAdmin.jsx'), 'SmartFitAdmin');
 export const WaitlistAdmin = namedLazy(() => import('./admin/WaitlistAdmin.jsx'), 'WaitlistAdmin');
-export const ModuleVisibilityGuard = namedLazy(() => import('./admin/ModuleVisibilityGuard.jsx'), 'ModuleVisibilityGuard');
 export const CommercialLanding = namedLazy(() => import('./commercial/CommercialLanding.jsx'), 'CommercialLanding');
