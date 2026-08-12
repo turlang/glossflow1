@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { getTenant } from '../helpers';
@@ -16,7 +16,7 @@ const marketingConsentSchema = z.object({
   evidence: z.string().trim().max(300).optional().default('CRM GlossFlow')
 }).strict();
 
-function sendRetentionError(reply: Parameters<FastifyInstance['post']>[2] extends (...args: infer P) => unknown ? P[1] : never, result: { code: string }) {
+function sendRetentionError(reply: FastifyReply, result: { code: string }) {
   if (result.code === 'CLIENT_NOT_FOUND') return reply.status(404).send({ message: 'Cliente não encontrado neste salão.', code: result.code });
   if (result.code === 'MARKETING_OPT_OUT') return reply.status(409).send({ message: 'Cliente optou por não receber comunicações de marketing.', code: result.code });
   return reply.status(400).send({ message: 'Cliente sem telefone válido para WhatsApp.', code: result.code });
