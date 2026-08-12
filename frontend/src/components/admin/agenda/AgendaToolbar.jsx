@@ -8,8 +8,33 @@ const VIEWS = [
   { key: 'timeline', label: 'Profissionais' }
 ];
 
-export function AgendaToolbar({ viewMode, setViewMode, selectedDate, setSelectedDate, professionalId, setProfessionalId, professionals, onPrevious, onNext, todayIso }) {
+const STATUS_OPTIONS = [
+  { value: 'CONFIRMED', label: 'Confirmados' },
+  { value: 'COMPLETED', label: 'Concluídos' },
+  { value: 'CANCELED', label: 'Cancelados' },
+  { value: 'NO_SHOW', label: 'Não compareceu' }
+];
+
+export function AgendaToolbar({
+  viewMode,
+  setViewMode,
+  selectedDate,
+  setSelectedDate,
+  professionalId,
+  setProfessionalId,
+  serviceId,
+  setServiceId,
+  statusFilter,
+  setStatusFilter,
+  professionals,
+  services = [],
+  onPrevious,
+  onNext,
+  onClearFilters,
+  todayIso
+}) {
   const refs = useRef([]);
+  const hasFilters = Boolean(professionalId || serviceId || statusFilter);
 
   function onTabsKeyDown(event, index) {
     const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
@@ -44,18 +69,42 @@ export function AgendaToolbar({ viewMode, setViewMode, selectedDate, setSelected
           </button>
         ))}
       </div>
+
       <div className="calendar-navigation">
         <button type="button" className="ghost-button" onClick={onPrevious}>Anterior</button>
         <Input label="Data" type="date" value={selectedDate} onChange={setSelectedDate} />
         <button type="button" className="ghost-button" onClick={() => setSelectedDate(todayIso)}>Hoje</button>
         <button type="button" className="ghost-button" onClick={onNext}>Próximo</button>
       </div>
-      <Select
-        label="Profissional"
-        value={professionalId}
-        onChange={setProfessionalId}
-        options={professionals.map((professional) => ({ value: professional.id, label: professional.name }))}
-      />
+
+      <div className="calendar-commercial-filters full-span" aria-label="Filtros comerciais da Agenda">
+        <Select
+          label="Profissional"
+          value={professionalId}
+          onChange={setProfessionalId}
+          options={professionals.map((professional) => ({ value: professional.id, label: professional.name }))}
+        />
+        <Select
+          label="Serviço"
+          value={serviceId}
+          onChange={setServiceId}
+          options={services.map((service) => ({ value: service.id, label: service.name }))}
+        />
+        <Select
+          label="Status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={STATUS_OPTIONS}
+        />
+        <button
+          type="button"
+          className="ghost-button calendar-clear-filters"
+          disabled={!hasFilters}
+          onClick={onClearFilters}
+        >
+          Limpar filtros
+        </button>
+      </div>
     </div>
   );
 }
