@@ -4,6 +4,9 @@ export type AgentSalon = {
   description: string;
   whatsapp: string;
   openingHours: string;
+  address?: string;
+  phone?: string;
+  instagram?: string;
 };
 
 export type ConversationMessage = {
