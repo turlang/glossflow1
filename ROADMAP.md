@@ -8,9 +8,9 @@ Este documento é a fonte canônica para a evolução do GlossFlow após o encer
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-A base técnica, a homologação por papel e as evoluções comerciais dos **Marcos 1–19 estão concluídas no PR do Marco 19**. Os próximos marcos representam IA/WhatsApp, ciclo de vida SaaS, confiabilidade, performance, segurança e escala.
+A base técnica, a homologação por papel e as evoluções comerciais dos **Marcos 1–19 estão concluídas e validadas em produção**. Os próximos marcos representam IA/WhatsApp, ciclo de vida SaaS, confiabilidade, performance, segurança e escala.
 
-Estado automatizado no head funcional do Marco 19:
+Estado automatizado após o Marco 19:
 
 - backend: **57 testes**;
 - frontend: **53 testes**;
@@ -18,10 +18,11 @@ Estado automatizado no head funcional do Marco 19:
 - Agenda comercial validada em produção no Marco 17;
 - Estoque operacional validado em produção no Marco 18;
 - CRM com segmentação explicável, histórico, preferência de marketing, follow-up e métrica de reativação;
-- GlossFlow Quality Gate do PR: **success**;
-- Production Gate do PR: **success**;
-- preview Vercel: **READY**;
-- smoke de produção do Marco 19 será a última evidência após merge.
+- merge de produção: `87dba94852dadec4db0e7c27bbc56ceb905cbc6f`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- deploy Vercel de produção: **READY**;
+- Production Smoke Validation: **success**.
 
 ---
 
@@ -194,9 +195,9 @@ Entregue:
 
 Critério operacional atingido: a equipe consegue identificar ruptura, justificar compra, registrar movimentos, reconciliar saldo físico e consultar a trilha sem planilha paralela.
 
-## Marco 19 — CRM, retenção e automações — CONCLUÍDO NO PR
+## Marco 19 — CRM, retenção e automações — CONCLUÍDO
 
-Objetivo cumprido no código: transformar o cadastro de clientes em uma fila operacional de retenção explicável, mensurável e compatível com preferência de comunicação.
+Objetivo cumprido: transformar o cadastro de clientes em uma fila operacional de retenção explicável, mensurável e compatível com preferência de comunicação.
 
 Entregue:
 
@@ -228,7 +229,7 @@ Entregue:
 - backend totalizando **57 testes**;
 - frontend totalizando **53 testes**.
 
-Validação no PR:
+Validação automatizada:
 
 - repository hygiene: **success**;
 - `npm audit` backend/frontend: **0 vulnerabilidades**;
@@ -236,15 +237,16 @@ Validação no PR:
 - backend: **57/57 testes**;
 - frontend: **53/53 testes**;
 - builds backend/frontend: **success**;
-- GlossFlow Quality Gate: **success**;
-- Production Gate: **success**;
-- preview Vercel: **READY**.
+- preview Vercel: **READY**;
+- merge em `main`: `87dba94852dadec4db0e7c27bbc56ceb905cbc6f`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- deploy Vercel de produção: **READY**;
+- Production Smoke Validation: **success**.
 
-Critério operacional atingido no produto e coberto pelo guia: a equipe consegue identificar quem merece follow-up, entender por que o cliente foi classificado, consultar o histórico, respeitar opt-out, preparar a mensagem e iniciar a ação dentro do GlossFlow sem planilha paralela.
+Critério operacional atingido: a equipe consegue identificar quem merece follow-up, entender por que o cliente foi classificado, consultar o histórico, respeitar opt-out, preparar a mensagem e iniciar a ação dentro do GlossFlow sem planilha paralela.
 
 Limite intencional: o Marco 19 **não envia campanhas automaticamente por Meta/Twilio**. Abertura do deep-link não equivale a confirmação de envio ou entrega. Templates oficiais, janela de atendimento, execução automática pelo provider, confirmação de ações e métricas de resolução/entrega pertencem ao Marco 20.
-
-Após o merge, o `Production Smoke Validation` fecha a evidência de produção do Marco 19.
 
 ---
 
