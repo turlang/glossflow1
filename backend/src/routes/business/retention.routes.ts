@@ -9,6 +9,7 @@ import {
   prepareRetentionFollowUp,
   recordRetentionFollowUpInitiated
 } from '../../services/client-retention.service';
+import { sendPolicyCompliantWhatsApp } from '../../services/whatsapp-agent/outbound-policy.service';
 import { businessAdminOrReception } from './access';
 
 const marketingConsentSchema = z.object({
@@ -22,11 +23,7 @@ function sendRetentionError(reply: FastifyReply, result: { code: string }) {
   return reply.status(400).send({ message: 'Cliente sem telefone válido para WhatsApp.', code: result.code });
 }
 
-/**
- * Retenção fica sob /admin/clients para herdar o entitlement de CRM.
- * Nenhuma rota dispara campanha automática: o Marco 19 registra consentimento,
- * segmenta, prepara o conteúdo e audita quando a equipe inicia o contato.
- */
+/** Retenção operacional, sempre sob o tenant autenticado. */
 export async function businessRetentionRoutes(app: FastifyInstance) {
   app.get('/admin/clients/retention', businessAdminOrReception, async (request) => {
     const tenant = getTenant(request);
@@ -49,13 +46,7 @@ export async function businessRetentionRoutes(app: FastifyInstance) {
     if (!client) return reply.status(404).send({ message: 'Cliente não encontrado neste salão.' });
 
     const consent = await prisma.lgpdConsent.create({
-      data: {
-        clientId: id,
-        salonId: tenant.salonId,
-        type: 'MARKETING',
-        granted: data.granted,
-        evidence: data.evidence
-      }
+      data: { clientId: id, salonId: tenant.salonId, type: 'MARKETING', granted: data.granted, evidence: data.evidence }
     });
     return reply.status(201).send(consent);
   });
@@ -74,5 +65,37 @@ export async function businessRetentionRoutes(app: FastifyInstance) {
     const result = await recordRetentionFollowUpInitiated(tenant.salonId, id);
     if (!result.ok) return sendRetentionError(reply, result);
     return result;
+  });
+
+  /**
+   * Marco 20: envio pelo provider aplica a janela de atendimento no servidor.
+   * Fora da janela, a operação é bloqueada sem template oficial configurado.
+   * Falha do provider nunca é registrada como follow-up executado com sucesso.
+   */
+  app.post('/admin/clients/:id/follow-up/send', businessAdminOrReception, async (request, reply) => {
+    const tenant = getTenant(request);
+    const { id } = z.object({ id: objectIdSchema }).parse(request.params);
+    const prepared = await prepareRetentionFollowUp(tenant.salonId, id);
+    if (!prepared.ok) return sendRetentionError(reply, prepared);
+
+    const sent = await sendPolicyCompliantWhatsApp({
+      salonId: tenant.salonId,
+      phone: prepared.profile.phone,
+      message: prepared.message,
+      event: prepared.templateEvent,
+      bodyParameters: [prepared.profile.name]
+    });
+
+    if (!sent.ok && sent.code === 'PROVIDER_TEMPLATE_REQUIRED') {
+      return reply.status(409).send(sent);
+    }
+    if (!sent.ok) {
+      request.log.error({ salonId: tenant.salonId, clientId: id, result: sent }, 'Falha no follow-up de retenção pelo provider.');
+      return reply.status(502).send({ ...sent, message: 'O provider não confirmou o envio. Nenhum sucesso foi registrado.' });
+    }
+
+    const recorded = await recordRetentionFollowUpInitiated(tenant.salonId, id);
+    if (!recorded.ok) return sendRetentionError(reply, recorded);
+    return { ok: true, clientId: id, mode: sent.mode, window: sent.window, provider: sent.provider || 'unknown' };
   });
 }
