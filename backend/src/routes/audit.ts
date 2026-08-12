@@ -2,8 +2,30 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { AuthContext } from './helpers';
 
-/** Registra ações administrativas relevantes sem bloquear a resposta da API. */
-export async function writeAuditLog(request: FastifyRequest, _reply: FastifyReply) {
+const SENSITIVE_BODY_KEYS = new Set([
+  'password',
+  'currentPassword',
+  'newPassword',
+  'token',
+  'refreshToken',
+  'accessToken',
+  'secret',
+  'apiKey',
+  'snapshot'
+]);
+
+function safeBodyKeys(body: unknown) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return [];
+  return Object.keys(body as Record<string, unknown>)
+    .filter((key) => !SENSITIVE_BODY_KEYS.has(key))
+    .sort();
+}
+
+/**
+ * Registra ações administrativas relevantes sem persistir conteúdo sensível.
+ * A auditoria inclui correlação com request/session para resposta a incidentes.
+ */
+export async function writeAuditLog(request: FastifyRequest, reply: FastifyReply) {
   const method = request.method.toUpperCase();
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
 
@@ -21,7 +43,13 @@ export async function writeAuditLog(request: FastifyRequest, _reply: FastifyRepl
       path,
       ip: request.ip || '',
       userAgent: String(request.headers['user-agent'] || ''),
-      metadata: { bodyKeys: request.body && typeof request.body === 'object' ? Object.keys(request.body as object) : [] },
+      metadata: {
+        requestId: String(request.id || ''),
+        sessionId: user.sessionId || '',
+        statusCode: reply.statusCode,
+        outcome: reply.statusCode >= 400 ? 'DENIED_OR_FAILED' : 'SUCCESS',
+        bodyKeys: safeBodyKeys(request.body)
+      },
       userId: user.id,
       salonId: user.salonId
     }

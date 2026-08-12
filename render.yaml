@@ -25,6 +25,11 @@ services:
         sync: false
       - key: PUBLIC_API_URL
         value: https://glossflow-api.onrender.com
+      - key: BACKUP_SIGNING_SECRET
+        sync: false
+      # Restore fica desligado durante operação normal e só é habilitado no runbook.
+      - key: BACKUP_RESTORE_ENABLED
+        value: "false"
 
       # Super Admin — provisionamento idempotente no startup
       - key: SUPER_ADMIN_NAME
@@ -42,9 +47,21 @@ services:
       - key: APP_PUBLIC_URL
         sync: false
 
-      # Operação
+      # Operação / rate limit
       - key: RATE_LIMIT_PER_MINUTE
         value: "180"
+      - key: AUTH_LOGIN_RATE_LIMIT_PER_MINUTE
+        value: "12"
+      - key: AUTH_REFRESH_RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: PUBLIC_WRITE_RATE_LIMIT_PER_MINUTE
+        value: "90"
+      - key: WEBHOOK_RATE_LIMIT_PER_MINUTE
+        value: "600"
+      - key: TENANT_RATE_LIMIT_PER_MINUTE
+        value: "600"
+      - key: TENANT_SECURITY_RATE_LIMIT_PER_MINUTE
+        value: "30"
       - key: ACCESS_TOKEN_MINUTES
         value: "30"
       - key: REFRESH_TOKEN_DAYS
@@ -59,6 +76,16 @@ services:
         value: "12"
       - key: APPOINTMENT_REMINDER_SCAN_MINUTES
         value: "10"
+
+      # Retenção de dados
+      - key: SESSION_RECORD_RETENTION_DAYS
+        value: "30"
+      - key: WHATSAPP_CONTENT_RETENTION_DAYS
+        value: "180"
+      - key: AUDIT_LOG_RETENTION_DAYS
+        value: "730"
+      - key: BACKUP_METADATA_RETENTION_DAYS
+        value: "180"
 
       # IA — Groq principal; OpenAI permanece apenas como fallback opcional
       - key: AI_PROVIDER

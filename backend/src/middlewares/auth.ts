@@ -13,9 +13,43 @@ function resolveJwtSecret() {
   return secret || 'glossflow-local-development-secret';
 }
 
+async function resolveSessionBoundContext(payload: AuthContext) {
+  if (!payload.sessionId || !payload.id || !payload.salonId) return null;
+
+  const session = await prisma.userSession.findFirst({
+    where: {
+      id: payload.sessionId,
+      userId: payload.id,
+      salonId: payload.salonId,
+      revokedAt: null,
+      expiresAt: { gt: new Date() }
+    },
+    include: {
+      user: {
+        select: { id: true, email: true, role: true, salonId: true, active: true }
+      }
+    }
+  });
+
+  if (!session?.user?.active) return null;
+  if (session.user.salonId !== session.salonId) return null;
+
+  return {
+    id: session.user.id,
+    email: session.user.email,
+    role: session.user.role,
+    salonId: session.user.salonId,
+    sessionId: session.id
+  } satisfies AuthContext;
+}
+
 /**
- * Autenticação JWT com RBAC básico.
- * O payload carrega salonId para isolar dados entre salões diferentes.
+ * Autenticação JWT com sessão revogável.
+ *
+ * Em produção, todo access token novo é vinculado a uma UserSession ativa.
+ * Assim revogação, desativação ou alteração de papel deixam de depender do TTL
+ * do JWT. Tokens legados continuam aceitos somente fora de produção para manter
+ * testes/migração local compatíveis.
  */
 export async function ensureAuthenticated(request: FastifyRequest, reply: FastifyReply) {
   const authorization = request.headers.authorization;
@@ -28,12 +62,22 @@ export async function ensureAuthenticated(request: FastifyRequest, reply: Fastif
     const accessToken = authorization.replace('Bearer ', '');
     const payload = jwt.verify(accessToken, resolveJwtSecret()) as AuthContext;
 
-    /**
-     * Compatibilidade acadêmica para versões anteriores do projeto:
-     * alguns tokens antigos possuíam id/e-mail/role, mas não carregavam salonId.
-     * Quando isso ocorrer em ambiente local, buscamos o usuário no banco e
-     * hidratamos o contexto multiempresa antes das rotas administrativas.
-     */
+    if (payload.sessionId) {
+      const current = await resolveSessionBoundContext(payload);
+      if (!current) {
+        return reply.status(401).send({ message: 'Sessão expirada, revogada ou usuário inativo.' });
+      }
+      (request as FastifyRequest & { user?: AuthContext }).user = current;
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      return reply.status(401).send({
+        message: 'Sessão antiga detectada. Renove a sessão ou faça login novamente.'
+      });
+    }
+
+    /** Compatibilidade restrita a desenvolvimento/testes para JWTs legados. */
     if (!payload.salonId && payload.id) {
       const persistedUser = await prisma.user.findUnique({
         where: { id: payload.id },

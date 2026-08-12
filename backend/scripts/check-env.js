@@ -1,10 +1,12 @@
 require('dotenv').config();
 /**
  * Validador de ambiente.
- * - Por padrão valida apenas o mínimo para o backend iniciar.
- * - Com STRICT_INTEGRATIONS=true, valida também integrações externas.
+ * - Por padrão valida o mínimo seguro para o backend iniciar.
+ * - Em produção exige também origem do frontend.
+ * - Com STRICT_INTEGRATIONS=true, valida integrações externas.
  */
-const required = ['DATABASE_URL', 'JWT_SECRET'];
+const production = process.env.NODE_ENV === 'production';
+const required = ['DATABASE_URL', 'JWT_SECRET', ...(production ? ['FRONTEND_ORIGIN'] : [])];
 const strict = process.env.STRICT_INTEGRATIONS === 'true';
 
 function whatsappRequiredEnv() {
@@ -28,15 +30,38 @@ const phase3 = [
   'PUBLIC_API_URL'
 ];
 
-const missing = [...required, ...(strict ? [...phase2, ...phase3] : [])].filter((key) => !process.env[key]);
-
+const missing = [...required, ...(strict ? [...phase2, ...phase3] : [])].filter((key) => !String(process.env[key] || '').trim());
 if (missing.length > 0) {
   console.error(`Variáveis obrigatórias ausentes: ${missing.join(', ')}`);
   process.exit(1);
 }
 
-if ((process.env.JWT_SECRET || '').length < 32) {
+const jwtSecret = String(process.env.JWT_SECRET || '');
+if (jwtSecret.length < 32) {
   console.error('JWT_SECRET deve ter pelo menos 32 caracteres.');
+  process.exit(1);
+}
+
+const normalizedSecret = jwtSecret.toLowerCase();
+if (['changeme', 'change-me', 'secret', 'password'].includes(normalizedSecret)
+  || normalizedSecret.includes('troque-por-uma-chave')) {
+  console.error('JWT_SECRET ainda usa valor de exemplo/placeholder.');
+  process.exit(1);
+}
+
+const backupSecret = String(process.env.BACKUP_SIGNING_SECRET || '').trim();
+if (backupSecret && backupSecret.length < 32) {
+  console.error('BACKUP_SIGNING_SECRET, quando configurado, deve ter pelo menos 32 caracteres.');
+  process.exit(1);
+}
+
+if (production && !/^mongodb(\+srv)?:\/\//.test(String(process.env.DATABASE_URL || ''))) {
+  console.error('DATABASE_URL de produção precisa usar URI MongoDB válida.');
+  process.exit(1);
+}
+
+if (production && process.env.BACKUP_RESTORE_ENABLED === 'true' && !backupSecret) {
+  console.error('BACKUP_RESTORE_ENABLED=true em produção exige BACKUP_SIGNING_SECRET explícito.');
   process.exit(1);
 }
 

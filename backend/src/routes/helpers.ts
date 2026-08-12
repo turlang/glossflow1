@@ -1,7 +1,13 @@
 import { FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 
-export type AuthContext = { id: string; role: string; salonId: string; email: string };
+export type AuthContext = {
+  id: string;
+  role: string;
+  salonId: string;
+  email: string;
+  sessionId?: string;
+};
 
 function cleanSlug(value?: string) {
   const normalized = (value || '').trim().toLowerCase();
