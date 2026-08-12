@@ -43,6 +43,7 @@ const overview = {
 
 describe('CRMRetentionHub', () => {
   beforeEach(() => {
+    vi.stubGlobal('confirm', vi.fn(() => true));
     request.mockImplementation(async (url, options = {}) => {
       if (url === '/admin/clients/retention') return overview;
       if (url === '/admin/clients/c1/history') {
@@ -55,6 +56,9 @@ describe('CRMRetentionHub', () => {
         return { ok: true, message: 'Olá, Carla! Podemos ajudar com seu próximo horário.', whatsappUrl: 'https://wa.me/5511999999999?text=teste' };
       }
       if (url === '/admin/clients/c1/follow-up/contacted' && options.method === 'POST') return { ok: true };
+      if (url === '/admin/clients/c1/follow-up/send' && options.method === 'POST') {
+        return { ok: true, mode: 'FREE_FORM', provider: 'twilio', window: { open: true } };
+      }
       if (url.includes('/marketing-consent') && options.method === 'POST') return { id: 'consent-1' };
       return {};
     });
@@ -62,6 +66,7 @@ describe('CRMRetentionHub', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
@@ -106,6 +111,20 @@ describe('CRMRetentionHub', () => {
     await user.click(link);
     await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/clients/c1/follow-up/contacted', { method: 'POST' }));
     expect(screen.getByText(/Podemos ajudar com seu próximo horário/i)).toBeTruthy();
+  });
+
+  it('envia follow-up pelo provider somente após confirmação do operador', async () => {
+    const user = userEvent.setup();
+    render(<CRMRetentionHub clients={clients} reload={vi.fn()} />);
+    const heading = await screen.findByRole('heading', { name: 'Carla' });
+    await user.click(within(heading.closest('article')).getByRole('button', { name: 'Preparar follow-up' }));
+    const sendButton = await screen.findByRole('button', { name: 'Enviar pelo provider' });
+    await user.click(sendButton);
+
+    expect(window.confirm).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/clients/c1/follow-up/send', { method: 'POST' }));
+    expect(await screen.findByText(/Provider confirmou a solicitação via janela de atendimento/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Envio solicitado' }).disabled).toBe(true);
   });
 
   it('carrega histórico somente quando solicitado', async () => {
