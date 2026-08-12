@@ -101,12 +101,16 @@ export function evaluateSubscriptionAccess(
   return { allowed: false, code: 'SUBSCRIPTION_CANCELED', status: 'CANCELED', endsAt };
 }
 
+/**
+ * Consulta o contrato pelo agregado Salon. Além de manter a regra tenant-scoped,
+ * preserva o mesmo boundary de repositório usado pelos testes e pelos guards de módulo.
+ */
 export async function getTenantSubscriptionAccess(salonId: string, now = new Date()) {
-  const subscription = await prisma.salonSubscription.findUnique({
-    where: { salonId },
-    select: { status: true, endsAt: true }
+  const salon = await prisma.salon.findUnique({
+    where: { id: salonId },
+    select: { subscription: { select: { status: true, endsAt: true } } }
   });
-  return evaluateSubscriptionAccess(subscription, now);
+  return evaluateSubscriptionAccess(salon?.subscription, now);
 }
 
 export async function recordSaasAudit(input: {
