@@ -1,0 +1,57 @@
+name: Marco 16 RBAC Patch
+
+on:
+  push:
+    branches: [feature/marco16-role-homologation]
+    paths:
+      - .github/workflows/marco16-rbac-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/marco16-role-homologation
+          fetch-depth: 0
+      - name: Apply role-safe agenda mutations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin = Path('backend/src/routes/appointments/admin.routes.ts')
+          text = admin.read_text(encoding='utf-8')
+          text = text.replace("import { adminAgendaAccess } from './access';", "import { adminAgendaAccess, agendaManageAccess } from './access';")
+          text = text.replace("app.put('/admin/appointments/:id', adminAgendaAccess,", "app.put('/admin/appointments/:id', agendaManageAccess,")
+          admin.write_text(text, encoding='utf-8')
+
+          waitlist = Path('backend/src/routes/appointments/waitlist.routes.ts')
+          text = waitlist.read_text(encoding='utf-8')
+          text = text.replace("import { adminAgendaAccess } from './access';", "import { agendaManageAccess } from './access';")
+          text = text.replace('adminAgendaAccess', 'agendaManageAccess')
+          waitlist.write_text(text, encoding='utf-8')
+
+          operational = Path('backend/src/routes/operational-agenda.routes.ts')
+          text = operational.read_text(encoding='utf-8')
+          old = "  app.get('/admin/appointments/operational-options', async (request) => {\n    const tenant = getTenant(request);"
+          new = "  app.get('/admin/appointments/operational-options', async (request, reply) => {\n    const tenant = getTenant(request);\n    if (!ensureManager(tenant.role, reply)) return;"
+          if old not in text:
+              raise SystemExit('operational-options marker not found')
+          text = text.replace(old, new, 1)
+          old = "  app.put('/admin/appointments/:id/attendance', async (request, reply) => {\n    const tenant = getTenant(request);"
+          new = "  app.put('/admin/appointments/:id/attendance', async (request, reply) => {\n    const tenant = getTenant(request);\n    if (!ensureManager(tenant.role, reply)) return;"
+          if old not in text:
+              raise SystemExit('attendance marker not found')
+          text = text.replace(old, new, 1)
+          operational.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/appointments/admin.routes.ts backend/src/routes/appointments/waitlist.routes.ts backend/src/routes/operational-agenda.routes.ts
+          git commit -m "fix: enforce role-safe agenda mutations"
+          git push origin HEAD:feature/marco16-role-homologation
