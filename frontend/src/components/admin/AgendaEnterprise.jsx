@@ -19,17 +19,29 @@ import { AgendaRescheduleForm } from './agenda/AgendaRescheduleForm.jsx';
 import { useAgendaReschedule } from './agenda/useAgendaReschedule.js';
 
 /** Orquestrador do domínio Agenda; regras e visualizações vivem em módulos próprios. */
-export function AgendaEnterprise({ appointments, professionals, reload, readOnly = false }) {
+export function AgendaEnterprise({ appointments, professionals, services = [], reload, readOnly = false }) {
   const todayIso = toLocalIsoDate(new Date());
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [viewMode, setViewMode] = useState('week');
   const [professionalId, setProfessionalId] = useState('');
+  const [serviceId, setServiceId] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [draggingId, setDraggingId] = useState('');
   const [editingAppointment, setEditingAppointment] = useState(null);
 
   const normalizedAppointments = useMemo(
     () => normalizeAppointments(appointments, professionalId),
     [appointments, professionalId]
+  );
+
+  const commercialFilteredAppointments = useMemo(
+    () => normalizedAppointments.filter((appointment) => {
+      const appointmentServiceId = appointment.serviceId || appointment.service?.id || '';
+      const matchesService = !serviceId || appointmentServiceId === serviceId;
+      const matchesStatus = !statusFilter || appointment.status === statusFilter;
+      return matchesService && matchesStatus;
+    }),
+    [normalizedAppointments, serviceId, statusFilter]
   );
 
   const visibleProfessionals = useMemo(
@@ -48,12 +60,12 @@ export function AgendaEnterprise({ appointments, professionals, reload, readOnly
 
   const visibleAppointments = useMemo(
     () => filterAppointmentsForView({
-      appointments: normalizedAppointments,
+      appointments: commercialFilteredAppointments,
       viewMode,
       selectedDate,
       weekDays: viewMode === 'week' ? weekDays : buildWeekDays(selectedDate)
     }),
-    [normalizedAppointments, selectedDate, viewMode, weekDays]
+    [commercialFilteredAppointments, selectedDate, viewMode, weekDays]
   );
 
   const metrics = useMemo(
@@ -94,10 +106,17 @@ export function AgendaEnterprise({ appointments, professionals, reload, readOnly
     setViewMode('day');
   }, []);
 
+  const clearFilters = useCallback(() => {
+    setProfessionalId('');
+    setServiceId('');
+    setStatusFilter('');
+  }, []);
+
   const dragStart = readOnly ? undefined : setDraggingId;
   const dragEnd = readOnly ? undefined : () => setDraggingId('');
   const drop = readOnly ? undefined : handleDrop;
   const openReschedule = readOnly ? undefined : setEditingAppointment;
+  const hasCommercialFilters = Boolean(professionalId || serviceId || statusFilter);
 
   return (
     <section className="panel-card enterprise-calendar-panel">
@@ -108,7 +127,7 @@ export function AgendaEnterprise({ appointments, professionals, reload, readOnly
           <p className="panel-help">
             {readOnly
               ? 'Visualização somente leitura para o perfil Profissional.'
-              : 'Dia, semana, mês e profissionais usam o mesmo contrato de reagendamento e isolamento de dados.'}
+              : 'Planeje por período e combine filtros de profissional, serviço e status antes de reagendar.'}
           </p>
         </div>
         <div className="enterprise-calendar-kpis" aria-label="Indicadores da agenda">
@@ -125,11 +144,23 @@ export function AgendaEnterprise({ appointments, professionals, reload, readOnly
         setSelectedDate={setSelectedDate}
         professionalId={professionalId}
         setProfessionalId={setProfessionalId}
+        serviceId={serviceId}
+        setServiceId={setServiceId}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         professionals={professionals}
+        services={services}
         onPrevious={() => move(-1)}
         onNext={() => move(1)}
+        onClearFilters={clearFilters}
         todayIso={todayIso}
       />
+
+      {hasCommercialFilters && (
+        <p className="agenda-filter-summary full-span" role="status">
+          Filtros ativos: {commercialFilteredAppointments.length} agendamento(s) no conjunto selecionado.
+        </p>
+      )}
 
       {!readOnly && message && <p className="feedback full-span" role="status" aria-live="polite">{message}</p>}
 
@@ -162,7 +193,7 @@ export function AgendaEnterprise({ appointments, professionals, reload, readOnly
       {viewMode === 'month' && (
         <AgendaMonthView
           monthDays={monthDays}
-          appointments={normalizedAppointments}
+          appointments={commercialFilteredAppointments}
           onOpenDay={openDay}
           onDragStart={dragStart}
           onDragEnd={dragEnd}
@@ -184,7 +215,11 @@ export function AgendaEnterprise({ appointments, professionals, reload, readOnly
       )}
 
       {visibleAppointments.length === 0 && viewMode !== 'month' && (
-        <p className="empty-state full-span">Nenhum agendamento encontrado para o período selecionado.</p>
+        <p className="empty-state full-span">
+          {hasCommercialFilters
+            ? 'Nenhum agendamento corresponde aos filtros e ao período selecionados.'
+            : 'Nenhum agendamento encontrado para o período selecionado.'}
+        </p>
       )}
 
       {!readOnly && editingAppointment && (
