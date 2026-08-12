@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { buildId } from '../config/environment';
 import { prisma } from '../lib/prisma';
 import { getIntegrationStatus } from '../services/integrationStatus.service';
 import { buildOpenApiDocument } from '../services/openapi.service';
@@ -41,6 +42,7 @@ export async function platformRoutes(app: FastifyInstance) {
     ok: true,
     service: 'glossflow-api',
     version: '10.0.0',
+    build: buildId,
     superAdminBootstrapConfigured: Boolean(
       String(process.env.SUPER_ADMIN_EMAIL || '').trim()
       && String(process.env.SUPER_ADMIN_PASSWORD || '')
@@ -61,6 +63,7 @@ export async function platformRoutes(app: FastifyInstance) {
     const ready = missing.length === 0 && database.ok;
     return reply.status(ready ? 200 : 503).send({
       ok: ready,
+      build: buildId,
       missing,
       database,
       integrations: { connected, total: integrations.length, items: integrations },

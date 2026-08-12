@@ -67,13 +67,18 @@ test('dependências registram taxa de sucesso e aparecem na exportação Prometh
   assert.match(prometheus, /glossflow_dependency_latency_p95_ms/);
 });
 
-test('HTTP expõe request id e registra a rota depois da resposta', async () => {
+test('HTTP expõe request id, build id e registra a rota depois da resposta', async () => {
   resetMetricsForTests();
   const app = buildApp();
   try {
     const response = await app.inject({ method: 'GET', url: '/health' });
     assert.equal(response.statusCode, 200);
     assert.ok(response.headers['x-request-id']);
+
+    const body = response.json();
+    assert.equal(typeof body.build, 'string');
+    assert.ok(body.build.length > 0);
+    assert.equal(response.headers['x-glossflow-build'], body.build);
 
     const snapshot = getMetricsSnapshot();
     assert.equal(snapshot.totalRequests, 1);
