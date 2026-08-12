@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { currency } from '../../utils/format.js';
 import { dashboardMenuForRole, defaultDashboardTabForRole } from '../../config/role-access.js';
-import { ROLES } from '../../utils/auth.js';
 import { OnboardingChecklist, ExecutiveDashboard, AdvancedMetricsAdmin } from './AdminOverview.jsx';
 import { ServicesAdmin, ProfessionalsAdmin, PortfolioAdmin } from './AdminCatalog.jsx';
 import { UsersAdmin, InventoryAdmin, ClientsAdmin } from './AdminOperations.jsx';
 import { FinancialAdmin, CommissionsAdmin, LoyaltyAdmin, SubscriptionAdmin } from './AdminFinance.jsx';
 import { AutomationsAdmin, AIAssistantAdmin } from './AdminIntelligence.jsx';
 import { SecurityAdmin, EcosystemAdmin, ObservabilityAdmin, UXPremiumAdmin, PWAAdmin } from './AdminPlatformModules.jsx';
-import { AgendaEnterprise } from './AgendaEnterprise.jsx';
+import { AgendaCommercialHub } from './AgendaCommercialHub.jsx';
 
 const MENU = [
   { key: 'executive', label: 'Dashboard', description: 'Receita, lucro e crescimento', icon: '📊' },
@@ -17,7 +16,7 @@ const MENU = [
   { key: 'services', label: 'Serviços', description: 'Preços, duração e imagens', icon: '✂' },
   { key: 'professionals', label: 'Profissionais', description: 'Equipe e especialidades', icon: '♛' },
   { key: 'portfolio', label: 'Vitrine', description: 'Galeria pública', icon: '◐' },
-  { key: 'appointments', label: 'Agenda', description: 'Calendário enterprise', icon: '▦' },
+  { key: 'appointments', label: 'Agenda', description: 'Operação, encaixes e jornada do cliente', icon: '▦' },
   { key: 'inventory', label: 'Estoque', description: 'Produtos e reposição', icon: '▣' },
   { key: 'users', label: 'Usuários', description: 'Acessos e permissões', icon: '◉' },
   { key: 'clients', label: 'Clientes', description: 'CRM e fidelidade', icon: '◎' },
@@ -56,7 +55,6 @@ export function AdminDashboard({ role, salon, services, professionals, portfolio
   }, [allowedMenu, command]);
 
   const activeMenu = allowedMenu.find((item) => item.key === tab) || allowedMenu[0] || MENU[0];
-  const professionalReadOnly = role === ROLES.PROFESSIONAL;
 
   function selectTab(nextTab) {
     if (allowedMenu.some((item) => item.key === nextTab)) setTab(nextTab);
@@ -107,7 +105,7 @@ export function AdminDashboard({ role, salon, services, professionals, portfolio
           {tab === 'services' && <ServicesAdmin services={services} reload={reload} />}
           {tab === 'professionals' && <ProfessionalsAdmin professionals={professionals} reload={reload} />}
           {tab === 'portfolio' && <PortfolioAdmin portfolio={portfolio} reload={reload} />}
-          {tab === 'appointments' && <AgendaEnterprise appointments={appointments} professionals={professionals} services={services} reload={reload} readOnly={professionalReadOnly} />}
+          {tab === 'appointments' && <AgendaCommercialHub role={role} appointments={appointments} professionals={professionals} services={services} reload={reload} setPage={setPage} />}
           {tab === 'inventory' && <InventoryAdmin inventory={inventory} reload={reload} />}
           {tab === 'users' && <UsersAdmin users={users} reload={reload} />}
           {tab === 'clients' && <ClientsAdmin clients={clients} reload={reload} />}
