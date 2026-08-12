@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { onAuthExpired, request } from './services/api.js';
+import { isAuthExpiredError, onAuthExpired, request } from './services/api.js';
 import { emptyBackofficeData, loadTenantBackofficeData } from './services/backoffice-data.js';
 import { Header, PublicShowcase, BookingPage, LoginPage } from './components/public/PublicExperience.jsx';
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
@@ -158,11 +158,14 @@ export default function App() {
         const tenantData = await loadTenantBackofficeData({ role: authRole });
         setBackoffice(tenantData);
       } catch (backofficeError) {
+        if (isAuthExpiredError(backofficeError)) return;
+
         console.warn('Falha ao atualizar dados administrativos:', backofficeError.message);
         if (silent) throw backofficeError;
         setError(backofficeError.message || 'Não foi possível carregar os dados administrativos.');
       }
     } catch (loadError) {
+      if (isAuthExpiredError(loadError)) return;
       if (silent) throw loadError;
       setError(loadError.message || 'Não foi possível conectar à API.');
     } finally {
