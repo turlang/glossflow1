@@ -1,53 +1,62 @@
 name: Production Smoke Validation
 
 on:
-  push:
-    branches: [agent/production-smoke]
+  workflow_run:
+    workflows: ["Production Gate"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       API_URL: https://glossflow-api.onrender.com
       WEB_URL: https://glossflow1.vercel.app
     steps:
+      - name: Allow production deploys to converge
+        if: github.event_name == 'workflow_run'
+        run: sleep 20
+
       - name: Check frontend production
         run: |
           curl --fail-with-body --silent --show-error \
-            --retry 4 --retry-all-errors --retry-delay 5 \
-            --max-time 30 "$WEB_URL/" > /tmp/frontend.html
+            --retry 6 --retry-all-errors --retry-delay 10 \
+            --max-time 45 "$WEB_URL/" > /tmp/frontend.html
           grep -q 'GlossFlow' /tmp/frontend.html
 
       - name: Wake and check backend health
         run: |
           curl --fail-with-body --silent --show-error \
-            --retry 8 --retry-all-errors --retry-delay 10 \
+            --retry 10 --retry-all-errors --retry-delay 10 \
             --max-time 45 "$API_URL/health" | tee /tmp/health.json
           jq -e 'type == "object"' /tmp/health.json > /dev/null
 
       - name: Check public salon
         run: |
           curl --fail-with-body --silent --show-error \
-            --retry 4 --retry-all-errors --retry-delay 5 \
-            --max-time 30 "$API_URL/public/salon" | tee /tmp/salon.json
+            --retry 6 --retry-all-errors --retry-delay 10 \
+            --max-time 45 "$API_URL/public/salon" | tee /tmp/salon.json
           jq -e 'type == "object" and (.id != null or .slug != null or .name != null)' /tmp/salon.json > /dev/null
 
       - name: Check public catalog
         run: |
           for path in services professionals portfolio; do
             curl --fail-with-body --silent --show-error \
-              --retry 4 --retry-all-errors --retry-delay 5 \
-              --max-time 30 "$API_URL/$path" > "/tmp/$path.json"
+              --retry 6 --retry-all-errors --retry-delay 10 \
+              --max-time 45 "$API_URL/$path" > "/tmp/$path.json"
             jq -e 'type == "array"' "/tmp/$path.json" > /dev/null
           done
 
       - name: Check public appointments read model
         run: |
           curl --fail-with-body --silent --show-error \
-            --retry 4 --retry-all-errors --retry-delay 5 \
-            --max-time 30 "$API_URL/appointments" > /tmp/appointments.json
+            --retry 6 --retry-all-errors --retry-delay 10 \
+            --max-time 45 "$API_URL/appointments" > /tmp/appointments.json
           jq -e 'type == "array"' /tmp/appointments.json > /dev/null
 
       - name: Summary
