@@ -8,24 +8,29 @@ Este documento é a fonte canônica para a evolução do GlossFlow.
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-Os **Marcos 1–19 estão concluídos e validados em produção**. O **Marco 20 — Assistente IA e WhatsApp em produção** está **CONCLUÍDO NO PR**, com código, documentação e gates funcionais verdes. A validação oficial de produção será registrada somente depois do merge, deploy e `Production Smoke Validation`.
+Os **Marcos 1–20 estão concluídos e validados em produção**. O próximo marco oficial é o **Marco 21 — Super Admin, planos e ciclo de vida SaaS**.
 
-Estado automatizado do head funcional do Marco 20:
+Estado automatizado após o Marco 20:
 
 - backend: **68/68 testes**;
 - frontend: **54/54 testes**;
 - `npm audit` backend/frontend: **0 vulnerabilidades**;
 - TypeScript/ESLint: **success**;
 - builds backend/frontend: **success**;
+- merge de produção: `238fdd4c2401424f12af26e5feb660a6f1cb1e1c`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- checks Vercel: **success**;
+- Production Smoke Validation: **success**;
 - confirmação de mutações de Agenda validada no servidor;
-- política de janela/template validada por testes;
+- política de janela/template validada;
 - falha de provider sem sucesso falso;
 - handoff com contexto;
 - métricas operacionais de IA/WhatsApp.
 
 ---
 
-# Ciclo concluído em produção — Marcos 1–19
+# Ciclo concluído em produção — Marcos 1–20
 
 ## Marco 1 — Higienização estrutural inicial — CONCLUÍDO
 
@@ -113,20 +118,18 @@ Validação final do Marco 19:
 - Vercel produção: **READY**;
 - Production Smoke Validation: **success**.
 
----
+## Marco 20 — Assistente IA e WhatsApp em produção — CONCLUÍDO
 
-# Marco 20 — Assistente IA e WhatsApp em produção — CONCLUÍDO NO PR
+Objetivo cumprido: transformar o agente em atendimento comercial controlado por fatos e regras do servidor, impedindo que o modelo execute mutações sensíveis ou declare sucesso de provider sem evidência.
 
-Objetivo cumprido no código: transformar o agente em atendimento comercial controlado por fatos e regras do servidor, impedindo que o modelo execute mutações sensíveis ou declare sucesso de provider sem evidência.
-
-## Base factual do tenant
+### Base factual do tenant
 
 - contexto institucional por salão;
 - serviços ativos, preço, duração e descrição;
 - disponibilidade e profissionais consultados por ferramentas;
 - informação ausente tratada como não cadastrada, sem completar lacunas por suposição.
 
-## Confirmação server-side de Agenda
+### Confirmação server-side de Agenda
 
 Criar, cancelar e reagendar seguem o fluxo:
 
@@ -153,14 +156,14 @@ Entregue:
 - proposta encerrada imediatamente no turno de tool calling para impedir encadeamento proposta + execução;
 - estados auditados `PENDING`, `COMPLETED`, `CANCELED`, `FAILED` e `EXPIRED`.
 
-## Handoff humano
+### Handoff humano
 
 - motivo persistido;
 - telefone normalizado;
 - até seis mensagens recentes anexadas quando disponíveis;
 - falha de leitura do contexto não impede o handoff.
 
-## Política de envio WhatsApp
+### Política de envio WhatsApp
 
 A decisão de canal é do servidor, não da IA:
 
@@ -178,7 +181,7 @@ O CRM ganhou `POST /admin/clients/:id/follow-up/send` com:
 - política de janela/template;
 - follow-up registrado somente depois de sucesso do provider.
 
-## Templates
+### Templates
 
 O CRUD interno aceita também:
 
@@ -189,7 +192,7 @@ O CRUD interno aceita também:
 
 O ambiente documenta os identificadores de template oficial correspondentes para o provider.
 
-## Métricas
+### Métricas
 
 Novo read model `/admin/whatsapp/metrics` com:
 
@@ -203,35 +206,30 @@ Novo read model `/admin/whatsapp/metrics` com:
 
 A taxa de resolução automática é um proxy operacional — resposta outbound sem handoff no período — e não uma prova de satisfação do cliente.
 
-## Interface
+### Interface e documentação
 
 - `WhatsAppAgentTester` mostra status e métricas de 30 dias;
 - playground continua sem enviar mensagem real ao provider;
 - CRM oferece fluxo manual e envio controlado por provider;
-- presets de retenção adicionados à Central de Automações.
+- presets de retenção adicionados à Central de Automações;
+- `backend/.env.example` documenta TTL e templates de retenção;
+- guia `docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`.
 
-## Configuração
-
-`backend/.env.example` documenta:
-
-- `WHATSAPP_ACTION_CONFIRMATION_TTL_MINUTES`;
-- templates de retenção do provider;
-- relação entre dry-run, sender, webhook e templates.
-
-## Documentação
-
-- `docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`.
-
-## Validação automatizada do head funcional
+### Validação final de produção
 
 - repository hygiene: **success**;
 - `npm audit` backend/frontend: **0 vulnerabilidades**;
 - TypeScript/ESLint: **success**;
 - backend: **68/68 testes**;
 - frontend: **54/54 testes**;
-- builds backend/frontend: **success**.
+- builds backend/frontend: **success**;
+- merge em `main`: `238fdd4c2401424f12af26e5feb660a6f1cb1e1c`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- checks Vercel: **success**;
+- Production Smoke Validation: **success**.
 
-Critério de saída funcional atingido:
+Critério de saída atingido:
 
 - o agente não recebe autoridade para inventar fatos fora da base/tooling;
 - qualquer mutação de Agenda exige confirmação explícita posterior validada pelo servidor;
@@ -240,8 +238,6 @@ Critério de saída funcional atingido:
 - handoff preserva contexto recente;
 - follow-up respeita opt-out e política de janela/template;
 - operação possui métricas de automação, handoff e provider.
-
-**Pendência para conclusão oficial:** merge no `main`, deploy de produção e `Production Smoke Validation` verdes.
 
 ---
 
