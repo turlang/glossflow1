@@ -45,7 +45,7 @@ function clientFixture() {
       clientPhone: '11999990000',
       clientEmail: 'cliente@example.test',
       startTime: new Date('2026-02-10T12:00:00.000Z'),
-      service: { id: 'service-1', name: 'Serviço', price: 100, duration: 60 },
+      service: { id: 'service-1', name: 'Serviço', price: 100, durationMin: 60 },
       professional: { id: 'professional-1', name: 'Profissional' }
     }],
     waitlistEntries: [{ id: 'wait-1', clientId }],
@@ -67,11 +67,11 @@ test('exportação LGPD isola tenant e agrega eventos realmente ligados ao titul
       findMany: async () => [
         {
           id: 'log-1', action: 'WHATSAPP_RECEIVED', resource: 'WhatsAppMessage',
-          resourceId: 'provider-message', metadata: { phone: '5511999990000', text: 'oi' }, createdAt: new Date()
+          resourceId: 'provider-message', metadata: { phone: '11999990000', text: 'oi' }, createdAt: new Date()
         },
         {
           id: 'log-2', action: 'WHATSAPP_RECEIVED', resource: 'WhatsAppMessage',
-          resourceId: 'other-message', metadata: { phone: '5511888880000', text: 'outro cliente' }, createdAt: new Date()
+          resourceId: 'other-message', metadata: { phone: '11888880000', text: 'outro cliente' }, createdAt: new Date()
         },
         {
           id: 'log-3', action: 'RETENTION_FOLLOWUP_INITIATED', resource: 'RetentionFollowUp',
@@ -110,9 +110,9 @@ test('eliminação LGPD anonimiza histórico e remove dados operacionais dispens
       },
       auditLog: {
         findMany: async () => [
-          { id: 'message-log', resource: 'WhatsAppMessage', resourceId: 'provider-id', metadata: { phone: '5511999990000', text: 'conteúdo pessoal' } },
+          { id: 'message-log', resource: 'WhatsAppMessage', resourceId: 'provider-id', metadata: { phone: '11999990000', text: 'conteúdo pessoal' } },
           { id: 'notification-log', resource: 'OperationalNotification', resourceId: appointmentId, metadata: { clientName: 'Cliente Teste', message: 'Cliente Teste chegou' } },
-          { id: 'other-log', resource: 'WhatsAppMessage', resourceId: 'other', metadata: { phone: '5511888880000', text: 'outro' } }
+          { id: 'other-log', resource: 'WhatsAppMessage', resourceId: 'other', metadata: { phone: '11888880000', text: 'outro' } }
         ],
         update: async (args) => { auditUpdates.push(args); return args.data; },
         create: async ({ data }) => { finalAudit = data; return data; }
