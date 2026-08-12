@@ -9,6 +9,7 @@ import {
   prepareRetentionFollowUp,
   recordRetentionFollowUpInitiated
 } from '../../services/client-retention.service';
+import { hasSalonModule } from '../../services/module-access.service';
 import { sendPolicyCompliantWhatsApp } from '../../services/whatsapp-agent/outbound-policy.service';
 import { businessAdminOrReception } from './access';
 
@@ -75,6 +76,18 @@ export async function businessRetentionRoutes(app: FastifyInstance) {
   app.post('/admin/clients/:id/follow-up/send', businessAdminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
+
+    // A rota está sob /admin/clients (CRM), portanto a dependência adicional de
+    // WhatsApp é validada explicitamente antes de qualquer chamada externa.
+    const salonAccess = await prisma.salon.findUnique({
+      where: { id: tenant.salonId },
+      select: { modulesConfigured: true, enabledModules: true }
+    });
+    if (!salonAccess) return reply.status(404).send({ message: 'Salão da sessão não encontrado.' });
+    if (!hasSalonModule(salonAccess, 'WHATSAPP')) {
+      return reply.status(403).send({ message: 'Módulo WhatsApp não habilitado para este salão.', code: 'MODULE_DISABLED', module: 'WHATSAPP' });
+    }
+
     const prepared = await prepareRetentionFollowUp(tenant.salonId, id);
     if (!prepared.ok) return sendRetentionError(reply, prepared);
 
@@ -86,9 +99,7 @@ export async function businessRetentionRoutes(app: FastifyInstance) {
       bodyParameters: [prepared.profile.name]
     });
 
-    if (!sent.ok && sent.code === 'PROVIDER_TEMPLATE_REQUIRED') {
-      return reply.status(409).send(sent);
-    }
+    if (!sent.ok && sent.code === 'PROVIDER_TEMPLATE_REQUIRED') return reply.status(409).send(sent);
     if (!sent.ok) {
       request.log.error({ salonId: tenant.salonId, clientId: id, result: sent }, 'Falha no follow-up de retenção pelo provider.');
       return reply.status(502).send({ ...sent, message: 'O provider não confirmou o envio. Nenhum sucesso foi registrado.' });
