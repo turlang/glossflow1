@@ -1,6 +1,8 @@
+import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
-import { normalizeEnabledModules, SalonModule } from './module-access.service';
+import { normalizeEnabledModules } from './module-access.service';
+import type { SalonModule } from './module-access.service';
 
 export const SUBSCRIPTION_STATUSES = ['TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELED'] as const;
 export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
@@ -127,7 +129,7 @@ export async function recordSaasAudit(input: {
       userAgent: input.actor?.userAgent || '',
       userId: input.actor?.userId,
       salonId: input.salonId,
-      metadata: input.metadata || {}
+      metadata: (input.metadata || {}) as Prisma.InputJsonObject
     }
   });
 }
@@ -149,18 +151,18 @@ export async function saveBillingProfile(salonId: string, input: Partial<Billing
     resource: 'SaasBillingProfile',
     resourceId: salonId,
     path: `/platform-admin/salons/${salonId}/lifecycle`,
-    metadata: billing,
+    metadata: { ...billing },
     actor
   });
   return billing;
 }
 
 function resolveEndsAt(status: SubscriptionStatus, supplied?: string | null, now = new Date()) {
+  if (status === 'CANCELED') return nullableDate(supplied) || now;
   const explicit = nullableDate(supplied);
   if (explicit) return explicit;
   if (status === 'TRIAL') return futureDate(envDays('SAAS_DEFAULT_TRIAL_DAYS', 7), now);
   if (status === 'PAST_DUE') return futureDate(envDays('SAAS_PAST_DUE_GRACE_DAYS', 3), now);
-  if (status === 'CANCELED') return now;
   return null;
 }
 
