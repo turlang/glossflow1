@@ -36,12 +36,26 @@ jobs:
             --max-time 45 "$API_URL/health" | tee /tmp/health.json
           jq -e 'type == "object" and .ok == true' /tmp/health.json > /dev/null
 
-      - name: Check backend readiness and MongoDB
+      - name: Wait for backend readiness contract and MongoDB
         run: |
-          curl --fail-with-body --silent --show-error \
-            --retry 10 --retry-all-errors --retry-delay 10 \
-            --max-time 45 "$API_URL/ready" | tee /tmp/ready.json
-          jq -e 'type == "object" and .ok == true and .database.ok == true' /tmp/ready.json > /dev/null
+          READY=false
+          for attempt in $(seq 1 12); do
+            echo "Readiness attempt $attempt/12"
+            if curl --silent --show-error --max-time 45 "$API_URL/ready" > /tmp/ready.json; then
+              cat /tmp/ready.json
+              if jq -e 'type == "object" and .ok == true and .database.ok == true' /tmp/ready.json > /dev/null 2>&1; then
+                READY=true
+                break
+              fi
+            fi
+            sleep 10
+          done
+
+          if [ "$READY" != "true" ]; then
+            echo "Backend did not converge to the Marco 22 readiness contract."
+            cat /tmp/ready.json || true
+            exit 1
+          fi
 
       - name: Check public salon
         run: |
