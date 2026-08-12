@@ -10,13 +10,10 @@ export async function writeAuditLog(request: FastifyRequest, _reply: FastifyRepl
   const user = (request as FastifyRequest & { user?: AuthContext }).user;
   if (!user?.salonId) return;
 
-  const auditModel = (prisma as any).auditLog;
-  if (!auditModel?.create) return;
-
   const path = request.url.split('?')[0];
   const resource = path.split('/').filter(Boolean).slice(1, 3).join('/') || 'admin';
 
-  auditModel.create({
+  prisma.auditLog.create({
     data: {
       action: method,
       resource,

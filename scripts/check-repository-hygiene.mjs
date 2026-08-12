@@ -1,12 +1,13 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 
 /**
  * Guardrail estrutural do GlossFlow.
  *
  * O objetivo não é substituir lint/testes. Este script impede que artefatos
- * removidos durante a higienização retornem silenciosamente ao repositório e
- * que arquivos de ambiente/backup sejam versionados por engano.
+ * removidos durante a higienização retornem silenciosamente ao repositório,
+ * que arquivos sensíveis sejam versionados e que dívidas já eliminadas
+ * reapareçam no backend ou nos componentes React.
  */
 
 const repositoryRoot = process.cwd();
@@ -36,6 +37,7 @@ const allowedEnvironmentFiles = new Set([
   'backend/.env.example',
   'frontend/.env.example'
 ]);
+const explicitAnyPattern = /\b(?:as\s+any\b|:\s*any\b|<any>|Record<[^>]*,\s*any>)/;
 
 const violations = [];
 
@@ -69,6 +71,23 @@ function walk(directory) {
       violations.push(`Arquivo temporário/backup não permitido: ${repositoryPath}`);
     }
 
+    if (repositoryPath.startsWith('backend/src/') && repositoryPath.endsWith('.ts')) {
+      const source = readFileSync(absolutePath, 'utf8');
+      source.split(/\r?\n/).forEach((line, index) => {
+        if (explicitAnyPattern.test(line)) {
+          violations.push(`Tipagem insegura explícita em ${repositoryPath}:${index + 1}`);
+        }
+      });
+    }
+
+    const isReactComponent = repositoryPath.startsWith('frontend/src/components/') && repositoryPath.endsWith('.jsx');
+    if (isReactComponent) {
+      const source = readFileSync(absolutePath, 'utf8');
+      if (source.includes('<style>')) {
+        violations.push(`CSS embutido deve ficar em folha de domínio: ${repositoryPath}`);
+      }
+    }
+
     // Evita que dumps/acidentes muito grandes entrem sem revisão explícita.
     const sizeBytes = statSync(absolutePath).size;
     if (sizeBytes > 5 * 1024 * 1024) {
@@ -86,4 +105,4 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log('✅ Repository hygiene gate aprovado. Estrutura e arquivos sensíveis estão dentro do padrão.');
+console.log('✅ Repository hygiene gate aprovado. Estrutura, tipagem e CSS de componentes estão dentro do padrão.');

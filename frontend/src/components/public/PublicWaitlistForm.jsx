@@ -76,11 +76,6 @@ export function PublicWaitlistForm({ service, date, professionalId = '', profess
         {message && <p className="feedback">{message}</p>}
         <button className="primary full" type="submit" disabled={loading}>{loading ? 'Entrando na fila…' : 'Entrar na lista de espera'}</button>
       </form>
-
-      <style>{`
-        .waitlist-public-card{display:grid;gap:16px;border:1px solid color-mix(in srgb,var(--primary) 38%,var(--border));background:color-mix(in srgb,var(--primary) 7%,var(--card));border-radius:20px;padding:18px}.waitlist-public-head{display:flex;gap:12px;align-items:flex-start}.waitlist-public-head strong{font-size:1.05rem}.waitlist-public-head p{margin:4px 0 0;color:var(--muted)}.waitlist-icon{display:grid;place-items:center;width:40px;height:40px;min-width:40px;border-radius:13px;background:color-mix(in srgb,var(--primary) 18%,var(--surface));font-size:1.15rem}.waitlist-context{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.waitlist-context span{display:grid;gap:3px;padding:10px 12px;border:1px solid var(--border);background:var(--surface);border-radius:13px}.waitlist-context small{color:var(--muted)}.waitlist-public-form{display:grid;gap:12px}.waitlist-time-grid,.waitlist-contact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.waitlist-contact-grid>*:last-child{grid-column:1/-1}.waitlist-time-grid label{display:grid;gap:5px;color:var(--muted);font-size:.78rem}.waitlist-time-grid input{height:42px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);padding:0 10px}.waitlist-success{display:flex;gap:13px;align-items:center;padding:18px;border:1px solid color-mix(in srgb,#3fb950 42%,var(--border));background:color-mix(in srgb,#3fb950 8%,var(--surface));border-radius:18px}.waitlist-success>span{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#3fb950;color:#07150a;font-weight:1000}.waitlist-success p{margin:4px 0 0;color:var(--muted)}
-        @media(max-width:640px){.waitlist-context{grid-template-columns:1fr}.waitlist-time-grid,.waitlist-contact-grid{grid-template-columns:1fr}.waitlist-contact-grid>*:last-child{grid-column:auto}}
-      `}</style>
     </div>
   );
 }

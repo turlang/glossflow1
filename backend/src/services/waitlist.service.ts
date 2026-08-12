@@ -1,9 +1,11 @@
 import { prisma } from '../lib/prisma';
-import { publicBookingAvailability } from './public-booking-availability.service';
+import { publicBookingAvailability, RankedSlot } from './public-booking-availability.service';
 import { normalizePhone, saveWhatsAppMessage } from './whatsapp-agent.service';
 import { sendWhatsAppMessage } from './whatsapp.service';
 
 const OFFER_MINUTES = Number(process.env.WAITLIST_OFFER_MINUTES || 20);
+
+type WaitlistCandidateSlot = RankedSlot & { professionalId: string; professionalName: string };
 
 function businessTimeZone() {
   return process.env.BUSINESS_TIMEZONE || 'America/Sao_Paulo';
@@ -99,7 +101,7 @@ export async function matchWaitlistForDate(input: { salonId: string; date: strin
   const availabilityCache = new Map<string, Awaited<ReturnType<typeof publicBookingAvailability>>>();
   const candidates: Array<{
     entry: typeof entries[number];
-    slot: any;
+    slot: WaitlistCandidateSlot;
     score: number;
   }> = [];
 

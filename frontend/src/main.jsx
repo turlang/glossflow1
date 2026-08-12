@@ -4,8 +4,18 @@ import App from './App.jsx';
 import { PublicManageBooking } from './components/public/PublicManageBooking.jsx';
 import { RecentBookingConfirmation } from './components/public/RecentBookingConfirmation.jsx';
 import './styles.css';
+import './public-showcase.css';
+import './ui-primitives.css';
+import './admin-shell.css';
+import './admin-operations.css';
+import './responsive.css';
+import './agenda-enterprise.css';
+import './admin-business.css';
+import './admin-platform.css';
 import './admin-mobile.css';
 import './booking-selection.css';
+import './public-booking.css';
+import './admin-component-styles.css';
 
 /**
  * Bootstrap do frontend GlossFlow.

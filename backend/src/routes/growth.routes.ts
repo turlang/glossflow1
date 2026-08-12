@@ -53,16 +53,16 @@ export async function growthRoutes(app: FastifyInstance) {
       prisma.salonSubscription.findMany({ where: { status: 'ACTIVE' }, include: { plan: true } })
     ]);
 
-    const mrr = activeSubscriptions.reduce((sum: number, subscription: any) => sum + Number(subscription.plan?.price || 0), 0);
-    const trialCount = subscriptions.filter((subscription: any) => subscription.status === 'TRIAL').length;
-    const activeCount = subscriptions.filter((subscription: any) => subscription.status === 'ACTIVE').length;
-    const pastDueCount = subscriptions.filter((subscription: any) => subscription.status === 'PAST_DUE').length;
+    const mrr = activeSubscriptions.reduce((sum, subscription) => sum + Number(subscription.plan?.price || 0), 0);
+    const trialCount = subscriptions.filter((subscription) => subscription.status === 'TRIAL').length;
+    const activeCount = subscriptions.filter((subscription) => subscription.status === 'ACTIVE').length;
+    const pastDueCount = subscriptions.filter((subscription) => subscription.status === 'PAST_DUE').length;
 
     return {
       totals: { salons, users, plans: plans.length, subscriptions: subscriptions.length },
       revenue: { mrr, mrrFormatted: `R$ ${brl(mrr)}` },
       subscriptionStatus: { trial: trialCount, active: activeCount, pastDue: pastDueCount },
-      recentSubscriptions: subscriptions.slice(0, 8).map((subscription: any) => ({
+      recentSubscriptions: subscriptions.slice(0, 8).map((subscription) => ({
         id: subscription.id,
         status: subscription.status,
         salon: subscription.salon?.name,
@@ -80,7 +80,7 @@ export async function growthRoutes(app: FastifyInstance) {
 
   app.get('/admin/saas/salons', adminOnly, async () => {
     const salons = await prisma.salon.findMany({ orderBy: { createdAt: 'desc' }, include: { subscription: { include: { plan: true } }, users: true } });
-    return salons.map((salon: any) => ({
+    return salons.map((salon) => ({
       id: salon.id,
       slug: salon.slug,
       name: salon.name,
@@ -154,11 +154,11 @@ export async function growthRoutes(app: FastifyInstance) {
     });
 
     const now = new Date();
-    const segments = clients.map((client: any) => {
+    const segments = clients.map((client) => {
       const lastAppointment = client.appointments[0];
-      const totalSpent = client.appointments.reduce((sum: number, appointment: any) => sum + Number(appointment.service?.price || 0), 0);
+      const totalSpent = client.appointments.reduce((sum, appointment) => sum + Number(appointment.service?.price || 0), 0);
       const daysSinceLastVisit = lastAppointment ? Math.floor((now.getTime() - new Date(lastAppointment.startTime).getTime()) / 86_400_000) : null;
-      const loyaltyPoints = client.loyaltyEntries.reduce((sum: number, entry: any) => sum + Number(entry.points || 0), 0);
+      const loyaltyPoints = client.loyaltyEntries.reduce((sum, entry) => sum + Number(entry.points || 0), 0);
       const birthDate = client.birthDate ? new Date(client.birthDate) : null;
       const birthdayThisMonth = birthDate ? birthDate.getMonth() === now.getMonth() : false;
 
@@ -175,9 +175,9 @@ export async function growthRoutes(app: FastifyInstance) {
 
     return {
       totalClients: clients.length,
-      vip: segments.filter((client: any) => client.tags.includes('VIP')),
-      inactive60Days: segments.filter((client: any) => client.tags.includes('INATIVO_60_DIAS')),
-      birthdays: segments.filter((client: any) => client.tags.includes('ANIVERSARIANTE')),
+      vip: segments.filter((client) => client.tags.includes('VIP')),
+      inactive60Days: segments.filter((client) => client.tags.includes('INATIVO_60_DIAS')),
+      birthdays: segments.filter((client) => client.tags.includes('ANIVERSARIANTE')),
       all: segments
     };
   });
@@ -185,8 +185,8 @@ export async function growthRoutes(app: FastifyInstance) {
   app.get('/admin/crm/campaign-suggestions', adminOrReception, async (request) => {
     const tenant = getTenant(request);
     const clients = await prisma.client.findMany({ where: { salonId: tenant.salonId }, include: { appointments: { orderBy: { startTime: 'desc' }, include: { service: true } } } });
-    const inactive = clients.filter((client: any) => !client.appointments[0] || new Date(client.appointments[0].startTime) < daysAgo(60));
-    const topClients = clients.filter((client: any) => client.appointments.reduce((sum: number, appt: any) => sum + Number(appt.service?.price || 0), 0) >= 500);
+    const inactive = clients.filter((client) => !client.appointments[0] || new Date(client.appointments[0].startTime) < daysAgo(60));
+    const topClients = clients.filter((client) => client.appointments.reduce((sum, appt) => sum + Number(appt.service?.price || 0), 0) >= 500);
 
     return [
       { title: 'Reativação de clientes', segment: 'INATIVO_60_DIAS', clients: inactive.length, channel: 'WhatsApp', message: 'Olá {nome}! Sentimos sua falta. Temos horários especiais esta semana.' },
@@ -204,8 +204,8 @@ export async function growthRoutes(app: FastifyInstance) {
     const professionals = await prisma.professional.findMany({ where: { salonId: tenant.salonId, active: true }, orderBy: { name: 'asc' } });
     const appointments = await prisma.appointment.findMany({ where: { salonId: tenant.salonId, startTime: { gte: start, lte: end } }, include: { service: true, professional: true }, orderBy: { startTime: 'asc' } });
 
-    return professionals.map((professional: any) => {
-      const items = appointments.filter((appointment: any) => appointment.professionalId === professional.id);
+    return professionals.map((professional) => {
+      const items = appointments.filter((appointment) => appointment.professionalId === professional.id);
       return { professionalId: professional.id, professional: professional.name, specialty: professional.specialty, appointments: items, totalAppointments: items.length };
     });
   });
@@ -252,13 +252,13 @@ export async function growthRoutes(app: FastifyInstance) {
       prisma.inventoryProduct.findMany({ where: { salonId: tenant.salonId } })
     ]);
 
-    const revenue = financialEntries.filter((entry: any) => entry.type === 'REVENUE').reduce((sum: number, entry: any) => sum + Number(entry.amount || 0), 0);
-    const expenses = financialEntries.filter((entry: any) => entry.type === 'EXPENSE').reduce((sum: number, entry: any) => sum + Number(entry.amount || 0), 0);
-    const appointmentValue = appointments.reduce((sum: number, appointment: any) => sum + Number(appointment.service?.price || 0), 0);
+    const revenue = financialEntries.filter((entry) => entry.type === 'REVENUE').reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const expenses = financialEntries.filter((entry) => entry.type === 'EXPENSE').reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const appointmentValue = appointments.reduce((sum, appointment) => sum + Number(appointment.service?.price || 0), 0);
     const ticketAverage = appointments.length ? appointmentValue / appointments.length : 0;
-    const lowStock = inventory.filter((product: any) => product.quantity <= product.minimumQuantity);
+    const lowStock = inventory.filter((product) => product.quantity <= product.minimumQuantity);
 
-    const professionals = appointments.reduce((acc: Record<string, number>, appointment: any) => {
+    const professionals = appointments.reduce<Record<string, number>>((acc, appointment) => {
       const name = appointment.professional?.name || 'Sem profissional';
       acc[name] = (acc[name] || 0) + Number(appointment.service?.price || 0);
       return acc;
@@ -272,7 +272,7 @@ export async function growthRoutes(app: FastifyInstance) {
       clients: clients.length,
       ticketAverage,
       lowStock: lowStock.length,
-      professionalRanking: Object.entries(professionals).map(([name, total]) => ({ name, total })).sort((a: any, b: any) => b.total - a.total),
+      professionalRanking: Object.entries(professionals).map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total),
       recommendations: [
         lowStock.length ? 'Priorize reposição dos produtos abaixo do estoque mínimo.' : 'Estoque sem alerta crítico.',
         ticketAverage < 80 ? 'Crie combos para elevar o ticket médio.' : 'Ticket médio saudável para campanhas premium.',

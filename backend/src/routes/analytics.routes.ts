@@ -18,16 +18,9 @@ function endOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 1);
 }
 
-/**
- * Métricas avançadas de negócio.
- * -----------------------------------------------------------------------------
- * Este módulo aproxima o GlossFlow de SaaS comerciais maduros: além de receita,
- * entrega KPIs de retenção, ticket médio, LTV estimado, churn operacional,
- * ocupação da agenda, clientes inativos, ranking e previsões.
- *
- * Observação: os cálculos usam dados existentes no MVP. Em produção, podem ser
- * evoluídos para tabelas materializadas, data warehouse ou jobs analíticos.
- */
+type RankingItem = { name: string; appointments: number; revenue: number };
+
+/** Métricas avançadas preservando os tipos inferidos pelo Prisma. */
 export async function analyticsRoutes(app: FastifyInstance) {
   app.get('/admin/analytics/advanced', async (request) => {
     const tenant = getTenant(request);
@@ -39,7 +32,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const last30 = new Date(now);
     last30.setDate(now.getDate() - 30);
 
-    const [appointmentsRaw, financialEntriesRaw, clientsRaw, inventoryRaw, professionalsRaw, servicesRaw] = await Promise.all([
+    const [appointments, financialEntries, clients, inventory, professionals, services] = await Promise.all([
       prisma.appointment.findMany({
         where: { salonId: tenant.salonId },
         include: { service: true, professional: true, client: true },
@@ -52,40 +45,33 @@ export async function analyticsRoutes(app: FastifyInstance) {
       prisma.service.findMany({ where: { salonId: tenant.salonId, active: true } })
     ]);
 
-    const appointments = appointmentsRaw as any[];
-    const financialEntries = financialEntriesRaw as any[];
-    const clients = clientsRaw as any[];
-    const inventory = inventoryRaw as any[];
-    const professionals = professionalsRaw as any[];
-    const services = servicesRaw as any[];
-
     const monthRevenue = financialEntries
-      .filter((entry: any) => entry.type === 'REVENUE' && entry.referenceDate >= monthStart && entry.referenceDate < nextMonth)
-      .reduce((sum: number, entry: any) => sum + money(entry.amount), 0);
+      .filter((entry) => entry.type === 'REVENUE' && entry.referenceDate >= monthStart && entry.referenceDate < nextMonth)
+      .reduce((sum, entry) => sum + money(entry.amount), 0);
     const monthExpenses = financialEntries
-      .filter((entry: any) => entry.type === 'EXPENSE' && entry.referenceDate >= monthStart && entry.referenceDate < nextMonth)
-      .reduce((sum: number, entry: any) => sum + money(entry.amount), 0);
-    const totalRevenue = financialEntries.filter((entry: any) => entry.type === 'REVENUE').reduce((sum: number, entry: any) => sum + money(entry.amount), 0);
+      .filter((entry) => entry.type === 'EXPENSE' && entry.referenceDate >= monthStart && entry.referenceDate < nextMonth)
+      .reduce((sum, entry) => sum + money(entry.amount), 0);
+    const totalRevenue = financialEntries.filter((entry) => entry.type === 'REVENUE').reduce((sum, entry) => sum + money(entry.amount), 0);
 
-    const appointments90 = appointments.filter((item: any) => item.startTime >= last90);
-    const appointments30 = appointments.filter((item: any) => item.startTime >= last30);
-    const completed = appointments.filter((item: any) => ['COMPLETED', 'CONFIRMED'].includes(item.status));
-    const totalServiceRevenue = completed.reduce((sum: number, item: any) => sum + money(item.service?.price), 0);
+    const appointments90 = appointments.filter((item) => item.startTime >= last90);
+    const appointments30 = appointments.filter((item) => item.startTime >= last30);
+    const completed = appointments.filter((item) => ['COMPLETED', 'CONFIRMED'].includes(item.status));
+    const totalServiceRevenue = completed.reduce((sum, item) => sum + money(item.service?.price), 0);
     const averageTicket = completed.length ? totalServiceRevenue / completed.length : 0;
 
-    const customerKey = (appointment: any) => appointment.clientId || appointment.clientPhone || appointment.clientName;
-    const clientFrequency = appointments.reduce<Record<string, number>>((acc: Record<string, number>, appointment: any) => {
+    const customerKey = (appointment: (typeof appointments)[number]) => appointment.clientId || appointment.clientPhone || appointment.clientName;
+    const clientFrequency = appointments.reduce<Record<string, number>>((acc, appointment) => {
       const key = customerKey(appointment);
       if (!key) return acc;
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
     const uniqueClients = Object.keys(clientFrequency).length;
-    const recurringClients = Object.values(clientFrequency).filter((count: number) => count > 1).length;
+    const recurringClients = Object.values(clientFrequency).filter((count) => count > 1).length;
     const retentionRate = uniqueClients ? Math.round((recurringClients / uniqueClients) * 100) : 0;
 
-    const activeKeys30 = new Set(appointments30.map((appointment: any) => customerKey(appointment)).filter(Boolean));
-    const activeKeys90 = new Set(appointments90.map((appointment: any) => customerKey(appointment)).filter(Boolean));
+    const activeKeys30 = new Set(appointments30.map(customerKey).filter(Boolean));
+    const activeKeys90 = new Set(appointments90.map(customerKey).filter(Boolean));
     const churnRiskClients = [...activeKeys90].filter((key) => !activeKeys30.has(key)).length;
     const churnRiskRate = activeKeys90.size ? Math.round((churnRiskClients / activeKeys90.size) * 100) : 0;
 
@@ -98,27 +84,29 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
     const workingDays = daysBetween(monthStart, nextMonth);
     const capacity = Math.max(1, professionals.length * 9 * workingDays);
-    const occupied = appointments.filter((item: any) => item.startTime >= monthStart && item.startTime < nextMonth).length;
+    const occupied = appointments.filter((item) => item.startTime >= monthStart && item.startTime < nextMonth).length;
     const occupancyRate = Math.min(100, Math.round((occupied / capacity) * 100));
 
-    const serviceRanking = Object.values(appointments.reduce<Record<string, any>>((acc: Record<string, any>, appointment: any) => {
+    const serviceRanking = Object.values(appointments.reduce<Record<string, RankingItem>>((acc, appointment) => {
       const name = appointment.service?.name || 'Serviço não informado';
-      acc[name] = acc[name] || { name, appointments: 0, revenue: 0 };
-      acc[name].appointments += 1;
-      acc[name].revenue += money(appointment.service?.price);
+      const item = acc[name] || { name, appointments: 0, revenue: 0 };
+      item.appointments += 1;
+      item.revenue += money(appointment.service?.price);
+      acc[name] = item;
       return acc;
-    }, {})).sort((a: any, b: any) => b.revenue - a.revenue).slice(0, 8);
+    }, {})).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
 
-    const professionalRanking = Object.values(appointments.reduce<Record<string, any>>((acc: Record<string, any>, appointment: any) => {
+    const professionalRanking = Object.values(appointments.reduce<Record<string, RankingItem>>((acc, appointment) => {
       const name = appointment.professional?.name || 'Profissional não informado';
-      acc[name] = acc[name] || { name, appointments: 0, revenue: 0 };
-      acc[name].appointments += 1;
-      acc[name].revenue += money(appointment.service?.price);
+      const item = acc[name] || { name, appointments: 0, revenue: 0 };
+      item.appointments += 1;
+      item.revenue += money(appointment.service?.price);
+      acc[name] = item;
       return acc;
-    }, {})).sort((a: any, b: any) => b.revenue - a.revenue).slice(0, 8);
+    }, {})).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
 
-    const lowStock = inventory.filter((item: any) => Number(item.quantity || 0) <= Number(item.minimumQuantity || 0));
-    const inventoryValue = inventory.reduce((sum: number, item: any) => sum + money(item.costPrice) * Number(item.quantity || 0), 0);
+    const lowStock = inventory.filter((item) => Number(item.quantity || 0) <= Number(item.minimumQuantity || 0));
+    const inventoryValue = inventory.reduce((sum, item) => sum + money(item.costPrice) * Number(item.quantity || 0), 0);
 
     const score = Math.max(0, Math.min(100,
       45 +

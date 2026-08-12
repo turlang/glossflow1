@@ -1,0 +1,105 @@
+/* 8. Skeleton e responsividade -------------------------------------- */
+.skeleton-container{display:grid;gap:var(--s5)}.skeleton-hero,.skeleton-card{border-radius:var(--r2);background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(255,255,255,.11),rgba(255,255,255,.06));background-size:240% 100%;animation:shimmer 1.4s infinite}.skeleton-hero{min-height:260px;padding:var(--s6)}.skeleton-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}.skeleton-card{height:220px}.skeleton-line{height:14px;margin-bottom:var(--s3);border-radius:999px;background:rgba(255,255,255,.16)}.skeleton-line.short{width:130px}.skeleton-line.medium{width:60%}.skeleton-line.title{width:76%;height:40px}@keyframes shimmer{to{background-position:-240% 0}}
+@media(max-width:1180px){:root{--sidebar:260px}.admin-pro-stats,.automation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.portfolio-grid,.cards.three,.onboarding-steps{grid-template-columns:repeat(2,minmax(0,1fr))}.automation-hero,.agenda-header{flex-direction:column}.automation-flow{grid-template-columns:repeat(5,auto);justify-content:start;overflow-x:auto}.flow-line{width:42px}.enterprise-onboarding{grid-template-columns:1fr}}
+@media(max-width:960px){.header{height:auto;align-items:flex-start;flex-direction:column;padding:var(--s3) var(--s4)}.nav{justify-content:flex-start}.admin-pro-shell,.admin-pro-shell.sidebar-collapsed{grid-template-columns:1fr}.admin-pro-sidebar{position:static;height:auto}.admin-pro-nav{max-height:380px}.admin-pro-topbar,.automation-editor{flex-direction:column;align-items:stretch;grid-template-columns:1fr}.admin-pro-stats,.mini-stats,.agenda-filters,.cards.two{grid-template-columns:repeat(2,minmax(0,1fr))}.weekly-board{grid-template-columns:repeat(7,minmax(190px,1fr))}.insight-grid,.automation-playbook{grid-template-columns:1fr}.sidebar-collapsed .admin-pro-brand span:last-child,.sidebar-collapsed .salon-card-mini,.sidebar-collapsed .admin-pro-nav small,.sidebar-collapsed .admin-pro-nav strong,.sidebar-collapsed .admin-logout{display:block}.sidebar-collapsed .sidebar-collapse{writing-mode:horizontal-tb;min-height:34px}}
+@media(max-width:720px){.container,.admin-pro-shell{width:min(100% - 20px,var(--container))}.hero{min-height:520px;padding:58px 20px}.hero h1{font-size:clamp(2.55rem,14vw,4.1rem)}.cards.three,.cards.two,.portfolio-grid,.form-card,.form-grid,.profile-card,.admin-pro-stats,.mini-stats,.agenda-filters,.automation-grid,.automation-scoreboard,.skeleton-grid,.onboarding-steps{grid-template-columns:1fr}.profile-card img{width:100%;height:220px}.list-row,.editable-row{align-items:flex-start;flex-direction:column}.row-actions,.row-actions button{width:100%}.image-input-grid{grid-template-columns:1fr}.automation-flow{grid-template-columns:1fr}.flow-line{width:2px;height:28px;justify-self:center}.onboarding-progress{grid-row:auto}.topbar-actions{justify-content:flex-start}.weekly-board{grid-template-columns:repeat(7,minmax(210px,1fr))}}
+
+
+/* =====================================================================
+   GlossFlow Enterprise v8.5 — Final UX Polish
+   ---------------------------------------------------------------------
+   Camada final de acabamento visual. Mantém compatibilidade com o App.jsx
+   atual e corrige os pontos críticos de percepção profissional:
+   - textos sem aglomeração;
+   - cards proporcionais;
+   - inputs alinhados;
+   - sidebar utilizável em telas menores;
+   - vitrine com ritmo editorial;
+   - painel administrativo com densidade visual de SaaS premium.
+   ===================================================================== */
+:root{
+  --container:1440px;
+  --sidebar:286px;
+  --r:16px;
+  --r2:22px;
+  --shadow-sm:0 10px 28px rgba(0,0,0,.18);
+  --shadow-md:0 18px 52px rgba(0,0,0,.24);
+}
+
+/* Base tipográfica final: menor que as versões premium anteriores, mas ainda legível. */
+html{font-size:16px!important}
+body{font-size:.94rem!important;line-height:1.58!important}
+h1,h2,h3,h4,p,span,small,strong,label,button,input,textarea,select{letter-spacing:normal}
+p{max-width:72ch}
+
+/* Header e navegação com densidade profissional. */
+.header{min-height:64px!important;padding:10px clamp(16px,3vw,48px)!important}
+.brand-mark{width:38px!important;height:38px!important;flex-basis:38px!important;border-radius:13px!important}
+.nav{gap:6px!important}.nav button,.theme-toggle{min-height:36px!important;padding:0 13px!important;font-size:.88rem!important}
+
+/* Containers mais controlados para evitar leitura longa demais em telas grandes. */
+.container{width:min(var(--container),calc(100% - 32px))!important;padding:38px 0!important}.compact{max-width:720px!important}
+.section-grid{gap:20px!important}.section-title{max-width:760px!important}.section-title h2,.agenda-header h2{font-size:clamp(1.85rem,3.4vw,3.15rem)!important;line-height:1.02!important}.section-title p,.panel-help{font-size:.98rem!important;line-height:1.62!important}
+.eyebrow,.section-title span{font-size:.68rem!important;letter-spacing:.13em!important}
+
+/* Hero com impacto sem ocupar espaço excessivo. */
+.hero{min-height:560px!important;padding:64px clamp(20px,5vw,86px)!important}.hero-content{max-width:820px!important}.hero h1{font-size:clamp(2.8rem,6vw,5.3rem)!important;line-height:.94!important}.hero p{font-size:clamp(1rem,1.35vw,1.18rem)!important;line-height:1.62!important}.hero-actions{margin-top:20px!important}.hero-meta span{padding:.5rem .75rem!important;font-size:.88rem!important}
+
+/* Cards padrão: todos com proporção estável e leitura vertical limpa. */
+.card,.profile-card,.form-card,.panel-card,.state-card,.admin-sidebar{padding:18px!important;border-radius:20px!important}.card h3,.profile-card h3,.panel-card h2{font-size:1.08rem!important;line-height:1.22!important;margin-bottom:8px!important}.card p,.profile-card p,.portfolio-card p{font-size:.92rem!important;line-height:1.58!important}.cards{gap:16px!important}.cards.three{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))!important}.cards.two{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important}.media-card{min-height:360px!important}.card-image{height:170px!important;margin:-18px -18px 14px!important;width:calc(100% + 36px)!important}.card-footer{padding-top:12px!important;margin-top:auto!important}.card-footer strong{font-size:1rem!important}.card-footer span{font-size:.86rem!important}
+
+/* Vitrine: layout editorial com cards consistentes. */
+.portfolio-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))!important;gap:18px!important}.portfolio-card{border-radius:20px!important;display:flex!important;flex-direction:column!important;min-height:390px!important}.portfolio-card img{height:210px!important;object-fit:cover!important}.portfolio-card div{padding:18px!important;display:grid!important;gap:7px!important}.portfolio-card h3{font-size:1.1rem!important;line-height:1.2!important;margin:0!important}.portfolio-card span{font-size:.68rem!important}.portfolio-card p{margin:0!important}
+
+/* Perfis: imagem menor e texto com hierarquia clara. */
+.profile-card{grid-template-columns:118px minmax(0,1fr)!important;gap:16px!important}.profile-card img{width:118px!important;height:118px!important;border-radius:16px!important}.profile-card strong{font-size:.9rem!important;margin-bottom:6px!important}
+
+/* Formulários: altura uniforme, inputs menores e alinhados. */
+.form-card,.form-grid{gap:14px!important}.field{gap:6px!important}.field span{font-size:.68rem!important;letter-spacing:.09em!important}.field input,.field textarea,.field select,.image-input-grid input[type=file]{min-height:40px!important;border-radius:12px!important;padding:0 12px!important;font-size:.92rem!important}.field textarea{min-height:92px!important;padding:11px 12px!important}.primary,.secondary,.ghost-button,.edit-button,.danger-button,.admin-logout,.sidebar-collapse{min-height:39px!important;padding:0 14px!important;font-size:.9rem!important}
+.feedback,.empty-state,.empty-postit{padding:12px!important;font-size:.9rem!important}
+
+/* Admin shell: painel com densidade real de SaaS e sidebar estável. */
+.admin-pro-shell{width:min(1680px,calc(100% - 24px))!important;grid-template-columns:var(--sidebar) minmax(0,1fr)!important;gap:18px!important;padding:14px 0 30px!important}.admin-pro-sidebar{top:78px!important;height:calc(100vh - 92px)!important;padding:14px!important;gap:12px!important;border-radius:22px!important;overflow:hidden!important}.admin-pro-brand{gap:10px!important}.admin-pro-brand span:last-child{display:grid!important;gap:2px!important;min-width:0!important}.admin-pro-brand strong{font-size:.98rem!important;line-height:1.1!important}.admin-pro-brand small{font-size:.72rem!important;color:var(--muted)!important}
+.salon-card-mini{padding:12px!important;border-radius:16px!important}.salon-card-mini span,.salon-card-mini small{font-size:.72rem!important}.salon-card-mini strong{font-size:.92rem!important;line-height:1.2!important}
+.admin-pro-nav{display:flex!important;flex-direction:column!important;gap:7px!important;overflow-y:auto!important;padding-right:4px!important}.admin-pro-nav button{display:grid!important;grid-template-columns:34px minmax(0,1fr)!important;align-items:center!important;gap:10px!important;min-height:54px!important;padding:8px 10px!important;text-align:left!important;border-radius:15px!important}.admin-pro-nav button span:last-child{display:grid!important;gap:2px!important;min-width:0!important}.admin-pro-nav strong{display:block!important;font-size:.86rem!important;line-height:1.12!important;white-space:normal!important}.admin-pro-nav small{display:block!important;font-size:.7rem!important;line-height:1.2!important;color:var(--muted)!important;white-space:normal!important}.menu-icon{width:30px!important;height:30px!important;border-radius:11px!important;font-size:.92rem!important}
+.admin-pro-topbar{padding:18px!important;border-radius:22px!important;gap:14px!important}.admin-pro-topbar h1{font-size:clamp(1.65rem,2.7vw,2.7rem)!important;line-height:1!important}.admin-pro-topbar p{font-size:.92rem!important;line-height:1.45!important}.topbar-actions{gap:8px!important}.admin-pro-content{gap:16px!important}.admin-pro-stats{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))!important;gap:12px!important}.pro-stat-card{min-height:104px!important;padding:14px!important;border-radius:18px!important}.pro-stat-icon{width:38px!important;height:38px!important;border-radius:13px!important}.pro-stat-card strong{font-size:1.28rem!important}.pro-stat-card span{font-size:.78rem!important}.pro-stat-card small{font-size:.72rem!important}
+
+/* Listas e tabelas simuladas: alinhamento previsível e ações sempre visíveis. */
+.list{gap:9px!important}.list-row,.editable-row{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;padding:12px!important;border-radius:15px!important}.list-row>div,.editable-row>div{min-width:0!important}.list-row span,.list-row time,.editable-row span{font-size:.85rem!important;line-height:1.35!important}.row-actions{display:flex!important;align-items:center!important;gap:7px!important;flex-wrap:wrap!important}.list-thumb{width:48px!important;height:48px!important;border-radius:12px!important}
+
+/* Agenda post-it: mantém sua proposta visual, mas com menos altura e mais organização. */
+.agenda-header{gap:16px!important}.agenda-kpis{grid-template-columns:repeat(2,minmax(130px,1fr))!important;gap:10px!important}.agenda-kpis div{padding:13px!important;border-radius:16px!important}.agenda-kpis strong{font-size:1.5rem!important}.weekly-board{gap:8px!important;padding:10px!important;border-radius:22px!important}.week-column{min-height:320px!important;border-radius:15px!important}.week-column header{padding:10px!important;font-size:.72rem!important}.postit-stack{gap:8px!important;padding:10px!important}.postit-note{min-height:100px!important;padding:11px!important}.postit-note strong{font-size:.95rem!important}.postit-note span,.postit-note small,.postit-note time{font-size:.76rem!important}
+
+/* Automações: cards legíveis, preview WhatsApp com escala correta. */
+.automation-hero h2{font-size:clamp(1.75rem,3.4vw,3.1rem)!important}.automation-scoreboard{gap:10px!important}.automation-scoreboard strong{font-size:1.45rem!important}.automation-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))!important;gap:13px!important}.automation-playbook,.insight-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))!important;gap:13px!important}.automation-card,.automation-playbook article,.insight-card{padding:14px!important;border-radius:17px!important}.automation-card h3{font-size:1rem!important}.automation-card p,.automation-playbook small,.insight-card p{font-size:.88rem!important;line-height:1.5!important}.automation-editor{grid-template-columns:minmax(0,1.1fr) minmax(270px,.9fr)!important;gap:16px!important}.phone-preview{border-radius:22px!important;padding:14px!important}.phone-bubble{padding:12px!important;font-size:.9rem!important}
+
+/* Onboarding: leitura guiada, sem cards gigantes. */
+.enterprise-onboarding{gap:16px!important}.onboarding-steps{gap:12px!important}.onboarding-steps article{padding:14px!important;border-radius:17px!important}.onboarding-steps strong{font-size:.98rem!important}.onboarding-steps p{font-size:.88rem!important;line-height:1.5!important}.onboarding-summary{padding:14px!important;border-radius:17px!important}
+
+/* Responsividade final. */
+@media(max-width:1180px){.admin-pro-shell{grid-template-columns:250px minmax(0,1fr)!important}.admin-pro-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}.portfolio-grid,.cards.three,.cards.two{grid-template-columns:repeat(2,minmax(0,1fr))!important}.automation-editor{grid-template-columns:1fr!important}.weekly-board{grid-template-columns:repeat(7,minmax(180px,1fr))!important;overflow-x:auto!important}}
+@media(max-width:900px){.header{align-items:flex-start!important;height:auto!important}.admin-pro-shell{grid-template-columns:1fr!important}.admin-pro-sidebar{position:static!important;height:auto!important}.admin-pro-nav{max-height:340px!important}.admin-pro-topbar{flex-direction:column!important;align-items:flex-start!important}.topbar-actions{width:100%!important}.topbar-actions button{flex:1 1 150px!important}.profile-card{grid-template-columns:1fr!important}.profile-card img{width:100%!important;height:220px!important}.form-card,.form-grid{grid-template-columns:1fr!important}}
+@media(max-width:640px){.container,.admin-pro-shell{width:calc(100% - 18px)!important}.portfolio-grid,.cards.three,.cards.two,.admin-pro-stats,.agenda-kpis,.automation-scoreboard{grid-template-columns:1fr!important}.hero{min-height:500px!important;padding:48px 18px!important}.portfolio-card{min-height:auto!important}.portfolio-card img,.card-image{height:170px!important}.list-row,.editable-row{align-items:flex-start!important;flex-direction:column!important}.row-actions,.row-actions button{width:100%!important}.weekly-board{grid-template-columns:repeat(7,minmax(200px,1fr))!important}.automation-flow{grid-template-columns:1fr!important}.flow-line{width:2px!important;height:24px!important;justify-self:center!important}}
+
+/* =========================================================
+   Assinaturas e Automações — UX comercial final
+   ---------------------------------------------------------
+   Estes estilos tornam claro o que cada plano oferece e
+   transformam automações em uma área operacional: criar,
+   editar, excluir, pausar e visualizar mensagens.
+   ========================================================= */
+.subscription-center{display:grid;gap:var(--s5)}
+.subscription-hero{display:flex;justify-content:space-between;gap:var(--s5);align-items:flex-start}
+.subscription-hero h2{margin:var(--s2) 0;color:var(--strong);font-size:clamp(1.8rem,3.8vw,3.1rem);line-height:1;letter-spacing:-.05em}
+.subscription-status-card{min-width:240px;padding:var(--s4);border-radius:var(--r);background:linear-gradient(135deg,rgba(214,179,95,.16),rgba(139,92,246,.12));border:1px solid rgba(214,179,95,.28)}
+.subscription-status-card span,.subscription-status-card small{display:block;color:var(--muted);font-weight:850}.subscription-status-card strong{display:block;margin:8px 0;color:var(--gold-2);font-size:1.55rem}
+.plan-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s4)}
+.plan-card{display:grid;gap:var(--s4);align-content:start;padding:var(--s5);border-radius:var(--r2);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-sm)}
+.plan-card.featured{border-color:rgba(214,179,95,.55);box-shadow:var(--shadow-md),inset 0 0 0 1px rgba(214,179,95,.18)}
+.plan-head span{display:inline-flex;margin-bottom:10px;padding:6px 10px;border-radius:999px;color:#111827;background:linear-gradient(135deg,var(--gold-2),var(--primary));font-size:.72rem;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.plan-head h3{margin:0;color:var(--strong);font-size:1.35rem}.plan-head strong{display:block;margin-top:6px;color:var(--gold-2);font-size:1.65rem}.plan-card p{margin:0;color:var(--muted);line-height:1.55}.plan-list{display:grid;gap:8px}.plan-list small{color:var(--soft);font-weight:950;text-transform:uppercase;letter-spacing:.08em}.plan-list span{color:var(--muted);font-size:.9rem}.muted-list span{opacity:.78}
+.automation-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:var(--s4)}
+.saved-automations .list-row p{max-width:760px;margin:0;color:var(--muted);line-height:1.5}.saved-automations .editable-row{align-items:flex-start}.saved-automations .row-actions{margin-left:auto}
+@media(max-width:1180px){.plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.subscription-hero{flex-direction:column}.subscription-status-card{width:100%}}
+@media(max-width:720px){.plan-grid{grid-template-columns:1fr}.automation-actions>*{width:100%}.saved-automations .row-actions{margin-left:0;width:100%}}
+
+
