@@ -1,8 +1,9 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply } from 'fastify';
 import { prisma } from '../../lib/prisma';
 import { appointmentSchema } from '../schemas';
 import { getPublicSalon } from '../helpers';
 import { hasSalonModule } from '../../services/module-access.service';
+import { getTenantSubscriptionAccess } from '../../services/saas-lifecycle.service';
 import { professionalCanPerform } from '../../services/professional-capability.service';
 import { bookingFitsProfessionalSchedule } from '../../services/professional-schedule.service';
 import { bookingFitsBusinessWindow, publicBookingAvailability } from '../../services/public-booking-availability.service';
@@ -10,10 +11,22 @@ import { cancellationMinHours, createAppointmentManagementAccess, notifyAppointm
 import { buildAppointmentConflictWhere } from '../../services/appointment-reschedule.service';
 import { availabilityQuerySchema, normalizePhone } from './contracts';
 
+async function ensureBookingContract(salonId: string, reply: FastifyReply) {
+  const access = await getTenantSubscriptionAccess(salonId);
+  if (access.allowed) return true;
+  reply.status(403).send({
+    message: 'Agendamento online temporariamente indisponível para este salão.',
+    code: access.code,
+    subscriptionStatus: access.status
+  });
+  return false;
+}
+
 export async function publicAppointmentRoutes(app: FastifyInstance) {
   app.get('/appointments/availability', async (request, reply) => {
     const query = availabilityQuerySchema.parse(request.query);
     const salon = await getPublicSalon(request);
+    if (!await ensureBookingContract(salon.id, reply)) return;
     if (!hasSalonModule(salon, 'AGENDA')) {
       return reply.status(403).send({ message: 'Agendamento online não está habilitado para este salão.', code: 'MODULE_DISABLED', module: 'AGENDA' });
     }
@@ -24,6 +37,7 @@ export async function publicAppointmentRoutes(app: FastifyInstance) {
 
   app.get('/appointments', async (request, reply) => {
     const salon = await getPublicSalon(request);
+    if (!await ensureBookingContract(salon.id, reply)) return;
     if (!hasSalonModule(salon, 'AGENDA')) {
       return reply.status(403).send({ message: 'Agendamento online não está habilitado para este salão.', code: 'MODULE_DISABLED', module: 'AGENDA' });
     }
@@ -37,6 +51,7 @@ export async function publicAppointmentRoutes(app: FastifyInstance) {
   app.post('/appointments', async (request, reply) => {
     const data = appointmentSchema.parse(request.body);
     const salon = await getPublicSalon(request);
+    if (!await ensureBookingContract(salon.id, reply)) return;
     if (!hasSalonModule(salon, 'AGENDA')) {
       return reply.status(403).send({ message: 'Agendamento online não está habilitado para este salão.', code: 'MODULE_DISABLED', module: 'AGENDA' });
     }
