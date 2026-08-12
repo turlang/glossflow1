@@ -15,7 +15,24 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3333').replace(/\/+$/, '');
 
 const AUTH_EXPIRED_EVENT = 'glossflow:auth-expired';
+const AUTH_EXPIRED_CODE = 'AUTH_EXPIRED';
+const AUTH_EXPIRED_MESSAGE = 'Sua sessão expirou. Entre novamente para continuar.';
 const BOOKING_CONFIRMED_EVENT = 'glossflow:booking-confirmed';
+
+/**
+ * Erro tipado de sessão expirada. A UI usa o `code` para distinguir expiração
+ * real de indisponibilidade da API e não bloquear a tela de login com um
+ * banner genérico de conexão.
+ */
+function authExpiredError() {
+  const error = new Error(AUTH_EXPIRED_MESSAGE);
+  error.code = AUTH_EXPIRED_CODE;
+  return error;
+}
+
+export function isAuthExpiredError(error) {
+  return error?.code === AUTH_EXPIRED_CODE;
+}
 
 /**
  * Identifica o tenant público sem confiar em dados administrativos.
@@ -118,7 +135,10 @@ export async function request(path, options = {}, retry = true) {
 
   if (!token && retry && !isAuthBootstrapPath(path) && localStorage.getItem('glossflow.refreshToken')) {
     token = await refreshAccessToken();
-    if (!token) clearSession();
+    if (!token) {
+      clearSession();
+      throw authExpiredError();
+    }
   }
 
   const response = await fetch(`${API_URL}${path}`, {
@@ -131,18 +151,19 @@ export async function request(path, options = {}, retry = true) {
     }
   });
 
-  if (response.status === 401 && retry && !isAuthBootstrapPath(path)) {
-    const newToken = await refreshAccessToken();
-    if (newToken) return request(path, options, false);
+  if (response.status === 401 && !isAuthBootstrapPath(path)) {
+    if (retry) {
+      const newToken = await refreshAccessToken();
+      if (newToken) return request(path, options, false);
+    }
+
     clearSession();
+    throw authExpiredError();
   }
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    if (response.status === 401 && !isAuthBootstrapPath(path)) {
-      throw new Error('Sua sessão expirou. Entre novamente para continuar.');
-    }
     throw new Error(apiErrorMessage(data));
   }
 
