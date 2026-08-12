@@ -63,7 +63,7 @@ export async function exportClientPersonalData(salonId: string, clientId: string
       appointments: {
         orderBy: { startTime: 'asc' },
         include: {
-          service: { select: { id: true, name: true, price: true, duration: true } },
+          service: { select: { id: true, name: true, price: true, durationMin: true } },
           professional: { select: { id: true, name: true } }
         }
       },
@@ -76,7 +76,7 @@ export async function exportClientPersonalData(salonId: string, clientId: string
   if (!client) return null;
 
   const phone = normalizePhone(client.phone);
-  const appointmentIds = new Set(client.appointments.map((item) => item.id));
+  const appointmentIds = new Set<string>(client.appointments.map((item) => item.id));
   const auditLogs = await prisma.auditLog.findMany({
     where: { salonId, resource: { in: [...SUBJECT_RESOURCES] } },
     orderBy: { createdAt: 'asc' },
@@ -156,7 +156,7 @@ export async function eraseClientPersonalData(input: {
   if (!client) return null;
 
   const phone = normalizePhone(client.phone);
-  const appointmentIds = new Set(client.appointments.map((item) => item.id));
+  const appointmentIds = new Set<string>(client.appointments.map((item) => item.id));
   const fingerprint = subjectFingerprint(input.salonId, input.clientId);
   const erasedAt = new Date().toISOString();
 
