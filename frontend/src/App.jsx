@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { onAuthExpired, request } from './services/api.js';
 import { emptyBackofficeData, loadTenantBackofficeData } from './services/backoffice-data.js';
 import { Header, PublicShowcase, BookingPage, LoginPage } from './components/public/PublicExperience.jsx';
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
-import { AdminDashboard } from './components/admin/AdminDashboard.jsx';
-import { PlatformAdmin } from './components/admin/PlatformAdmin.jsx';
-import { WhatsAppAgentTester } from './components/admin/WhatsAppAgentTester.jsx';
-import { ProfessionalCapabilitiesAdmin } from './components/admin/ProfessionalCapabilitiesAdmin.jsx';
-import { ProfessionalScheduleAdmin } from './components/admin/ProfessionalScheduleAdmin.jsx';
-import { OperationalAgendaBoard } from './components/admin/OperationalAgendaBoard.jsx';
-import { SmartFitAdmin } from './components/admin/SmartFitAdmin.jsx';
-import { WaitlistAdmin } from './components/admin/WaitlistAdmin.jsx';
 import { ModuleVisibilityGuard } from './components/admin/ModuleVisibilityGuard.jsx';
-import { CommercialLanding } from './components/commercial/CommercialLanding.jsx';
+import {
+  AdminDashboard,
+  CommercialLanding,
+  OperationalAgendaBoard,
+  PlatformAdmin,
+  ProfessionalCapabilitiesAdmin,
+  ProfessionalScheduleAdmin,
+  SmartFitAdmin,
+  WaitlistAdmin,
+  WhatsAppAgentTester
+} from './components/lazy-pages.jsx';
 import { TENANT_BACKOFFICE_PAGES, normalizePageForRole, resolveInitialPage } from './config/navigation.js';
 import { isSuperAdmin as isSuperAdminRole, tokenRole } from './utils/auth.js';
 import { hasModule } from './utils/modules.js';
@@ -27,6 +29,8 @@ import { hasModule } from './utils/modules.js';
  *
  * Regras de papel, navegação e matriz de endpoints ficam em módulos dedicados
  * para impedir que o App volte a concentrar autorização e acesso a dados.
+ * Telas pesadas do backoffice são carregadas sob demanda para manter a vitrine
+ * e o fluxo público fora do bundle administrativo.
  */
 export default function App() {
   const [page, setPage] = useState('public');
@@ -200,107 +204,109 @@ export default function App() {
       {loading && <SkeletonPage />}
       {!loading && error && <StateMessage title="Não foi possível conectar à API." text={error} danger />}
 
-      {!loading && !error && page === 'public' && (
-        <PublicShowcase
-          salon={salon}
-          services={services}
-          professionals={professionals}
-          portfolio={portfolio}
-          setPage={setPage}
-        />
-      )}
+      <Suspense fallback={<SkeletonPage />}>
+        {!loading && !error && page === 'public' && (
+          <PublicShowcase
+            salon={salon}
+            services={services}
+            professionals={professionals}
+            portfolio={portfolio}
+            setPage={setPage}
+          />
+        )}
 
-      {!loading && !error && page === 'commercial' && <CommercialLanding />}
+        {!loading && !error && page === 'commercial' && <CommercialLanding />}
 
-      {!loading && !error && page === 'booking' && (
-        canUseBooking
-          ? <BookingPage services={services} professionals={professionals} onCreated={loadPublicData} salon={salon} />
-          : <StateMessage title="Agendamento online indisponível" text="Este salão não possui o módulo Agenda habilitado." danger />
-      )}
+        {!loading && !error && page === 'booking' && (
+          canUseBooking
+            ? <BookingPage services={services} professionals={professionals} onCreated={loadPublicData} salon={salon} />
+            : <StateMessage title="Agendamento online indisponível" text="Este salão não possui o módulo Agenda habilitado." danger />
+        )}
 
-      {!loading && !error && page === 'login' && (
-        <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
+        {!loading && !error && page === 'login' && (
+          <LoginPage setPage={setPage} onLogin={setAuthToken} />
+        )}
 
-      {!loading && !error && page === 'platform-admin' && (
-        isAuthenticated && isSuperAdmin
-          ? <PlatformAdmin setPage={setPage} />
-          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
-
-      {!loading && !error && page === 'agent-test' && (
-        isAuthenticated && !isSuperAdmin && canUseAgent
-          ? <WhatsAppAgentTester setPage={setPage} />
-          : isAuthenticated && !isSuperAdmin
-            ? <StateMessage title="Módulo não habilitado" text="O agente precisa dos módulos WhatsApp e Inteligência Artificial habilitados." danger />
+        {!loading && !error && page === 'platform-admin' && (
+          isAuthenticated && isSuperAdmin
+            ? <PlatformAdmin setPage={setPage} />
             : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
+        )}
 
-      {!loading && !error && page === 'professional-services' && (
-        isAuthenticated && !isSuperAdmin
-          ? <ProfessionalCapabilitiesAdmin salon={backofficeSalon} services={services} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} />
-          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
+        {!loading && !error && page === 'agent-test' && (
+          isAuthenticated && !isSuperAdmin && canUseAgent
+            ? <WhatsAppAgentTester setPage={setPage} />
+            : isAuthenticated && !isSuperAdmin
+              ? <StateMessage title="Módulo não habilitado" text="O agente precisa dos módulos WhatsApp e Inteligência Artificial habilitados." danger />
+              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+        )}
 
-      {!loading && !error && page === 'professional-schedule' && (
-        isAuthenticated && !isSuperAdmin && canUseBooking
-          ? <ProfessionalScheduleAdmin setPage={setPage} />
-          : isAuthenticated && !isSuperAdmin
-            ? <StateMessage title="Módulo não habilitado" text="A jornada da equipe faz parte do módulo Agenda." danger />
+        {!loading && !error && page === 'professional-services' && (
+          isAuthenticated && !isSuperAdmin
+            ? <ProfessionalCapabilitiesAdmin salon={backofficeSalon} services={services} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} />
             : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
+        )}
 
-      {!loading && !error && page === 'operational-agenda' && (
-        isAuthenticated && !isSuperAdmin && canUseBooking
-          ? <OperationalAgendaBoard appointments={appointments} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} />
-          : isAuthenticated && !isSuperAdmin
-            ? <StateMessage title="Módulo não habilitado" text="A agenda operacional faz parte do módulo Agenda." danger />
+        {!loading && !error && page === 'professional-schedule' && (
+          isAuthenticated && !isSuperAdmin && canUseBooking
+            ? <ProfessionalScheduleAdmin setPage={setPage} />
+            : isAuthenticated && !isSuperAdmin
+              ? <StateMessage title="Módulo não habilitado" text="A jornada da equipe faz parte do módulo Agenda." danger />
+              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+        )}
+
+        {!loading && !error && page === 'operational-agenda' && (
+          isAuthenticated && !isSuperAdmin && canUseBooking
+            ? <OperationalAgendaBoard appointments={appointments} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} />
+            : isAuthenticated && !isSuperAdmin
+              ? <StateMessage title="Módulo não habilitado" text="A agenda operacional faz parte do módulo Agenda." danger />
+              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+        )}
+
+        {!loading && !error && page === 'smart-fit' && (
+          isAuthenticated && !isSuperAdmin && canUseBooking
+            ? <SmartFitAdmin services={services} professionals={professionals} setPage={setPage} />
+            : isAuthenticated && !isSuperAdmin
+              ? <StateMessage title="Módulo não habilitado" text="O encaixe inteligente faz parte do módulo Agenda." danger />
+              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+        )}
+
+        {!loading && !error && page === 'waitlist' && (
+          isAuthenticated && !isSuperAdmin && canUseBooking
+            ? <WaitlistAdmin setPage={setPage} />
+            : isAuthenticated && !isSuperAdmin
+              ? <StateMessage title="Módulo não habilitado" text="A lista de espera faz parte do módulo Agenda." danger />
+              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+        )}
+
+        {!loading && !error && page === 'admin' && (
+          isAuthenticated && !isSuperAdmin
+            ? (
+              <AdminDashboard
+                role={authRole}
+                salon={backofficeSalon}
+                services={services}
+                professionals={professionals}
+                portfolio={portfolio}
+                appointments={appointments}
+                inventory={inventory}
+                users={users}
+                clients={clients}
+                financialEntries={financialEntries}
+                commissions={commissions}
+                loyalty={loyalty}
+                subscription={subscription}
+                whatsappTemplates={whatsappTemplates}
+                insights={insights}
+                reload={reloadBackofficeData}
+                setPage={setPage}
+                theme={theme}
+                toggleTheme={toggleTheme}
+              />
+            )
             : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
-
-      {!loading && !error && page === 'smart-fit' && (
-        isAuthenticated && !isSuperAdmin && canUseBooking
-          ? <SmartFitAdmin services={services} professionals={professionals} setPage={setPage} />
-          : isAuthenticated && !isSuperAdmin
-            ? <StateMessage title="Módulo não habilitado" text="O encaixe inteligente faz parte do módulo Agenda." danger />
-            : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
-
-      {!loading && !error && page === 'waitlist' && (
-        isAuthenticated && !isSuperAdmin && canUseBooking
-          ? <WaitlistAdmin setPage={setPage} />
-          : isAuthenticated && !isSuperAdmin
-            ? <StateMessage title="Módulo não habilitado" text="A lista de espera faz parte do módulo Agenda." danger />
-            : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
-
-      {!loading && !error && page === 'admin' && (
-        isAuthenticated && !isSuperAdmin
-          ? (
-            <AdminDashboard
-              role={authRole}
-              salon={backofficeSalon}
-              services={services}
-              professionals={professionals}
-              portfolio={portfolio}
-              appointments={appointments}
-              inventory={inventory}
-              users={users}
-              clients={clients}
-              financialEntries={financialEntries}
-              commissions={commissions}
-              loyalty={loyalty}
-              subscription={subscription}
-              whatsappTemplates={whatsappTemplates}
-              insights={insights}
-              reload={reloadBackofficeData}
-              setPage={setPage}
-              theme={theme}
-              toggleTheme={toggleTheme}
-            />
-          )
-          : <LoginPage setPage={setPage} onLogin={setAuthToken} />
-      )}
+        )}
+      </Suspense>
     </div>
   );
 }
