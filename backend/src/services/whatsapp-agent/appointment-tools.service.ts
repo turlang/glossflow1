@@ -25,18 +25,18 @@ export async function listClientAppointments(salonId: string, phone: string) {
 }
 
 export async function availableSlots(input: { salon: AgentSalon; serviceId: string; professionalId?: string | null; date: string }) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { ok: false, message: 'Data inválida. Use YYYY-MM-DD.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { ok: false as const, message: 'Data inválida. Use YYYY-MM-DD.' };
 
   const service = await prisma.service.findFirst({ where: { id: input.serviceId, salonId: input.salon.id, active: true } });
-  if (!service) return { ok: false, message: 'Serviço não encontrado neste salão.' };
+  if (!service) return { ok: false as const, message: 'Serviço não encontrado neste salão.' };
 
   const professionals = input.professionalId
     ? await prisma.professional.findMany({ where: { id: input.professionalId, salonId: input.salon.id, active: true } })
     : await prisma.professional.findMany({ where: { salonId: input.salon.id, active: true }, orderBy: { name: 'asc' } });
-  if (!professionals.length) return { ok: false, message: 'Nenhum profissional disponível para consulta.' };
+  if (!professionals.length) return { ok: false as const, message: 'Nenhum profissional disponível para consulta.' };
 
   const weekday = new Date(`${input.date}T12:00:00Z`).getUTCDay();
-  if (weekday === 0) return { ok: true, slots: [], message: 'Domingo não está habilitado na configuração padrão.' };
+  if (weekday === 0) return { ok: true as const, slots: [], message: 'Domingo não está habilitado na configuração padrão.' };
 
   const { startHour, endHour } = parseOpeningHours(input.salon.openingHours);
   const intervalMin = Number(process.env.BOOKING_SLOT_INTERVAL_MINUTES || 30);
@@ -61,67 +61,149 @@ export async function availableSlots(input: { salon: AgentSalon; serviceId: stri
     }
     if (result.length >= 12) break;
   }
-  return { ok: true, service: service.name, slots: result };
+  return { ok: true as const, service: service.name, slots: result };
 }
 
-export async function createAppointment(input: { salon: AgentSalon; phone: string; serviceId: string; professionalId: string; startTime: string; clientName: string; confirmed: boolean }) {
-  if (!input.confirmed) return { ok: false, requiresConfirmation: true, message: 'Peça confirmação explícita do cliente antes de criar o agendamento.' };
+type CreateInput = { salon: AgentSalon; phone: string; serviceId: string; professionalId: string; startTime: string; clientName: string };
+
+async function validateCreateAppointment(input: CreateInput) {
   const [service, professional] = await Promise.all([
     prisma.service.findFirst({ where: { id: input.serviceId, salonId: input.salon.id, active: true } }),
     prisma.professional.findFirst({ where: { id: input.professionalId, salonId: input.salon.id, active: true } })
   ]);
-  if (!service || !professional) return { ok: false, message: 'Serviço ou profissional inválido para este salão.' };
-  if (!professionalCanPerform(professional, service.id)) return { ok: false, message: `${professional.name} não executa ${service.name}.` };
+  if (!service || !professional) return { ok: false as const, message: 'Serviço ou profissional inválido para este salão.' };
+  if (!professionalCanPerform(professional, service.id)) return { ok: false as const, message: `${professional.name} não executa ${service.name}.` };
 
   const start = new Date(input.startTime);
-  if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now()) return { ok: false, message: 'Horário inválido ou já passou.' };
+  if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now()) return { ok: false as const, message: 'Horário inválido ou já passou.' };
   const end = new Date(start.getTime() + service.durationMin * 60_000);
   if (!bookingFitsBusinessWindow(input.salon.openingHours, start, service.durationMin)
     || !bookingFitsProfessionalSchedule({ professional, openingHours: input.salon.openingHours, start, end })) {
-    return { ok: false, message: 'O horário solicitado não cabe na jornada disponível.' };
+    return { ok: false as const, message: 'O horário solicitado não cabe na jornada disponível.' };
   }
 
   const conflict = await prisma.appointment.findFirst({ where: buildAppointmentConflictWhere({ salonId: input.salon.id, professionalId: professional.id, start, end }) });
-  if (conflict) return { ok: false, message: 'O horário acabou de ficar indisponível. Consulte novos horários.' };
+  if (conflict) return { ok: false as const, message: 'O horário acabou de ficar indisponível. Consulte novos horários.' };
 
-  const phone = normalizePhone(input.phone);
-  const existingClient = await prisma.client.findFirst({ where: { salonId: input.salon.id, phone } });
-  const client = existingClient || await prisma.client.create({ data: { name: input.clientName, phone, notes: 'Criado automaticamente pelo agente de WhatsApp.', salonId: input.salon.id } });
+  return { ok: true as const, service, professional, start, end, phone: normalizePhone(input.phone) };
+}
+
+export async function previewCreateAppointment(input: CreateInput) {
+  const checked = await validateCreateAppointment(input);
+  if (!checked.ok) return checked;
+  return {
+    ok: true as const,
+    service: checked.service.name,
+    professional: checked.professional.name,
+    startTime: checked.start.toISOString(),
+    displayTime: formatBusinessDate(checked.start),
+    message: `Agendar ${checked.service.name} com ${checked.professional.name} em ${formatBusinessDate(checked.start)}.`
+  };
+}
+
+export async function createAppointment(input: CreateInput & { confirmed: boolean }) {
+  if (!input.confirmed) return { ok: false as const, requiresConfirmation: true, message: 'A confirmação deve ser validada pelo servidor antes de criar o agendamento.' };
+  const checked = await validateCreateAppointment(input);
+  if (!checked.ok) return checked;
+
+  const existingClient = await prisma.client.findFirst({ where: { salonId: input.salon.id, phone: checked.phone } });
+  const client = existingClient || await prisma.client.create({ data: { name: input.clientName, phone: checked.phone, notes: 'Criado automaticamente pelo agente de WhatsApp.', salonId: input.salon.id } });
   const appointment = await prisma.appointment.create({
-    data: { clientName: input.clientName, clientPhone: phone, clientId: client.id, startTime: start, endTime: end, notes: 'Agendado pelo agente de WhatsApp.', salonId: input.salon.id, serviceId: service.id, professionalId: professional.id }
+    data: { clientName: input.clientName, clientPhone: checked.phone, clientId: client.id, startTime: checked.start, endTime: checked.end, notes: 'Agendado pelo agente de WhatsApp após confirmação explícita.', salonId: input.salon.id, serviceId: checked.service.id, professionalId: checked.professional.id }
   });
-  return { ok: true, appointmentId: appointment.id, service: service.name, professional: professional.name, startTime: start.toISOString(), displayTime: formatBusinessDate(start) };
+  return {
+    ok: true as const,
+    appointmentId: appointment.id,
+    service: checked.service.name,
+    professional: checked.professional.name,
+    startTime: checked.start.toISOString(),
+    displayTime: formatBusinessDate(checked.start),
+    message: `Agendamento confirmado: ${checked.service.name} com ${checked.professional.name} em ${formatBusinessDate(checked.start)}.`
+  };
+}
+
+async function findCancelableAppointment(salonId: string, phone: string, appointmentId: string) {
+  return prisma.appointment.findFirst({
+    where: { id: appointmentId, salonId, clientPhone: normalizePhone(phone), status: 'CONFIRMED' },
+    include: { service: true, professional: true }
+  });
+}
+
+export async function previewCancelAppointment(salonId: string, phone: string, appointmentId: string) {
+  const appointment = await findCancelableAppointment(salonId, phone, appointmentId);
+  if (!appointment) return { ok: false as const, message: 'Agendamento ativo não encontrado para este cliente.' };
+  return {
+    ok: true as const,
+    appointmentId: appointment.id,
+    service: appointment.service.name,
+    professional: appointment.professional.name,
+    displayTime: formatBusinessDate(appointment.startTime),
+    message: `Cancelar ${appointment.service.name} com ${appointment.professional.name} em ${formatBusinessDate(appointment.startTime)}.`
+  };
 }
 
 export async function cancelAppointment(salonId: string, phone: string, appointmentId: string, confirmed: boolean) {
-  if (!confirmed) return { ok: false, requiresConfirmation: true, message: 'Peça confirmação explícita antes de cancelar.' };
-  const appointment = await prisma.appointment.findFirst({ where: { id: appointmentId, salonId, clientPhone: normalizePhone(phone), status: 'CONFIRMED' } });
-  if (!appointment) return { ok: false, message: 'Agendamento ativo não encontrado para este cliente.' };
+  if (!confirmed) return { ok: false as const, requiresConfirmation: true, message: 'A confirmação deve ser validada pelo servidor antes de cancelar.' };
+  const appointment = await findCancelableAppointment(salonId, phone, appointmentId);
+  if (!appointment) return { ok: false as const, message: 'Agendamento ativo não encontrado para este cliente.' };
   await prisma.appointment.update({ where: { id: appointment.id }, data: { status: 'CANCELED' } });
-  return { ok: true, appointmentId, message: 'Agendamento cancelado.' };
+  return { ok: true as const, appointmentId, message: `Agendamento de ${appointment.service.name} em ${formatBusinessDate(appointment.startTime)} cancelado.` };
 }
 
-export async function rescheduleAppointment(input: { salonId: string; phone: string; appointmentId: string; startTime: string; professionalId?: string | null; confirmed: boolean }) {
-  if (!input.confirmed) return { ok: false, requiresConfirmation: true, message: 'Peça confirmação explícita antes de reagendar.' };
+type RescheduleInput = { salonId: string; phone: string; appointmentId: string; startTime: string; professionalId?: string | null };
+
+async function validateRescheduleAppointment(input: RescheduleInput) {
   const appointment = await prisma.appointment.findFirst({ where: { id: input.appointmentId, salonId: input.salonId, clientPhone: normalizePhone(input.phone), status: 'CONFIRMED' }, include: { service: true } });
-  if (!appointment) return { ok: false, message: 'Agendamento ativo não encontrado para este cliente.' };
+  if (!appointment) return { ok: false as const, message: 'Agendamento ativo não encontrado para este cliente.' };
 
   const professionalId = input.professionalId || appointment.professionalId;
-  const professional = await prisma.professional.findFirst({ where: { id: professionalId, salonId: input.salonId, active: true } });
-  if (!professional) return { ok: false, message: 'Profissional inválido.' };
-  if (!professionalCanPerform(professional, appointment.service.id)) return { ok: false, message: `${professional.name} não executa ${appointment.service.name}.` };
+  const [professional, salon] = await Promise.all([
+    prisma.professional.findFirst({ where: { id: professionalId, salonId: input.salonId, active: true } }),
+    prisma.salon.findUnique({ where: { id: input.salonId }, select: { openingHours: true } })
+  ]);
+  if (!professional) return { ok: false as const, message: 'Profissional inválido.' };
+  if (!salon) return { ok: false as const, message: 'Salão não encontrado.' };
+  if (!professionalCanPerform(professional, appointment.service.id)) return { ok: false as const, message: `${professional.name} não executa ${appointment.service.name}.` };
 
-  const salon = await prisma.salon.findUnique({ where: { id: input.salonId }, select: { openingHours: true } });
-  if (!salon) return { ok: false, message: 'Salão não encontrado.' };
   const start = new Date(input.startTime);
-  if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now()) return { ok: false, message: 'Novo horário inválido.' };
+  if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now()) return { ok: false as const, message: 'Novo horário inválido.' };
   const end = new Date(start.getTime() + appointment.service.durationMin * 60_000);
   if (!bookingFitsBusinessWindow(salon.openingHours, start, appointment.service.durationMin)
-    || !bookingFitsProfessionalSchedule({ professional, openingHours: salon.openingHours, start, end })) return { ok: false, message: 'O novo horário fica fora da jornada disponível.' };
+    || !bookingFitsProfessionalSchedule({ professional, openingHours: salon.openingHours, start, end })) {
+    return { ok: false as const, message: 'O novo horário fica fora da jornada disponível.' };
+  }
 
   const conflict = await prisma.appointment.findFirst({ where: buildAppointmentConflictWhere({ appointmentId: appointment.id, salonId: input.salonId, professionalId, start, end }) });
-  if (conflict) return { ok: false, message: 'O novo horário não está mais disponível.' };
+  if (conflict) return { ok: false as const, message: 'O novo horário não está mais disponível.' };
 
-  await prisma.appointment.update({ where: { id: appointment.id }, data: { startTime: start, endTime: end, professionalId } });
-  return { ok: true, appointmentId: appointment.id, professional: professional.name, displayTime: formatBusinessDate(start) };
+  return { ok: true as const, appointment, professional, professionalId, start, end };
+}
+
+export async function previewRescheduleAppointment(input: RescheduleInput) {
+  const checked = await validateRescheduleAppointment(input);
+  if (!checked.ok) return checked;
+  return {
+    ok: true as const,
+    appointmentId: checked.appointment.id,
+    service: checked.appointment.service.name,
+    professional: checked.professional.name,
+    startTime: checked.start.toISOString(),
+    displayTime: formatBusinessDate(checked.start),
+    message: `Reagendar ${checked.appointment.service.name} para ${formatBusinessDate(checked.start)} com ${checked.professional.name}.`
+  };
+}
+
+export async function rescheduleAppointment(input: RescheduleInput & { confirmed: boolean }) {
+  if (!input.confirmed) return { ok: false as const, requiresConfirmation: true, message: 'A confirmação deve ser validada pelo servidor antes de reagendar.' };
+  const checked = await validateRescheduleAppointment(input);
+  if (!checked.ok) return checked;
+
+  await prisma.appointment.update({ where: { id: checked.appointment.id }, data: { startTime: checked.start, endTime: checked.end, professionalId: checked.professionalId } });
+  return {
+    ok: true as const,
+    appointmentId: checked.appointment.id,
+    professional: checked.professional.name,
+    displayTime: formatBusinessDate(checked.start),
+    message: `Agendamento reagendado para ${formatBusinessDate(checked.start)} com ${checked.professional.name}.`
+  };
 }
