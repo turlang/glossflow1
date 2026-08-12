@@ -4,6 +4,7 @@ import { businessClientRoutes } from './business/clients.routes';
 import { businessCommissionRoutes } from './business/commissions.routes';
 import { businessFinancialRoutes } from './business/financial.routes';
 import { businessLoyaltyRoutes } from './business/loyalty.routes';
+import { businessRetentionRoutes } from './business/retention.routes';
 import { businessSubscriptionRoutes } from './business/subscription.routes';
 import { businessWhatsappTemplateRoutes } from './business/whatsapp-templates.routes';
 
@@ -12,6 +13,7 @@ import { businessWhatsappTemplateRoutes } from './business/whatsapp-templates.ro
  * existentes e aplica isolamento por tenant no ponto de acesso aos dados.
  */
 export async function businessRoutes(app: FastifyInstance) {
+  app.register(businessRetentionRoutes);
   app.register(businessClientRoutes);
   app.register(businessFinancialRoutes);
   app.register(businessCommissionRoutes);
