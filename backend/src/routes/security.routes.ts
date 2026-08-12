@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { getTenant } from './helpers';
 import { eraseClientPersonalData, exportClientPersonalData } from '../services/lgpd.service';
+import { previewTenantRetention, runTenantRetention } from '../services/data-retention.service';
 import { z } from 'zod';
 
 /** Segurança corporativa com delegates explícitos do schema canônico. */
@@ -26,9 +27,10 @@ export async function securityRoutes(app: FastifyInstance) {
       setupHint: null,
       controls: [
         { name: 'Auditoria', status: 'Ativa', description: 'Registra alterações administrativas importantes.' },
-        { name: 'Rate limit', status: 'Ativo', description: 'Reduz abuso de API e tentativa de força bruta.' },
+        { name: 'Rate limit', status: 'Ativo', description: 'Reduz abuso por IP, superfície e tenant autenticado.' },
         { name: 'LGPD', status: consents ? 'Em uso' : 'Pronto', description: 'Exporta, registra consentimentos e permite eliminação controlada de dados pessoais.' },
-        { name: 'Sessões', status: activeSessions ? 'Monitorando' : 'Sem sessões extras', description: 'Access tokens são vinculados a sessões revogáveis e refresh tokens rotacionam a cada uso.' }
+        { name: 'Sessões', status: activeSessions ? 'Monitorando' : 'Sem sessões extras', description: 'Access tokens são vinculados a sessões revogáveis e refresh tokens rotacionam a cada uso.' },
+        { name: 'Retenção', status: 'Controlada', description: 'Políticas explícitas permitem prévia antes de redigir ou eliminar registros antigos.' }
       ]
     };
   });
@@ -112,6 +114,17 @@ export async function securityRoutes(app: FastifyInstance) {
     }
 
     return reply.status(201).send(await prisma.lgpdConsent.create({ data: { ...body, salonId: tenant.salonId } }));
+  });
+
+  app.get('/admin/security/retention/preview', async (request) => {
+    const tenant = getTenant(request);
+    return previewTenantRetention(tenant.salonId);
+  });
+
+  app.post('/admin/security/retention/run', async (request) => {
+    const tenant = getTenant(request);
+    z.object({ confirmation: z.literal('APLICAR RETENCAO') }).parse(request.body);
+    return runTenantRetention({ salonId: tenant.salonId, userId: tenant.id });
   });
 
   app.post('/admin/security/backups', async (request, reply) => {
