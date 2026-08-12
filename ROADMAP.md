@@ -18,9 +18,11 @@ Estado automatizado após o Marco 17:
 - Agenda comercial integrada a Operação do Dia, Smart Fit, Lista de Espera e Jornada da Equipe;
 - filtros consolidados por profissional, serviço e status;
 - jornada cliente → salão → WhatsApp coberta por testes de regressão;
-- Quality Gate e Production Gate do PR validados;
-- deploy de preview Vercel validado como `READY`;
-- merge e smoke de produção permanecem como última validação operacional antes do avanço para o Marco 18.
+- merge de produção: `84eac1541f722be4beef473281785eda09ba950e`;
+- GlossFlow Quality Gate: **success**;
+- Production Gate: **success**;
+- deploy Vercel de produção: **READY**;
+- Production Smoke Validation: **success**.
 
 ---
 
@@ -189,7 +191,7 @@ Entregue:
 - backend totalizando **46 testes**;
 - frontend totalizando **35 testes**.
 
-Validação no PR:
+Validação automatizada:
 
 - repository hygiene: **success**;
 - npm audit backend/frontend: **0 vulnerabilidades**;
@@ -197,9 +199,14 @@ Validação no PR:
 - backend: **46/46 testes**;
 - frontend: **35/35 testes**;
 - builds backend/frontend: **success**;
-- preview Vercel: **READY**.
+- preview Vercel: **READY**;
+- merge em `main`: **success**;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- deploy Vercel de produção: **READY**;
+- Production Smoke Validation: **success**.
 
-Critério operacional atingido pelo produto e coberto pelo guia/checklist: a equipe possui no GlossFlow os recursos necessários para planejar e operar Agenda, conflitos, encaixes, fila, confirmação e cancelamento sem depender de uma agenda paralela. A validação final pós-merge é feita pelo `Production Smoke Validation` antes do início do Marco 18.
+Critério operacional atingido pelo produto e coberto pelo guia/checklist: a equipe possui no GlossFlow os recursos necessários para planejar e operar Agenda, conflitos, encaixes, fila, confirmação e cancelamento sem depender de uma agenda paralela.
 
 ---
 
