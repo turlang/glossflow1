@@ -6,7 +6,8 @@ import { objectIdSchema } from '../schemas';
 import {
   getClientServiceHistory,
   getRetentionOverview,
-  registerRetentionFollowUp
+  prepareRetentionFollowUp,
+  recordRetentionFollowUpInitiated
 } from '../../services/client-retention.service';
 import { businessAdminOrReception } from './access';
 
@@ -15,10 +16,16 @@ const marketingConsentSchema = z.object({
   evidence: z.string().trim().max(300).optional().default('CRM GlossFlow')
 }).strict();
 
+function sendRetentionError(reply: Parameters<FastifyInstance['post']>[2] extends (...args: infer P) => unknown ? P[1] : never, result: { code: string }) {
+  if (result.code === 'CLIENT_NOT_FOUND') return reply.status(404).send({ message: 'Cliente não encontrado neste salão.', code: result.code });
+  if (result.code === 'MARKETING_OPT_OUT') return reply.status(409).send({ message: 'Cliente optou por não receber comunicações de marketing.', code: result.code });
+  return reply.status(400).send({ message: 'Cliente sem telefone válido para WhatsApp.', code: result.code });
+}
+
 /**
  * Retenção fica sob /admin/clients para herdar o entitlement de CRM.
  * Nenhuma rota dispara campanha automática: o Marco 19 registra consentimento,
- * segmenta, mede e prepara o contato; provider automático será fechado no Marco 20.
+ * segmenta, prepara o conteúdo e audita quando a equipe inicia o contato.
  */
 export async function businessRetentionRoutes(app: FastifyInstance) {
   app.get('/admin/clients/retention', businessAdminOrReception, async (request) => {
@@ -56,17 +63,16 @@ export async function businessRetentionRoutes(app: FastifyInstance) {
   app.post('/admin/clients/:id/follow-up', businessAdminOrReception, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
-    const result = await registerRetentionFollowUp(tenant.salonId, id);
+    const result = await prepareRetentionFollowUp(tenant.salonId, id);
+    if (!result.ok) return sendRetentionError(reply, result);
+    return result;
+  });
 
-    if (!result.ok && result.code === 'CLIENT_NOT_FOUND') {
-      return reply.status(404).send({ message: 'Cliente não encontrado neste salão.', code: result.code });
-    }
-    if (!result.ok && result.code === 'MARKETING_OPT_OUT') {
-      return reply.status(409).send({ message: 'Cliente optou por não receber comunicações de marketing.', code: result.code });
-    }
-    if (!result.ok && result.code === 'INVALID_PHONE') {
-      return reply.status(400).send({ message: 'Cliente sem telefone válido para WhatsApp.', code: result.code });
-    }
+  app.post('/admin/clients/:id/follow-up/contacted', businessAdminOrReception, async (request, reply) => {
+    const tenant = getTenant(request);
+    const { id } = z.object({ id: objectIdSchema }).parse(request.params);
+    const result = await recordRetentionFollowUpInitiated(tenant.salonId, id);
+    if (!result.ok) return sendRetentionError(reply, result);
     return result;
   });
 }
