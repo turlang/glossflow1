@@ -221,6 +221,10 @@ test('cancelamento por token secreto valida hash, cancela e libera a vaga', asyn
       assert.equal(statusSaved, 'CANCELED');
       assert.equal(response.json().cancelled, true);
       assert.equal(response.json().clientNotification, 'SENT');
+
+      // A rota libera a vaga em setImmediate; aguardamos o tick antes de restaurar
+      // os mocks para evitar que o efeito assíncrono tente acessar um banco real no CI.
+      await new Promise((resolve) => setImmediate(resolve));
     });
   } finally {
     await app.close();
