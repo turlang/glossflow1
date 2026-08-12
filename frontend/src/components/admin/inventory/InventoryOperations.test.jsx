@@ -43,9 +43,10 @@ describe('InventoryOperations', () => {
   it('exibe ruptura, capital imobilizado e fila de reposição', async () => {
     render(<InventoryAdmin inventory={inventory} reload={vi.fn()} />);
     expect(screen.getByText('O que comprar agora')).toBeTruthy();
-    expect(screen.getByText('Sem estoque')).toBeTruthy();
-    expect(screen.getByText('Capital imobilizado')).toBeTruthy();
-    expect(screen.getAllByText('R$ 70,00').length).toBeGreaterThan(0);
+    const kpis = screen.getByRole('region', { name: 'Indicadores de estoque' });
+    expect(within(kpis).getByText('Sem estoque')).toBeTruthy();
+    expect(within(kpis).getByText('Capital imobilizado')).toBeTruthy();
+    expect(within(kpis).getByText(/70,00/)).toBeTruthy();
     await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/inventory/overview'));
   });
 
