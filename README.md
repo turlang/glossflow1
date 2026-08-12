@@ -4,13 +4,15 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 ## Estado atual
 
-O projeto está em **produção ativa e fechamento de release comercial estável**.
+O projeto está em **produção ativa e Release Candidate comercial do Marco 24**.
 
-Os **Marcos 1–23 estão concluídos e validados em produção**. O **Marco 24 — Release comercial estável** está **EM EXECUÇÃO** na Issue #19.
+Os **Marcos 1–23 estão concluídos e validados em produção**. O **Marco 24 — Release comercial estável** está **CONCLUÍDO FUNCIONALMENTE / PENDENTE SOMENTE DA VALIDAÇÃO FINAL DE PRODUÇÃO** na Issue #19 e no PR #20.
+
+A Issue #19 é a evidência canônica de encerramento. Quando o merge final estiver no Vercel/Render, o `Production Smoke Validation` confirmar o **Build ID exato do merge** e a Issue #19 for fechada como `completed`, o Marco 24 é considerado oficialmente validado em produção **sem exigir um commit documental adicional que alteraria novamente o SHA da release**.
 
 ### Validação final do Marco 23
 
-O Marco 23 foi integrado e homologado somente depois que o smoke passou a exigir o SHA exato de `main` no Render.
+O Marco 23 foi homologado somente depois que o smoke passou a exigir o SHA exato de `main` no Render.
 
 - build/commit validado: `afc22563d54645a8555cbafc53b1a9b6b31f2713`;
 - Build ID servido pelo Render: `afc22563d546`;
@@ -21,18 +23,28 @@ O Marco 23 foi integrado e homologado somente depois que o smoke passou a exigir
 - `Production Smoke Validation` estrito: **success** no rerun do workflow `31639887820`;
 - Issue #14 encerrada como `completed`.
 
-### Baseline automatizada de entrada do Marco 24
+### Release Candidate do Marco 24
+
+Evidência funcional já concluída antes do merge:
 
 - backend: **100/100 testes**;
 - frontend: **61/61 testes**;
-- `npm audit --audit-level=high`: sem vulnerabilidade bloqueadora conhecida;
+- `npm audit --audit-level=high`: sem vulnerabilidade bloqueadora nas dependências do produto;
 - TypeScript/ESLint: **success**;
 - builds backend/frontend: **success**;
-- `GlossFlow Quality Gate`: **success**;
-- `Production Gate`: **success**;
-- Vercel: **READY**;
-- Render: build exato confirmado;
-- MongoDB readiness: **success**.
+- `GlossFlow Quality Gate`: **success** no candidato;
+- `Production Gate`: **success** no candidato;
+- homologação pública real em Chromium: **15/15 PASS**;
+- páginas homologadas: vitrine, booking e landing comercial;
+- viewports: 1366×768, 1920×1080, 768×1024, 430×932 e 360×800;
+- 0 overflow horizontal bloqueador;
+- 0 `pageerror` nas 15 combinações;
+- nenhum erro visível de API/agendamento indisponível;
+- runtime isolado de navegador auditado antes da execução;
+- nenhuma issue P0/P1 conhecida aberta;
+- documentação de produção, implantação, suporte, incidente e recuperação revisada.
+
+A única pendência de promoção é operacional: **merge do PR #20 → Vercel/Render no SHA exato → `/ready` com MongoDB → Production Smoke final verde → fechamento da Issue #19**.
 
 ## Stack
 
@@ -188,11 +200,9 @@ A API mantém:
 - paginação CRM;
 - code splitting e budget de bundle.
 
-O `Production Smoke Validation` agora **falha se o Render não estiver servindo exatamente os 12 primeiros caracteres do SHA de `main` que disparou o Production Gate**.
+O `Production Smoke Validation` **falha se o Render não estiver servindo exatamente os 12 primeiros caracteres do SHA de `main` que disparou o Production Gate**.
 
 ## Release comercial — Marco 24
-
-O Marco 24 não adiciona funcionalidades por volume. O objetivo é transformar o produto atual em uma release vendável e implantável de forma repetível.
 
 O gate comercial separa:
 
@@ -219,7 +229,9 @@ Mercado Pago/Stripe não bloqueiam a release base quando cobrança automática n
 - `Production Gate`;
 - `Production Smoke Validation` com SHA exato.
 
-O Marco 24 acrescenta homologação pública real em Chromium para desktop, tablet e mobile, sem autenticação e sem escrita em produção.
+### Gate responsivo do Marco 24
+
+O workflow `Marco 24 Public Responsive Validation` usa Chromium real, audita o runtime isolado e valida vitrine, booking e landing comercial em cinco viewports. Screenshots e `report.json` são publicados como artefato de CI.
 
 ## Documentação
 
@@ -240,6 +252,6 @@ O Marco 24 acrescenta homologação pública real em Chromium para desktop, tabl
 
 ## Marco atual
 
-**Marco 24 — Release comercial estável — EM EXECUÇÃO.**
+**Marco 24 — Release comercial estável — RELEASE CANDIDATE.**
 
-A decisão de GO/NO-GO é registrada em [`docs/engineering/MARCO24_RELEASE_VALIDATION.md`](docs/engineering/MARCO24_RELEASE_VALIDATION.md).
+Decisão funcional: **GO para promoção**. Validação oficial de produção: **pendente exclusivamente do merge e do exact-build smoke final**.
