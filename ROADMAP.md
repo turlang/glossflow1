@@ -8,25 +8,29 @@ Este documento é a fonte canônica para a evolução do GlossFlow.
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-Os **Marcos 1–20 estão concluídos e validados em produção**. O **Marco 21 — Super Admin, planos e ciclo de vida SaaS** está **CONCLUÍDO NO PR**, com implementação funcional e Production Gate verdes. A validação oficial de produção será registrada somente depois do merge, deploy e `Production Smoke Validation`.
+Os **Marcos 1–21 estão concluídos e validados em produção**. O próximo marco oficial é o **Marco 22 — Observabilidade, performance e confiabilidade**.
 
-Estado automatizado do head funcional do Marco 21:
+Estado automatizado após o Marco 21:
 
 - backend: **76/76 testes**;
 - frontend: **58/58 testes**;
 - `npm audit` backend/frontend: **0 vulnerabilidades**;
 - TypeScript/ESLint: **success**;
 - builds backend/frontend: **success**;
-- Production Gate: **success**;
+- merge de produção: `8b8aa0f2a07061b84aaa72db96c1511dae62a369`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- checks Vercel: **success**;
+- Production Smoke Validation: **success**;
 - provisionamento completo sem edição manual no banco;
-- estados `TRIAL`, `ACTIVE`, `PAST_DUE` e `CANCELED` aplicados pelo servidor;
+- ciclo `TRIAL`, `ACTIVE`, `PAST_DUE`, `CANCELED` aplicado pelo servidor;
 - cancelamento revogando sessões sem destruir tenant;
 - billing preparado por tenant sem executar cobrança externa;
-- mudanças sensíveis com auditoria dedicada.
+- alterações sensíveis com auditoria dedicada.
 
 ---
 
-# Ciclo concluído em produção — Marcos 1–20
+# Ciclo concluído em produção — Marcos 1–21
 
 ## Marco 1 — Higienização estrutural inicial — CONCLUÍDO
 
@@ -142,13 +146,11 @@ Validação final de produção:
 - checks Vercel: **success**;
 - Production Smoke Validation: **success**.
 
----
+## Marco 21 — Super Admin, planos e ciclo de vida SaaS — CONCLUÍDO
 
-# Marco 21 — Super Admin, planos e ciclo de vida SaaS — CONCLUÍDO NO PR
+Objetivo cumprido: permitir que o `SUPER_ADMIN` provisione e administre um cliente SaaS completo sem editar documentos diretamente no MongoDB e sem destruir o tenant para suspender ou reativar o contrato.
 
-Objetivo funcional cumprido: permitir que o `SUPER_ADMIN` provisione e administre um cliente SaaS completo sem editar documentos diretamente no MongoDB e sem destruir o tenant para suspender ou reativar o contrato.
-
-## Provisionamento canônico
+### Provisionamento canônico
 
 Novo fluxo **Provisionar salão completo** dividido em cinco etapas:
 
@@ -162,14 +164,14 @@ A operação cria:
 
 - `Salon` com slug único;
 - primeiro usuário `ADMIN` com senha bcrypt;
-- `SalonSubscription` ligada a um plano ativo;
+- `SalonSubscription` ligada a plano ativo;
 - módulos efetivamente contratados;
 - perfil inicial de billing;
 - eventos dedicados de auditoria.
 
 Se uma etapa interna falhar depois da criação inicial, o backend executa limpeza compensatória de auditorias, sessões, usuários, assinatura e tenant criado, evitando provisionamento órfão.
 
-## Ciclo de vida comercial
+### Ciclo de vida comercial
 
 Estados canônicos:
 
@@ -201,7 +203,7 @@ Regras:
 - contrato cancelado pode ser reativado como `ACTIVE`, sem recriar o salão;
 - tenant legado sem `SalonSubscription` permanece compatível até migração comercial.
 
-## Enforcement do contrato
+### Enforcement do contrato
 
 A situação comercial é validada antes do entitlement de módulo em:
 
@@ -216,46 +218,27 @@ A situação comercial é validada antes do entitlement de módulo em:
 
 O `SUPER_ADMIN` permanece fora desse bloqueio para conseguir corrigir o contrato.
 
-## Acesso do administrador principal
+### Acesso do administrador principal
 
-O Super Admin pode alterar:
+O Super Admin pode alterar nome, e-mail, ativo/inativo e senha. Rotação de senha ou desativação revoga sessões do administrador. A senha não é incluída nos metadados de auditoria.
 
-- nome;
-- e-mail;
-- ativo/inativo;
-- senha.
+### Planos, módulos e billing
 
-Rotação de senha ou desativação revoga sessões do administrador. A senha não é incluída nos metadados de auditoria.
+O plano representa a oferta comercial/preço; os módulos representam o entitlement efetivo. O fluxo canônico impede atribuir plano arquivado a um novo contrato.
 
-## Planos e módulos
+O perfil de billing registra provider `MANUAL`, `MERCADO_PAGO`, `STRIPE` ou `OTHER`, Customer ID, referência externa, próxima cobrança e observações.
 
-O plano representa a oferta comercial/preço; os módulos representam o entitlement efetivo. O fluxo canônico impede atribuir plano arquivado a um novo contrato e permite alterar módulos sem usar a remoção de módulos como substituto do cancelamento financeiro.
+Limite intencional: **o Marco 21 não cria, cobra, cancela ou sincroniza uma assinatura no gateway externo**. O objetivo é preparar o vínculo para billing real posterior sem efeitos financeiros durante a implantação deste marco.
 
-## Billing preparado por tenant
+### White-label, domínio e custos
 
-Perfil comercial armazenado de forma auditável:
+`Site & Marca` permanece exclusivo do Super Admin. Atualizações registram evento `SAAS_SITE_BRAND_UPDATED` com antes/depois de domínio, template e cores, mais indicadores de alteração de logo/hero. Imagens base64 não são copiadas integralmente para auditoria. Colisão de `customDomain` entre tenants continua bloqueada.
 
-- provider `MANUAL`, `MERCADO_PAGO`, `STRIPE` ou `OTHER`;
-- Customer ID;
-- referência da assinatura externa;
-- próxima cobrança;
-- observações.
+O painel de custos externos continua disponível por tenant e complementa o ciclo SaaS com custos de WhatsApp, IA, domínio e outros itens.
 
-Limite intencional: **o Marco 21 não cria, cobra, cancela ou sincroniza uma assinatura no gateway externo**. O objetivo é preparar o vínculo para billing real posterior sem criar efeitos financeiros durante a implantação deste marco.
+### Auditoria sensível
 
-## White-label e domínio
-
-`Site & Marca` permanece exclusivo do Super Admin. Atualizações registram evento `SAAS_SITE_BRAND_UPDATED` com antes/depois de domínio, template e cores, mais indicadores de alteração de logo/hero. Imagens base64 não são copiadas integralmente para auditoria.
-
-Colisão de `customDomain` entre tenants continua bloqueada.
-
-## Custos externos
-
-O painel existente de custos continua disponível por tenant e complementa o novo ciclo SaaS com custos de WhatsApp, IA, domínio e outros itens comerciais/operacionais.
-
-## Auditoria sensível
-
-Eventos adicionados/consolidados:
+Eventos consolidados:
 
 - `SAAS_TENANT_PROVISIONED`;
 - `SAAS_SUBSCRIPTION_CHANGED`;
@@ -264,7 +247,7 @@ Eventos adicionados/consolidados:
 - `SAAS_BILLING_PROFILE_UPDATED`;
 - `SAAS_SITE_BRAND_UPDATED`.
 
-## Interface e documentação
+### Interface e documentação
 
 - `SaasProvisioningWizard` com cinco etapas;
 - `TenantBillingProfile` dentro do gerenciamento do cliente;
@@ -272,7 +255,7 @@ Eventos adicionados/consolidados:
 - `backend/.env.example` com defaults de TRIAL e PAST_DUE;
 - guia `docs/usuario/14_SUPER_ADMIN_SAAS.md`.
 
-## Cobertura funcional do PR
+### Validação final de produção
 
 - backend: **76/76 testes**;
 - frontend: **58/58 testes**;
@@ -281,15 +264,17 @@ Eventos adicionados/consolidados:
 - `npm audit` backend/frontend: **0 vulnerabilidades**;
 - TypeScript/ESLint: **success**;
 - builds: **success**;
-- Production Gate: **success**.
+- merge em `main`: `8b8aa0f2a07061b84aaa72db96c1511dae62a369`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- checks Vercel: **success**;
+- Production Smoke Validation: **success**.
 
-Critério funcional atingido: um novo salão pode ser provisionado, receber ADMIN, plano, estado comercial, módulos e preparação de billing pelo Super Admin, além de ser suspenso ou reativado sem edição manual no banco.
-
-A marca de **validado em produção** depende ainda do merge do PR, checks de deploy e `Production Smoke Validation` do `main`.
+Critério de saída atingido: um novo salão pode ser provisionado, receber ADMIN, plano, estado comercial, módulos e preparação de billing pelo Super Admin, além de ser suspenso ou reativado sem edição manual no banco.
 
 ---
 
-# Próximo ciclo após a validação do Marco 21
+# Próximo ciclo — Operação em escala
 
 ## Marco 22 — Observabilidade, performance e confiabilidade — PRÓXIMO
 
@@ -342,8 +327,6 @@ Resultado esperado:
 # Prioridade de execução
 
 ```text
-Marco 21 — Super Admin / planos / ciclo de vida SaaS  ← fechamento de produção
-   ↓
 Marco 22 — Observabilidade e performance
    ↓
 Marco 23 — Segurança / LGPD
