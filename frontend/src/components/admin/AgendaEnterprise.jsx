@@ -19,7 +19,7 @@ import { AgendaRescheduleForm } from './agenda/AgendaRescheduleForm.jsx';
 import { useAgendaReschedule } from './agenda/useAgendaReschedule.js';
 
 /** Orquestrador do domínio Agenda; regras e visualizações vivem em módulos próprios. */
-export function AgendaEnterprise({ appointments, professionals, reload }) {
+export function AgendaEnterprise({ appointments, professionals, reload, readOnly = false }) {
   const todayIso = toLocalIsoDate(new Date());
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [viewMode, setViewMode] = useState('week');
@@ -37,7 +37,6 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
     [professionalId, professionals]
   );
 
-  // Grades custosas só são montadas quando a visualização correspondente está ativa.
   const weekDays = useMemo(
     () => viewMode === 'week' ? buildWeekDays(selectedDate) : [],
     [selectedDate, viewMode]
@@ -78,7 +77,7 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
 
   const handleDrop = useCallback(async (event, { dateIso, hour, professional }) => {
     event.preventDefault();
-    if (!draggingId) return;
+    if (readOnly || !draggingId) return;
     const appointment = appointments.find((item) => item.id === draggingId);
     const nextProfessionalId = professional?.id || appointment?.professionalId || appointment?.professional?.id;
     if (!appointment || !nextProfessionalId) return;
@@ -88,12 +87,17 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
     } catch {
       // O hook mantém o feedback visível; o drop não deve desmontar a Agenda em erro.
     }
-  }, [appointments, draggingId, reschedule]);
+  }, [appointments, draggingId, readOnly, reschedule]);
 
   const openDay = useCallback((dateIso) => {
     setSelectedDate(dateIso);
     setViewMode('day');
   }, []);
+
+  const dragStart = readOnly ? undefined : setDraggingId;
+  const dragEnd = readOnly ? undefined : () => setDraggingId('');
+  const drop = readOnly ? undefined : handleDrop;
+  const openReschedule = readOnly ? undefined : setEditingAppointment;
 
   return (
     <section className="panel-card enterprise-calendar-panel">
@@ -101,7 +105,11 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
         <div>
           <span className="eyebrow">Agenda Enterprise</span>
           <h2>Calendário operacional do salão</h2>
-          <p className="panel-help">Dia, semana, mês e profissionais usam o mesmo contrato de reagendamento e isolamento de dados.</p>
+          <p className="panel-help">
+            {readOnly
+              ? 'Visualização somente leitura para o perfil Profissional.'
+              : 'Dia, semana, mês e profissionais usam o mesmo contrato de reagendamento e isolamento de dados.'}
+          </p>
         </div>
         <div className="enterprise-calendar-kpis" aria-label="Indicadores da agenda">
           <div><span>Agendamentos</span><strong>{metrics.count}</strong><small>no período</small></div>
@@ -123,7 +131,7 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
         todayIso={todayIso}
       />
 
-      {message && <p className="feedback full-span" role="status" aria-live="polite">{message}</p>}
+      {!readOnly && message && <p className="feedback full-span" role="status" aria-live="polite">{message}</p>}
 
       {viewMode === 'day' && (
         <AgendaDayView
@@ -131,10 +139,10 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
           appointments={visibleAppointments}
           professionals={visibleProfessionals}
           draggingId={draggingId}
-          onDragStart={setDraggingId}
-          onDragEnd={() => setDraggingId('')}
-          onDrop={handleDrop}
-          onReschedule={setEditingAppointment}
+          onDragStart={dragStart}
+          onDragEnd={dragEnd}
+          onDrop={drop}
+          onReschedule={openReschedule}
         />
       )}
 
@@ -144,10 +152,10 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
           appointments={visibleAppointments}
           professionals={visibleProfessionals}
           draggingId={draggingId}
-          onDragStart={setDraggingId}
-          onDragEnd={() => setDraggingId('')}
-          onDrop={handleDrop}
-          onReschedule={setEditingAppointment}
+          onDragStart={dragStart}
+          onDragEnd={dragEnd}
+          onDrop={drop}
+          onReschedule={openReschedule}
         />
       )}
 
@@ -156,9 +164,9 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
           monthDays={monthDays}
           appointments={normalizedAppointments}
           onOpenDay={openDay}
-          onDragStart={setDraggingId}
-          onDragEnd={() => setDraggingId('')}
-          onReschedule={setEditingAppointment}
+          onDragStart={dragStart}
+          onDragEnd={dragEnd}
+          onReschedule={openReschedule}
         />
       )}
 
@@ -168,10 +176,10 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
           appointments={visibleAppointments}
           professionals={visibleProfessionals}
           draggingId={draggingId}
-          onDragStart={setDraggingId}
-          onDragEnd={() => setDraggingId('')}
-          onDrop={handleDrop}
-          onReschedule={setEditingAppointment}
+          onDragStart={dragStart}
+          onDragEnd={dragEnd}
+          onDrop={drop}
+          onReschedule={openReschedule}
         />
       )}
 
@@ -179,7 +187,7 @@ export function AgendaEnterprise({ appointments, professionals, reload }) {
         <p className="empty-state full-span">Nenhum agendamento encontrado para o período selecionado.</p>
       )}
 
-      {editingAppointment && (
+      {!readOnly && editingAppointment && (
         <AgendaRescheduleForm
           appointment={editingAppointment}
           professionals={professionals}
