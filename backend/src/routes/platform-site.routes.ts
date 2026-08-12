@@ -1,6 +1,8 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { recordSaasAudit } from '../services/saas-lifecycle.service';
+import { AuthContext } from './helpers';
 import { salonSchema } from './schemas';
 
 const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'ID de salão inválido.');
@@ -12,6 +14,33 @@ function normalizeDomain(value?: string) {
     .replace(/^https?:\/\//, '')
     .split('/')[0]
     .replace(/^www\./, '');
+}
+
+function actorFromRequest(request: FastifyRequest) {
+  const user = (request as FastifyRequest & { user?: AuthContext }).user;
+  return {
+    userId: user?.id,
+    ip: request.ip || '',
+    userAgent: String(request.headers['user-agent'] || '')
+  };
+}
+
+function siteAuditSnapshot(salon: {
+  name: string;
+  customDomain?: string | null;
+  siteTemplate?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+}) {
+  return {
+    name: salon.name,
+    customDomain: salon.customDomain || null,
+    siteTemplate: salon.siteTemplate || 'ELEGANCE',
+    primaryColor: salon.primaryColor || null,
+    secondaryColor: salon.secondaryColor || null,
+    accentColor: salon.accentColor || null
+  };
 }
 
 /**
@@ -60,6 +89,21 @@ export async function platformSiteRoutes(app: FastifyInstance) {
         ...data,
         customDomain: customDomain || null
       }
+    });
+
+    await recordSaasAudit({
+      salonId: id,
+      action: 'SAAS_SITE_BRAND_UPDATED',
+      resource: 'TenantSite',
+      resourceId: id,
+      path: `/platform-admin/salons/${id}/site`,
+      metadata: {
+        before: siteAuditSnapshot(current),
+        after: siteAuditSnapshot(updated),
+        heroImageChanged: current.heroImage !== updated.heroImage,
+        logoChanged: current.logoUrl !== updated.logoUrl
+      },
+      actor: actorFromRequest(request)
     });
 
     return updated;
