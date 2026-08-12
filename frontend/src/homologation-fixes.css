@@ -1,0 +1,114 @@
+/* Homologation fixes — production UI defects captured during acceptance testing. */
+
+/* Prevent short admin screens from stretching the topbar/content to fill sidebar height. */
+.admin-pro-main {
+  align-self: start;
+  align-content: start;
+}
+
+.admin-pro-content {
+  align-content: start;
+}
+
+.admin-pro-topbar {
+  min-height: 0;
+  align-self: start;
+}
+
+.ai-assistant-page,
+.ai-workspace,
+.enterprise-onboarding,
+.panel-card,
+.form-grid {
+  align-content: start;
+}
+
+/* Keep native controls coherent with the active GlossFlow theme. */
+html {
+  color-scheme: dark;
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+}
+
+select,
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'] {
+  color-scheme: inherit;
+}
+
+/* Chromium/Windows opens native option popups outside normal component styling.
+   Explicit option colors avoid white text on the browser's white popup surface. */
+select option,
+select optgroup {
+  background: #111827;
+  color: #f8fafc;
+}
+
+select option:disabled {
+  color: #94a3b8;
+}
+
+html[data-theme='light'] select option,
+html[data-theme='light'] select optgroup {
+  background: #ffffff;
+  color: #111827;
+}
+
+html[data-theme='light'] select option:disabled {
+  color: #64748b;
+}
+
+/* Legacy/Super Admin controls that are not wrapped by the shared .field component. */
+.admin-pro-main label > select,
+.admin-pro-main label > input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']),
+.admin-pro-main label > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  outline: 0;
+  color: var(--text);
+  background: rgba(255,255,255,.055);
+  font: inherit;
+}
+
+.admin-pro-main label > textarea {
+  min-height: 106px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.admin-pro-main label > select:focus,
+.admin-pro-main label > input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']):focus,
+.admin-pro-main label > textarea:focus {
+  border-color: rgba(214,179,95,.72);
+  box-shadow: 0 0 0 4px rgba(214,179,95,.12);
+}
+
+.admin-pro-main label > span {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 950;
+  letter-spacing: .08em;
+}
+
+/* Public booking selectors use their own wrappers; keep the popup readable there too. */
+.booking-shell select,
+.booking-card select,
+.public-booking select,
+.manage-booking select {
+  color-scheme: inherit;
+}
+
+@media (max-width: 720px) {
+  .admin-pro-main label > select,
+  .admin-pro-main label > input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']) {
+    min-height: 46px;
+  }
+}
