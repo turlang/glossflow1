@@ -84,4 +84,11 @@ describe('AgendaEnterprise', () => {
     expect(screen.queryByText('Carla')).toBeNull();
     expect(screen.getByText('Dani')).toBeTruthy();
   });
+
+  it('remove drag e reagendamento quando a Agenda está em modo somente leitura', () => {
+    render(<AgendaEnterprise appointments={appointments} professionals={professionals} reload={vi.fn()} readOnly />);
+    expect(screen.getByText('Visualização somente leitura para o perfil Profissional.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Reagendar/i })).toBeNull();
+    expect(screen.getByText('Carla').closest('article').draggable).toBe(false);
+  });
 });

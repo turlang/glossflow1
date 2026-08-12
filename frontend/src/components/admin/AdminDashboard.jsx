@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { currency } from '../../utils/format.js';
+import { dashboardMenuForRole, defaultDashboardTabForRole } from '../../config/role-access.js';
+import { ROLES } from '../../utils/auth.js';
 import { OnboardingChecklist, ExecutiveDashboard, AdvancedMetricsAdmin } from './AdminOverview.jsx';
 import { ServicesAdmin, ProfessionalsAdmin, PortfolioAdmin } from './AdminCatalog.jsx';
 import { UsersAdmin, InventoryAdmin, ClientsAdmin } from './AdminOperations.jsx';
@@ -33,8 +35,9 @@ const MENU = [
 ];
 
 /** Shell administrativo: navegação, indicadores e composição dos domínios. */
-export function AdminDashboard({ salon, services, professionals, portfolio, appointments, inventory, users, clients, financialEntries, commissions, loyalty, subscription, whatsappTemplates, insights, reload, setPage, theme, toggleTheme }) {
-  const [tab, setTab] = useState('executive');
+export function AdminDashboard({ role, salon, services, professionals, portfolio, appointments, inventory, users, clients, financialEntries, commissions, loyalty, subscription, whatsappTemplates, insights, reload, setPage, theme, toggleTheme }) {
+  const allowedMenu = useMemo(() => dashboardMenuForRole(role, MENU), [role]);
+  const [tab, setTab] = useState(() => defaultDashboardTabForRole(role));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [command, setCommand] = useState('');
 
@@ -49,10 +52,15 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
 
   const filteredMenu = useMemo(() => {
     const search = command.trim().toLowerCase();
-    return search ? MENU.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(search)) : MENU;
-  }, [command]);
+    return search ? allowedMenu.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(search)) : allowedMenu;
+  }, [allowedMenu, command]);
 
-  const activeMenu = MENU.find((item) => item.key === tab) || MENU[0];
+  const activeMenu = allowedMenu.find((item) => item.key === tab) || allowedMenu[0] || MENU[0];
+  const professionalReadOnly = role === ROLES.PROFESSIONAL;
+
+  function selectTab(nextTab) {
+    if (allowedMenu.some((item) => item.key === nextTab)) setTab(nextTab);
+  }
 
   function logout() {
     localStorage.removeItem('glossflow.token');
@@ -93,13 +101,13 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
         {tab === 'executive' && <section className="admin-pro-stats" aria-label="Resumo administrativo">{stats.map((item) => <article className="pro-stat-card" key={item.label}><span className="pro-stat-icon">{item.icon}</span><div><strong>{item.value}</strong><span>{item.label}</span><small>{item.hint}</small></div></article>)}</section>}
 
         <section className="admin-pro-content">
-          {tab === 'onboarding' && <OnboardingChecklist services={services} professionals={professionals} portfolio={portfolio} whatsappTemplates={whatsappTemplates} inventory={inventory} setTab={setTab} />}
-          {tab === 'executive' && <ExecutiveDashboard services={services} professionals={professionals} appointments={appointments} clients={clients} inventory={inventory} financialEntries={financialEntries} commissions={commissions} insights={insights} setTab={setTab} />}
+          {tab === 'onboarding' && <OnboardingChecklist services={services} professionals={professionals} portfolio={portfolio} whatsappTemplates={whatsappTemplates} inventory={inventory} setTab={selectTab} />}
+          {tab === 'executive' && <ExecutiveDashboard services={services} professionals={professionals} appointments={appointments} clients={clients} inventory={inventory} financialEntries={financialEntries} commissions={commissions} insights={insights} setTab={selectTab} />}
           {tab === 'analytics' && <AdvancedMetricsAdmin appointments={appointments} clients={clients} financialEntries={financialEntries} inventory={inventory} />}
           {tab === 'services' && <ServicesAdmin services={services} reload={reload} />}
           {tab === 'professionals' && <ProfessionalsAdmin professionals={professionals} reload={reload} />}
           {tab === 'portfolio' && <PortfolioAdmin portfolio={portfolio} reload={reload} />}
-          {tab === 'appointments' && <AgendaEnterprise appointments={appointments} professionals={professionals} services={services} reload={reload} />}
+          {tab === 'appointments' && <AgendaEnterprise appointments={appointments} professionals={professionals} services={services} reload={reload} readOnly={professionalReadOnly} />}
           {tab === 'inventory' && <InventoryAdmin inventory={inventory} reload={reload} />}
           {tab === 'users' && <UsersAdmin users={users} reload={reload} />}
           {tab === 'clients' && <ClientsAdmin clients={clients} reload={reload} />}
@@ -112,7 +120,7 @@ export function AdminDashboard({ salon, services, professionals, portfolio, appo
           {tab === 'security' && <SecurityAdmin clients={clients} />}
           {tab === 'ecosystem' && <EcosystemAdmin />}
           {tab === 'observability' && <ObservabilityAdmin />}
-          {tab === 'ux' && <UXPremiumAdmin setTab={setTab} />}
+          {tab === 'ux' && <UXPremiumAdmin setTab={selectTab} />}
           {tab === 'pwa' && <PWAAdmin />}
         </section>
       </section>
