@@ -54,9 +54,9 @@ describe('SaasProvisioningWizard', () => {
   it('organiza o provisionamento em cinco etapas comerciais', () => {
     render(<Harness />);
     expect(screen.getByText('Provisionar salão completo')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /01 Salão/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /03 Contrato/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /05 Revisão/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /SalãoDados do negócio/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /ContratoPlano e ciclo SaaS/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /RevisãoProvisionar tenant/i })).toBeTruthy();
   });
 
   it('não permite avançar do contrato sem plano ativo selecionado', async () => {
@@ -75,11 +75,11 @@ describe('SaasProvisioningWizard', () => {
     const user = userEvent.setup();
     render(<Harness initial={{ ...valid, enabledModules: [] }} />);
 
-    await user.click(screen.getByRole('button', { name: /04 Módulos/i }));
+    await user.click(screen.getByRole('button', { name: /MódulosRecursos contratados/i }));
     expect(screen.getByText('Selecione ao menos um módulo.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continuar →' }).disabled).toBe(true);
 
-    await user.click(screen.getByRole('button', { name: /Site & Marca/i }));
+    await user.click(screen.getByRole('button', { name: /Site & MarcaVitrine pública/i }));
     expect(screen.getByRole('button', { name: 'Continuar →' }).disabled).toBe(false);
   });
 
@@ -88,10 +88,10 @@ describe('SaasProvisioningWizard', () => {
     const submit = vi.fn();
     render(<Harness onSubmit={submit} />);
 
-    await user.click(screen.getByRole('button', { name: /05 Revisão/i }));
+    await user.click(screen.getByRole('button', { name: /RevisãoProvisionar tenant/i }));
     expect(screen.getByText('Revisar e provisionar')).toBeTruthy();
-    expect(screen.getByText('Studio Aurora')).toBeTruthy();
-    expect(screen.getByText('Smart')).toBeTruthy();
+    expect(screen.getAllByText('Studio Aurora').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Smart').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: 'Provisionar cliente SaaS' }));
     expect(submit).toHaveBeenCalledTimes(1);
