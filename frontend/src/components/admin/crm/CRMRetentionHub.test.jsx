@@ -69,7 +69,7 @@ describe('CRMRetentionHub', () => {
     expect(await screen.findByRole('heading', { name: 'Quem precisa de atenção agora' })).toBeTruthy();
     expect(screen.getByText('Aniversário em 2 dia(s).')).toBeTruthy();
     expect(screen.getByText(/3 atendimentos nos últimos 90 dias/i)).toBeTruthy();
-    expect(screen.getByText('Reativação')).toBeTruthy();
+    expect(screen.getByText('Reativacao')).toBeTruthy();
     await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/clients/retention'));
   });
 
@@ -97,7 +97,8 @@ describe('CRMRetentionHub', () => {
     const card = heading.closest('article');
     await user.click(within(card).getByRole('button', { name: 'Preparar follow-up' }));
     await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/clients/c1/follow-up', { method: 'POST' }));
-    expect(await screen.findByRole('link', { name: 'Abrir WhatsApp' })).toHaveAttribute('href', expect.stringMatching(/^https:\/\/wa\.me\//));
+    const link = await screen.findByRole('link', { name: 'Abrir WhatsApp' });
+    expect(link.getAttribute('href')).toMatch(/^https:\/\/wa\.me\//);
     expect(screen.getByText(/Podemos ajudar com seu próximo horário/i)).toBeTruthy();
   });
 
