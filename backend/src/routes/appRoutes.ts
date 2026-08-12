@@ -25,6 +25,7 @@ import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
+import { enforceTenantRateLimit } from '../middlewares/rate-limit';
 import { enforceTenantSubscriptionAccess } from '../middlewares/subscription-access';
 import { enforceSalonModuleAccess } from '../services/module-access.service';
 
@@ -45,6 +46,7 @@ export async function appRoutes(app: FastifyInstance) {
   /** Administração global: clientes, planos, ciclo SaaS, Site & Marca, custos e infraestrutura. */
   app.register(async (platformAdmin) => {
     platformAdmin.addHook('preHandler', ensureAuthenticated);
+    platformAdmin.addHook('preHandler', enforceTenantRateLimit);
     platformAdmin.addHook('preHandler', requireRoles(['SUPER_ADMIN']));
     platformAdmin.addHook('onResponse', writeAuditLog);
     platformAdmin.register(platformAdminRoutes);
@@ -57,6 +59,7 @@ export async function appRoutes(app: FastifyInstance) {
   /** Operação do salão, sempre isolada pelo salonId, contrato vigente e módulos contratados. */
   app.register(async (operational) => {
     operational.addHook('preHandler', ensureAuthenticated);
+    operational.addHook('preHandler', enforceTenantRateLimit);
     operational.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']));
     operational.addHook('preHandler', enforceTenantSubscriptionAccess);
     operational.addHook('preHandler', async (request, reply) => {
@@ -80,6 +83,7 @@ export async function appRoutes(app: FastifyInstance) {
 
   app.register(async (business) => {
     business.addHook('preHandler', ensureAuthenticated);
+    business.addHook('preHandler', enforceTenantRateLimit);
     business.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION']));
     business.addHook('preHandler', enforceTenantSubscriptionAccess);
     business.addHook('preHandler', async (request, reply) => {
@@ -104,6 +108,7 @@ export async function appRoutes(app: FastifyInstance) {
   /** Segurança do próprio tenant continua disponível apenas ao ADMIN com contrato operacional. */
   app.register(async (criticalAdmin) => {
     criticalAdmin.addHook('preHandler', ensureAuthenticated);
+    criticalAdmin.addHook('preHandler', enforceTenantRateLimit);
     criticalAdmin.addHook('preHandler', requireRoles(['ADMIN']));
     criticalAdmin.addHook('preHandler', enforceTenantSubscriptionAccess);
     criticalAdmin.addHook('preHandler', enforceSalonModuleAccess);
