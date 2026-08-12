@@ -16,6 +16,7 @@ import './admin-mobile.css';
 import './booking-selection.css';
 import './public-booking.css';
 import './admin-component-styles.css';
+import './homologation-fixes.css';
 
 /**
  * Bootstrap do frontend GlossFlow.
