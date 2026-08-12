@@ -6,19 +6,26 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-Os **Marcos 1–21 estão concluídos e validados em produção**. O **Marco 22 — Observabilidade, performance e confiabilidade** está **concluído funcionalmente no PR #10**, aguardando merge e smoke pós-deploy para receber a validação oficial de produção.
+Os **Marcos 1–22 estão concluídos e validados em produção**. O **Marco 23 — Segurança e LGPD comercial** está **concluído funcionalmente no PR #17**, aguardando merge e `Production Smoke Validation` para receber a marca oficial de produção.
 
-Estado automatizado do Marco 22:
+### Validação do Marco 22
 
-- backend: **83/83 testes**;
-- frontend: **58/58 testes**;
+O Marco 22 revelou que o backend do Render estava preso em um build antigo. Depois da correção do serviço, o smoke de produção passou exigindo rastreabilidade real do backend:
+
+- commit/build validado: `f61ba1268bb135d1e5cab4f85bf28acfb011d196`;
+- `/health`: `ok=true`, Build ID no body e em `X-GlossFlow-Build`;
+- `/ready`: mesmo Build ID e `database.ok=true`;
+- frontend e endpoints públicos: **success**;
+- `Production Smoke Validation`: **success**.
+
+### Estado automatizado do Marco 23
+
+- backend: **100/100 testes**;
+- frontend: **61/61 testes**;
 - `npm audit --audit-level=high`: **0 vulnerabilidades** no backend e frontend;
 - TypeScript/ESLint: **success**;
 - builds backend/frontend: **success**;
-- Quality Gate do head funcional: **success**;
-- Production Gate do head funcional: **success**;
-- bundle principal JS reduzido de aproximadamente **405,82 kB para 192,67 kB**;
-- orçamento permanente de bundle aplicado no build.
+- Production Gate do head funcional: **success**.
 
 ## Stack
 
@@ -50,133 +57,140 @@ Estado automatizado do Marco 22:
 - Groq como provider principal de IA
 - OpenAI como fallback opcional
 - Twilio / Meta / provider HTTP para WhatsApp
-- preparação de billing para Mercado Pago, Stripe, manual ou outro provider
-- endpoint Prometheus para coleta opcional de métricas
+- Mercado Pago / Stripe preparados como providers opcionais
+- métricas Prometheus e observabilidade interna
 
-## Marco 22 — Observabilidade, performance e confiabilidade
+## Segurança e sessões — Marco 23
 
-### Observabilidade HTTP
+### Access token vinculado à sessão
 
-A API possui uma janela de métricas bounded-memory com baixa cardinalidade. IDs MongoDB, UUIDs e segmentos numéricos longos são normalizados antes da agregação.
+O login cria uma `UserSession` revogável e inclui `sessionId` no JWT. Em produção, o backend só aceita um access token quando a sessão ainda existe, não foi revogada, não expirou e o usuário continua ativo.
 
-São medidos:
+`role`, `email` e `salonId` usados na autorização são revalidados a partir do usuário persistido. Redução de privilégio ou revogação passa a valer sem aguardar o TTL do JWT antigo.
 
-- requisições ativas;
-- respostas 4xx e 5xx;
-- taxa de erro 5xx;
-- latência média, p50, p95, p99 e máxima;
-- requisições lentas;
-- rotas mais lentas;
-- consumo de memória;
-- erros recentes;
-- dependências externas e internas monitoradas.
+### Refresh token de uso único
 
-Toda resposta recebe `X-Request-Id`, usado para correlacionar erro HTTP e logs do Render.
+Cada `/auth/refresh` rotaciona o refresh token. O token anterior deixa de funcionar, inclusive em tentativas concorrentes/replay.
 
-### Liveness e readiness
+### Resposta a incidente
 
-- `GET /health`: liveness do processo Node;
-- `GET /ready`: valida configuração mínima e executa `ping` real no MongoDB;
-- `GET /metrics`: exportação Prometheus de baixa cardinalidade.
+O ADMIN pode:
 
-O `Production Smoke Validation` do Marco 22 também verifica `/ready` e exige `database.ok=true` depois do deploy.
+- encerrar uma sessão específica;
+- encerrar todas as demais sessões do tenant preservando a sessão atual por padrão;
+- correlacionar auditoria com `requestId` e `sessionId`.
 
-### Painel operacional do Super Admin
+## LGPD operacional
 
-`GET /platform-admin/observability/overview` é exclusivo do `SUPER_ADMIN` e consolida:
+### Exportação do titular
 
-- health score;
-- probe MongoDB;
-- p50/p95/p99;
-- taxa 5xx;
-- rotas lentas;
-- memória do processo;
-- contratos, sessões, auditorias e backups;
-- estado público de IA/WhatsApp sem expor tokens;
-- dependências degradadas;
-- alertas e recomendações operacionais.
+`GET /admin/security/lgpd/export/:clientId` gera um pacote isolado por tenant contendo perfil, atendimentos, lista de espera, fidelidade, consentimentos e eventos operacionais relacionados ao titular. A resposta usa `Cache-Control: no-store`.
 
-### Providers e webhooks
+### Eliminação/anônimização
 
-- Groq/OpenAI: latência, status e falha da chamada externa;
-- MongoDB: resultado e latência do `ping` de readiness;
-- Twilio: processamento assíncrono de inbound e status callback medido separadamente do ACK HTTP.
+`POST /admin/security/lgpd/erase/:clientId` exige a confirmação exata `EXCLUIR DADOS` e um motivo documentado.
 
-Prompts, API keys, tokens, conteúdo completo de conversas e dados sensíveis não são adicionados às métricas.
+A transação:
 
-### Índices MongoDB
+- redige eventos relacionados ao titular;
+- anonimiza PII dos atendimentos históricos;
+- remove fila, fidelidade, consentimentos e perfil do cliente;
+- mantém uma trilha anônima `LGPD_SUBJECT_ERASED`.
 
-O bootstrap sincroniza índices compostos idempotentes com `createIndexes`, sem `db push` destrutivo, para caminhos críticos de:
+Essa operação não deve ser usada como simples correção de cadastro.
 
-- sessões;
-- serviços e profissionais ativos;
-- CRM;
-- Agenda;
-- lista de espera;
-- estoque;
-- financeiro;
-- auditoria;
-- backups.
+## Retenção de dados
 
-`SYNC_MONGO_INDEXES=false` existe apenas para diagnóstico. Falha isolada na criação de índice é registrada sem derrubar a API.
-
-### Paginação e crescimento de dados
-
-O CRM ganhou o read model:
+O Marco 23 introduz política explícita e **manual/controlada**, sem cron destrutivo silencioso:
 
 ```text
-GET /admin/clients/paginated?page=1&limit=50
+SESSION_RECORD_RETENTION_DAYS=30
+WHATSAPP_CONTENT_RETENTION_DAYS=180
+AUDIT_LOG_RETENTION_DAYS=730
+BACKUP_METADATA_RETENTION_DAYS=180
 ```
 
-Ele aplica `skip/take`, contagem total e isolamento por tenant, preservando o endpoint legado para compatibilidade com a interface atual.
+Fluxo:
 
-### Performance frontend
+1. `GET /admin/security/retention/preview`;
+2. revisar candidatos;
+3. confirmar `APLICAR RETENCAO`;
+4. executar `/admin/security/retention/run`.
 
-As áreas pesadas do backoffice passaram a usar `React.lazy` + `Suspense`.
+Conteúdo antigo de WhatsApp é redigido antes da expiração final do audit log.
 
-Medição no CI do Marco 22:
+## Rate limit
 
-- bundle principal antes: aproximadamente **405,82 kB**;
-- bundle principal após code splitting: aproximadamente **192,67 kB**;
-- redução: aproximadamente **52,5%**;
-- `AdminDashboard`: chunk próprio de aproximadamente 89,77 kB;
-- `PlatformAdmin`: chunk próprio de aproximadamente 62,70 kB.
+O backend aplica limites por IP/superfície e por tenant autenticado. Defaults por minuto:
 
-O build agora falha se um chunk JS ultrapassar 320 kB ou o CSS ultrapassar 180 kB, salvo alteração deliberada dos budgets.
+- login: 12;
+- refresh: 60;
+- escrita pública: 90;
+- webhooks: 600;
+- tráfego geral: 180;
+- tenant autenticado: 600;
+- operações de Segurança do tenant: 30.
 
-### SLOs operacionais iniciais
+Respostas excedentes usam HTTP `429`, `Retry-After`, `RATE_LIMITED` e a superfície atingida.
 
-Defaults documentados:
+## Backup lógico assinado e restore controlado
 
-```text
-OBSERVABILITY_SLOW_REQUEST_MS=750
-OBSERVABILITY_SLO_P95_MS=750
-OBSERVABILITY_SLO_ERROR_RATE_PCT=2
-OBSERVABILITY_DEPENDENCY_SUCCESS_RATE_PCT=98
-SYNC_MONGO_INDEXES=true
-```
+A tela Segurança gera um snapshot `glossflow-tenant-backup/v1` assinado com HMAC SHA-256. O snapshot contém o domínio operacional do tenant, como serviços, profissionais, clientes, Agenda, estoque, financeiro, fidelidade, templates e consentimentos.
 
-Esses valores são limites operacionais iniciais do piloto e não representam SLA comercial contratual.
+Não inclui usuários, senhas, sessões, lifecycle SaaS, domínio nem audit logs.
 
-## Limitações intencionais
+O restore:
 
-- métricas HTTP/dependência ficam em memória bounded e reiniciam junto com o processo;
-- histórico de longo prazo depende de coleta externa de `/metrics` e/ou logs;
-- o projeto não cria dependência obrigatória de Grafana, Datadog ou serviço pago;
-- `SENTRY_DSN` continua opcional e não é tratado como integração real enquanto não houver SDK externo efetivamente configurado;
-- nenhuma mensagem WhatsApp real ou alteração de dados de cliente foi necessária para validar o Marco 22.
+- valida schema, tenant e assinatura;
+- é `REPLACE` somente para o domínio operacional incluído;
+- exige `BACKUP_RESTORE_ENABLED=true`;
+- exige confirmação explícita `RESTAURAR BACKUP`;
+- gera auditoria `TENANT_BACKUP_RESTORED`;
+- deve voltar para `BACKUP_RESTORE_ENABLED=false` imediatamente após o procedimento.
+
+## Auditoria sensível
+
+Mutações administrativas registram ação, recurso, path, IP, user-agent, `requestId`, `sessionId`, status HTTP e outcome. O sistema não persiste valores do body e exclui até os nomes de campos sensíveis como senha, token, segredo, API key, refresh token e snapshot.
+
+## Secrets de produção
+
+`backend/scripts/check-env.js` bloqueia configurações inseguras, incluindo:
+
+- `JWT_SECRET` ausente, curto ou placeholder;
+- `BACKUP_SIGNING_SECRET` curto quando configurado;
+- `DATABASE_URL` não MongoDB em produção;
+- `FRONTEND_ORIGIN` ausente em produção;
+- restore habilitado em produção sem `BACKUP_SIGNING_SECRET` explícito.
+
+Segredos reais nunca devem ser versionados.
+
+## Observabilidade — Marco 22
+
+A API mantém:
+
+- `X-Request-Id`;
+- Build ID rastreável em `/health` e `/ready`;
+- readiness com ping MongoDB;
+- métricas p50/p95/p99, erros, slow requests, memória e dependências;
+- endpoint Prometheus;
+- observabilidade global para `SUPER_ADMIN`;
+- índices MongoDB idempotentes;
+- paginação CRM;
+- code splitting e budget de bundle.
+
+O bundle principal foi reduzido de aproximadamente 405,82 kB para 192,67 kB no Marco 22.
 
 ## Testes e qualidade
 
 ### Backend
 
-**83/83 testes automatizados**, incluindo cobertura dedicada para métricas, percentis, normalização de rotas, request ID, RBAC da observabilidade, plano de índices e paginação CRM multi-tenant.
+**100/100 testes automatizados** no head funcional do Marco 23, incluindo autenticação, RBAC, Agenda, Estoque, CRM, IA/WhatsApp, observabilidade, lifecycle SaaS, sessões revogáveis, refresh rotation, LGPD, retenção, rate limit, auditoria e backup/restore.
 
 ### Frontend
 
-**58/58 testes automatizados**, com build incluindo orçamento de bundle.
+**61/61 testes automatizados**, incluindo controles do painel Segurança/LGPD.
 
-Workflows permanentes:
+### Gates permanentes
 
 - `GlossFlow Quality Gate`;
 - `Production Gate`;
@@ -190,10 +204,12 @@ Workflows permanentes:
 - [`QUALITY_GATE.md`](QUALITY_GATE.md)
 - [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
 - [`docs/engineering/OBSERVABILITY.md`](docs/engineering/OBSERVABILITY.md)
+- [`docs/engineering/SECURITY_LGPD.md`](docs/engineering/SECURITY_LGPD.md)
 - [`docs/usuario/14_SUPER_ADMIN_SAAS.md`](docs/usuario/14_SUPER_ADMIN_SAAS.md)
+- [`docs/usuario/15_SEGURANCA_LGPD.md`](docs/usuario/15_SEGURANCA_LGPD.md)
 
 ## Próximo marco após a validação de produção
 
-**Marco 23 — Segurança e LGPD comercial**.
+**Marco 24 — Release comercial estável**.
 
 A sequência canônica está em [`ROADMAP.md`](ROADMAP.md).
