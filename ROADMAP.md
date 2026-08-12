@@ -8,19 +8,20 @@ Este documento é a fonte canônica para a evolução do GlossFlow após o encer
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-A base técnica, a homologação por papel e as evoluções comerciais dos **Marcos 1–18 estão concluídas no PR do Marco 18**. Os próximos marcos representam retenção, IA, ciclo de vida SaaS, confiabilidade, performance, segurança e escala.
+A base técnica, a homologação por papel e as evoluções comerciais dos **Marcos 1–18 estão concluídas e validadas em produção**. Os próximos marcos representam retenção, IA, ciclo de vida SaaS, confiabilidade, performance, segurança e escala.
 
-Estado automatizado no head funcional do Marco 18:
+Estado automatizado após o Marco 18:
 
 - backend: **51 testes**;
 - frontend: **44 testes**;
 - RBAC homologado para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
 - Agenda comercial integrada e validada em produção no Marco 17;
 - Estoque operacional com reposição, conciliação física, histórico e indicadores econômicos;
-- GlossFlow Quality Gate do PR: **success**;
-- Production Gate do PR: **success**;
-- preview Vercel: **READY**;
-- smoke de produção do Marco 18 será a última evidência após merge.
+- merge de produção: `6eb20a878e5f55c9df5cf73348228b0ada4b610f`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- deploy Vercel de produção: **READY**;
+- Production Smoke Validation: **success**.
 
 ---
 
@@ -169,9 +170,9 @@ Entregue:
 
 Critério operacional atingido: a equipe possui os recursos necessários para operar a Agenda sem agenda paralela.
 
-## Marco 18 — Estoque operacional e reposição — CONCLUÍDO NO PR
+## Marco 18 — Estoque operacional e reposição — CONCLUÍDO
 
-Objetivo cumprido no código: tornar o estoque confiável para uso diário, conciliação física e decisão de compra.
+Objetivo cumprido: tornar o estoque confiável para uso diário, conciliação física e decisão de compra.
 
 Entregue:
 
@@ -194,7 +195,7 @@ Entregue:
 - backend totalizando **51 testes**;
 - frontend totalizando **44 testes**.
 
-Validação no PR:
+Validação automatizada:
 
 - repository hygiene: **success**;
 - npm audit backend/frontend: **0 vulnerabilidades**;
@@ -202,13 +203,14 @@ Validação no PR:
 - backend: **51/51 testes**;
 - frontend: **44/44 testes**;
 - builds backend/frontend: **success**;
-- GlossFlow Quality Gate: **success**;
-- Production Gate: **success**;
-- preview Vercel: **READY**.
+- preview Vercel: **READY**;
+- merge em `main`: `6eb20a878e5f55c9df5cf73348228b0ada4b610f`;
+- GlossFlow Quality Gate pós-merge: **success**;
+- Production Gate pós-merge: **success**;
+- deploy Vercel de produção: **READY**;
+- Production Smoke Validation: **success**.
 
-Critério operacional atingido no produto e coberto pelo guia: a equipe consegue identificar ruptura, justificar compra, registrar movimentos, reconciliar o saldo físico e consultar a trilha sem planilha paralela. A baixa automática por serviço permanece futura e só será implementada quando existir configuração explícita de consumo por serviço/produto.
-
-Após o merge, o `Production Smoke Validation` fecha a evidência de produção do Marco 18.
+Critério operacional atingido: a equipe consegue identificar ruptura, justificar compra, registrar movimentos, reconciliar o saldo físico e consultar a trilha sem planilha paralela. A baixa automática por serviço permanece futura e só será implementada quando existir configuração explícita de consumo por serviço/produto.
 
 ---
 
