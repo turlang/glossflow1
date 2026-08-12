@@ -6,7 +6,7 @@ import { professionalCanPerform } from '../../services/professional-capability.s
 import { publicBookingAvailability } from '../../services/public-booking-availability.service';
 import { createOperationalNotification } from '../../services/appointment-notification.service';
 import { expireWaitlistOffers, matchWaitlistForDate } from '../../services/waitlist.service';
-import { adminAgendaAccess } from './access';
+import { agendaManageAccess } from './access';
 import { idParamSchema, normalizePhone, slotInWindow, waitlistCreateSchema, waitlistScanSchema, waitlistUpdateSchema } from './contracts';
 
 export async function waitlistAppointmentRoutes(app: FastifyInstance) {
@@ -59,13 +59,13 @@ export async function waitlistAppointmentRoutes(app: FastifyInstance) {
     return reply.status(201).send({ ...entry, message: 'Você entrou na lista de espera. Se surgir uma vaga compatível, o GlossFlow poderá avisar pelo WhatsApp.' });
   });
 
-  app.get('/admin/appointments/waitlist', adminAgendaAccess, async (request) => {
+  app.get('/admin/appointments/waitlist', agendaManageAccess, async (request) => {
     const tenant = getTenant(request);
     await expireWaitlistOffers(tenant.salonId);
     return prisma.waitlistEntry.findMany({ where: { salonId: tenant.salonId }, include: { service: true, professional: true }, orderBy: [{ status: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }] });
   });
 
-  app.post('/admin/appointments/waitlist/scan', adminAgendaAccess, async (request) => {
+  app.post('/admin/appointments/waitlist/scan', agendaManageAccess, async (request) => {
     const tenant = getTenant(request);
     const { date } = waitlistScanSchema.parse(request.body);
     const result = await matchWaitlistForDate({ salonId: tenant.salonId, date });
@@ -77,7 +77,7 @@ export async function waitlistAppointmentRoutes(app: FastifyInstance) {
     return result;
   });
 
-  app.put('/admin/appointments/waitlist/:id', adminAgendaAccess, async (request, reply) => {
+  app.put('/admin/appointments/waitlist/:id', agendaManageAccess, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = idParamSchema.parse(request.params);
     const data = waitlistUpdateSchema.parse(request.body);

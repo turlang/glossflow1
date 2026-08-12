@@ -35,8 +35,9 @@ function ensureManager(role: string, reply: FastifyReply) {
  * serviços usados pelo agendamento público e pelo WhatsApp.
  */
 export async function operationalAgendaRoutes(app: FastifyInstance) {
-  app.get('/admin/appointments/operational-options', async (request) => {
+  app.get('/admin/appointments/operational-options', async (request, reply) => {
     const tenant = getTenant(request);
+    if (!ensureManager(tenant.role, reply)) return;
     const [services, attendanceLogs, confirmationLogs, reminderLogs] = await Promise.all([
       prisma.service.findMany({
         where: { salonId: tenant.salonId, active: true },
@@ -211,6 +212,7 @@ export async function operationalAgendaRoutes(app: FastifyInstance) {
 
   app.put('/admin/appointments/:id/attendance', async (request, reply) => {
     const tenant = getTenant(request);
+    if (!ensureManager(tenant.role, reply)) return;
     const { id } = z.object({ id: objectIdSchema }).parse(request.params);
     const data = attendanceSchema.parse(request.body);
 

@@ -13,7 +13,7 @@ import {
 } from '../../services/appointment-notification.service';
 import { matchWaitlistAfterAppointmentChange } from '../../services/waitlist.service';
 import { buildAppointmentConflictWhere, changesAppointmentSchedule, resolveAppointmentSchedule } from '../../services/appointment-reschedule.service';
-import { adminAgendaAccess } from './access';
+import { adminAgendaAccess, agendaManageAccess } from './access';
 import { appointmentUpdateSchema, idParamSchema, smartFitQuerySchema } from './contracts';
 
 export async function adminAppointmentRoutes(app: FastifyInstance) {
@@ -52,7 +52,7 @@ export async function adminAppointmentRoutes(app: FastifyInstance) {
     return { date: query.date, service: availability.service, totalCapacity: availability.totalCapacity, strategy: availability.smartFit?.strategy || 'BEST_FIT', suggestions: availability.smartFit?.recommendedSlots || [] };
   });
 
-  app.put('/admin/appointments/:id', adminAgendaAccess, async (request, reply) => {
+  app.put('/admin/appointments/:id', agendaManageAccess, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = idParamSchema.parse(request.params);
     const data = appointmentUpdateSchema.parse(request.body);
