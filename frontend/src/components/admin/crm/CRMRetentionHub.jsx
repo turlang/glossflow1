@@ -17,7 +17,7 @@ function historyDate(value) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
 
-/** Central do Marco 19: segmentação, retenção, consentimento e histórico. */
+/** Central de retenção conectada à política de WhatsApp do Marco 20. */
 export function CRMRetentionHub({ clients, reload }) {
   const [overview, setOverview] = useState(EMPTY_OVERVIEW);
   const [segment, setSegment] = useState('ALL');
@@ -28,6 +28,7 @@ export function CRMRetentionHub({ clients, reload }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [prepared, setPrepared] = useState(null);
   const [busyClientId, setBusyClientId] = useState('');
+  const [providerSending, setProviderSending] = useState(false);
 
   async function loadRetention() {
     setLoading(true);
@@ -88,7 +89,7 @@ export function CRMRetentionHub({ clients, reload }) {
     setError('');
     try {
       const result = await request(`/admin/clients/${client.id}/follow-up`, { method: 'POST' });
-      setPrepared({ client, ...result });
+      setPrepared({ client, ...result, providerResult: null });
     } catch (err) {
       setError(err?.message || 'Não foi possível preparar o follow-up.');
     } finally {
@@ -100,6 +101,24 @@ export function CRMRetentionHub({ clients, reload }) {
     void request(`/admin/clients/${clientId}/follow-up/contacted`, { method: 'POST' })
       .then(() => loadRetention())
       .catch((err) => setError(err?.message || 'O WhatsApp foi aberto, mas não foi possível registrar o follow-up no CRM.'));
+  }
+
+  async function sendFollowUpByProvider() {
+    if (!prepared?.client?.id || providerSending) return;
+    const confirmed = window.confirm(`Enviar agora o follow-up para ${prepared.client.name} pelo provider de WhatsApp?`);
+    if (!confirmed) return;
+
+    setProviderSending(true);
+    setError('');
+    try {
+      const result = await request(`/admin/clients/${prepared.client.id}/follow-up/send`, { method: 'POST' });
+      setPrepared((current) => current ? { ...current, providerResult: result } : current);
+      await loadRetention();
+    } catch (err) {
+      setError(err?.message || 'O provider não confirmou o envio. Verifique janela, template e configuração do WhatsApp.');
+    } finally {
+      setProviderSending(false);
+    }
   }
 
   return (
@@ -130,7 +149,7 @@ export function CRMRetentionHub({ clients, reload }) {
           <div>
             <span className="eyebrow">Fila de relacionamento</span>
             <h2>Segmentos acionáveis</h2>
-            <p>Cada cliente mostra o motivo da classificação. O sistema não dispara mensagens automaticamente neste marco.</p>
+            <p>Cada cliente mostra o motivo da classificação. O envio pelo provider só ocorre por ação explícita e respeita a política de janela/template do servidor.</p>
           </div>
           <strong>{visibleClients.length} cliente(s)</strong>
         </div>
@@ -212,16 +231,24 @@ export function CRMRetentionHub({ clients, reload }) {
             <span className="eyebrow">Contato preparado</span>
             <h2>{prepared.client.name}</h2>
             <p>{prepared.message}</p>
+            {prepared.providerResult?.ok && (
+              <small role="status">Provider confirmou a solicitação via {prepared.providerResult.mode === 'TEMPLATE' ? 'template oficial' : 'janela de atendimento'}.</small>
+            )}
           </div>
-          <a
-            className="primary button-link"
-            href={prepared.whatsappUrl}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() => registerFollowUpInitiated(prepared.client.id)}
-          >
-            Abrir WhatsApp
-          </a>
+          <div className="crm-followup-actions">
+            <a
+              className="secondary button-link"
+              href={prepared.whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => registerFollowUpInitiated(prepared.client.id)}
+            >
+              Abrir WhatsApp
+            </a>
+            <button type="button" className="primary" onClick={sendFollowUpByProvider} disabled={providerSending || prepared.providerResult?.ok}>
+              {providerSending ? 'Enviando...' : prepared.providerResult?.ok ? 'Envio solicitado' : 'Enviar pelo provider'}
+            </button>
+          </div>
         </section>
       )}
 
