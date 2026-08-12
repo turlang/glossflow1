@@ -21,7 +21,7 @@ const overview = {
     inactive60d: 1,
     inactive120d: 1,
     frequent90d: 1,
-    contacted180d: 1,
+    followUpsInitiated180d: 1,
     reactivated30d: 1,
     reactivationRate: 100
   },
@@ -54,6 +54,7 @@ describe('CRMRetentionHub', () => {
       if (url === '/admin/clients/c1/follow-up' && options.method === 'POST') {
         return { ok: true, message: 'Olá, Carla! Podemos ajudar com seu próximo horário.', whatsappUrl: 'https://wa.me/5511999999999?text=teste' };
       }
+      if (url === '/admin/clients/c1/follow-up/contacted' && options.method === 'POST') return { ok: true };
       if (url.includes('/marketing-consent') && options.method === 'POST') return { id: 'consent-1' };
       return {};
     });
@@ -90,15 +91,20 @@ describe('CRMRetentionHub', () => {
     expect(within(card).getByText('Opt-out ativo')).toBeTruthy();
   });
 
-  it('prepara follow-up e oferece abertura do WhatsApp', async () => {
+  it('prepara follow-up e só registra quando o WhatsApp é aberto', async () => {
     const user = userEvent.setup();
     render(<CRMRetentionHub clients={clients} reload={vi.fn()} />);
     const heading = await screen.findByRole('heading', { name: 'Carla' });
     const card = heading.closest('article');
     await user.click(within(card).getByRole('button', { name: 'Preparar follow-up' }));
     await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/clients/c1/follow-up', { method: 'POST' }));
+    expect(request).not.toHaveBeenCalledWith('/admin/clients/c1/follow-up/contacted', { method: 'POST' });
+
     const link = await screen.findByRole('link', { name: 'Abrir WhatsApp' });
     expect(link.getAttribute('href')).toMatch(/^https:\/\/wa\.me\//);
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    await user.click(link);
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/clients/c1/follow-up/contacted', { method: 'POST' }));
     expect(screen.getByText(/Podemos ajudar com seu próximo horário/i)).toBeTruthy();
   });
 
