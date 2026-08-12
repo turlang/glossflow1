@@ -65,4 +65,4 @@ if (production && process.env.BACKUP_RESTORE_ENABLED === 'true' && !backupSecret
   process.exit(1);
 }
 
-console.log(strict ? 'Ambiente completo das integrações validado com sucesso.' : 'Ambiente mínimo seguro validado com sucesso.');
+console.log(strict ? 'Ambiente completo das integrações validado com sucesso.' : 'Ambiente mínimo validado com sucesso.');
