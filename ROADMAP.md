@@ -8,11 +8,18 @@ Este documento é a fonte canônica para a evolução do GlossFlow após o encer
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-A base técnica dos **Marcos 1–15 está concluída** e validada por Quality Gate, Production Gate e smoke pós-deploy. A partir daqui, novos marcos representam evolução de produto, homologação comercial, confiabilidade, performance e escala.
+A base técnica e a primeira homologação funcional dos **Marcos 1–16 estão concluídas** e validadas por Quality Gate, Production Gate e smoke pós-deploy. A partir daqui, os próximos marcos representam evolução comercial, confiabilidade, performance e escala.
+
+Estado automatizado após o Marco 16:
+
+- backend: **41 testes**;
+- frontend: **29 testes**;
+- RBAC homologado para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
+- deploy Vercel e smoke de produção validados.
 
 ---
 
-# Ciclo concluído — Marcos 1–15
+# Ciclo concluído — Marcos 1–16
 
 ## Marco 1 — Higienização estrutural inicial — CONCLUÍDO
 
@@ -96,7 +103,7 @@ A base técnica dos **Marcos 1–15 está concluída** e validada por Quality Ga
 - CRM;
 - Twilio;
 - agente WhatsApp;
-- backend totalizando 30 testes.
+- backend passou a 30 testes nessa etapa.
 
 ## Marco 13 — Domínio comercial modularizado — CONCLUÍDO
 
@@ -124,12 +131,40 @@ A base técnica dos **Marcos 1–15 está concluída** e validada por Quality Ga
 
 - bloqueio automático de regressões estruturais;
 - zero `<style>` em componentes JSX;
-- zero `any` explícito em backend/src;
+- zero `any` explícito em `backend/src`;
 - gates permanentes de qualidade e produção.
+
+## Marco 16 — Homologação funcional completa por papel — CONCLUÍDO
+
+Objetivo cumprido: alinhar o produto visível ao contrato real de autorização antes de ampliar funcionalidades.
+
+Entregue:
+
+- matriz canônica de UX por papel no frontend;
+- `SUPER_ADMIN` direcionado à administração global e bloqueado na operação tenant;
+- `ADMIN` com operação completa do salão dentro dos módulos contratados;
+- `RECEPTION` com módulos operacionais e sem usuários, financeiro sensível, assinatura ou segurança;
+- `PROFESSIONAL` com painel mínimo e Agenda em modo somente leitura;
+- URLs diretas incompatíveis normalizadas por papel;
+- Agenda sem drag-and-drop nem botão Reagendar para `PROFESSIONAL`;
+- separação backend entre `agendaReadAccess` e `agendaManageAccess`;
+- reagendamento, lista de espera administrativa e mesa operacional restritos a `ADMIN`/`RECEPTION`;
+- checklist em `docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`;
+- backend totalizando **41 testes**;
+- frontend totalizando **29 testes**.
+
+Validação de saída:
+
+- GlossFlow Quality Gate: **success**;
+- Production Gate: **success**;
+- Production Smoke Validation: **success**;
+- deploy de produção: **READY**.
+
+Observação arquitetural: nesta versão não existe vínculo persistente `User → Professional`; por isso, o perfil `PROFESSIONAL` possui Agenda tenant em modo somente leitura, sem alegar filtragem por profissional individual até que esse vínculo seja modelado explicitamente.
 
 ---
 
-# Homologação pós-higienização — CONCLUÍDA NA BASE ATUAL
+# Homologação visual pós-higienização — CONCLUÍDA
 
 A primeira rodada visual em produção identificou inconsistências sistêmicas e foi corrigida.
 
@@ -147,43 +182,30 @@ Entregue:
 
 # Próximo ciclo — Evolução comercial
 
-## Marco 16 — Homologação funcional completa por papel — PRÓXIMO
-
-Objetivo: validar o produto como um usuário real antes de ampliar funcionalidades.
-
-Escopo:
-
-- homologar `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
-- percorrer todos os módulos visíveis para cada papel;
-- validar estados vazios, carregamento, erro e sucesso;
-- revisar desktop e mobile;
-- testar criação, edição, desativação e exclusão onde aplicável;
-- confirmar que erros 403/404 isolados não encerram sessão;
-- registrar regressões em checklist de homologação.
-
-Critério de saída:
-
-- nenhuma tela principal vazia por erro de layout/dados;
-- nenhum controle ilegível;
-- nenhum fluxo principal bloqueado por permissão incorreta;
-- Quality Gate, Production Gate e smoke verdes.
-
-## Marco 17 — Agenda comercial e jornada do cliente — PLANEJADO
+## Marco 17 — Agenda comercial e jornada do cliente — PRÓXIMO
 
 Objetivo: transformar a Agenda no principal motor operacional do salão.
 
-Escopo planejado:
+Escopo:
 
 - revisar experiência de criação e reagendamento no admin;
-- consolidar filtros por profissional/serviço/status;
+- consolidar filtros por profissional, serviço e status;
 - revisar Smart Fit e lista de espera em cenários reais;
 - melhorar comunicação de conflito e indisponibilidade;
 - reforçar lembretes, confirmação e cancelamento;
-- ampliar testes de jornada completa cliente → salão → WhatsApp.
+- validar jornada pública de agendamento ponta a ponta;
+- validar transição cliente → salão → WhatsApp;
+- ampliar testes de jornada completa;
+- revisar experiência desktop/mobile dos fluxos de Agenda.
 
 Critério de saída:
 
-- um salão consegue operar o dia inteiro sem depender de planilha ou agenda paralela.
+- criação, reagendamento e cancelamento operam sem inconsistência conhecida;
+- conflito e indisponibilidade possuem mensagens acionáveis;
+- confirmação/lembrete via WhatsApp preservam estado correto;
+- Smart Fit e lista de espera são utilizáveis em operação real;
+- um salão consegue operar o dia inteiro sem depender de planilha ou agenda paralela;
+- Quality Gate, Production Gate e smoke específicos ficam verdes.
 
 ## Marco 18 — Estoque operacional e reposição — PLANEJADO
 
@@ -330,8 +352,6 @@ Resultado esperado:
 Ordem oficial atual:
 
 ```text
-Marco 16 — Homologação funcional completa
-   ↓
 Marco 17 — Agenda comercial
    ↓
 Marco 18 — Estoque operacional
@@ -370,3 +390,4 @@ Um marco somente é considerado concluído quando:
 - [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md)
 - [`QUALITY_GATE.md`](QUALITY_GATE.md)
 - [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
+- [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
