@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { request } from '../../services/api';
 import { MODULE_CATALOG } from '../../utils/modules';
-import { NewClientWizard } from './NewClientWizard.jsx';
+import { SaasProvisioningWizard } from './SaasProvisioningWizard.jsx';
 import { PlatformPlans } from './PlatformPlans.jsx';
 import { PlatformSiteManager } from './PlatformSiteManager.jsx';
 import { ExternalCostControl } from './ExternalCostControl.jsx';
+import { TenantBillingProfile } from './TenantBillingProfile.jsx';
 
 function money(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -27,6 +28,10 @@ const initialClient = {
   adminName: '',
   adminEmail: '',
   adminPassword: '',
+  planId: '',
+  subscriptionStatus: 'TRIAL',
+  subscriptionEndsAt: '',
+  billingProvider: 'MANUAL',
   enabledModules: ['SITE', 'AGENDA']
 };
 
@@ -141,14 +146,14 @@ export function PlatformAdmin({ setPage }) {
   async function saveModules(salon) {
     setSaving(`modules-${salon.id}`);
     try {
-      const updated = await request(`/platform-admin/salons/${salon.id}/modules`, {
+      const updated = await request(`/platform-admin/salons/${salon.id}/lifecycle`, {
         method: 'PUT',
         body: JSON.stringify({ enabledModules: moduleDrafts[salon.id] || [] })
       });
       setSalons((current) => current.map((item) => item.id === salon.id
-        ? { ...item, modulesConfigured: true, enabledModules: updated.enabledModules }
+        ? { ...item, modulesConfigured: true, enabledModules: updated.salon?.enabledModules || [] }
         : item));
-      setMessage(`Módulos de ${salon.name} atualizados.`);
+      setMessage(`Módulos contratados de ${salon.name} atualizados e auditados.`);
     } catch (err) {
       setMessage(err.message || 'Não foi possível atualizar os módulos.');
     } finally {
@@ -162,11 +167,11 @@ export function PlatformAdmin({ setPage }) {
 
     setSaving(`subscription-${salon.id}`);
     try {
-      await request(`/platform-admin/salons/${salon.id}/subscription`, {
+      await request(`/platform-admin/salons/${salon.id}/lifecycle`, {
         method: 'PUT',
         body: JSON.stringify(draft)
       });
-      setMessage(`Assinatura de ${salon.name} atualizada.`);
+      setMessage(`Ciclo de assinatura de ${salon.name} atualizado. Mudanças de estado já valem para login e operação.`);
       await load();
     } catch (err) {
       setMessage(err.message || 'Não foi possível atualizar a assinatura.');
@@ -182,11 +187,13 @@ export function PlatformAdmin({ setPage }) {
       const payload = { name: draft.name, email: draft.email, active: draft.active };
       if (draft.password) payload.password = draft.password;
 
-      await request(`/platform-admin/salons/${salon.id}/admin-access`, {
+      const updated = await request(`/platform-admin/salons/${salon.id}/owner`, {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
-      setMessage(`Acesso administrativo de ${salon.name} atualizado.`);
+      setMessage(updated.sessionsRevoked
+        ? `Acesso de ${salon.name} atualizado; sessões anteriores foram revogadas por segurança.`
+        : `Acesso administrativo de ${salon.name} atualizado e auditado.`);
       await load();
     } catch (err) {
       setMessage(err.message || 'Não foi possível atualizar o acesso do cliente.');
@@ -200,15 +207,19 @@ export function PlatformAdmin({ setPage }) {
     setSaving('new-client');
     setMessage('');
     try {
-      await request('/platform-admin/salons', {
+      const { billingProvider, ...client } = newClient;
+      await request('/platform-admin/provisioning', {
         method: 'POST',
-        body: JSON.stringify(newClient)
+        body: JSON.stringify({
+          ...client,
+          billing: { provider: billingProvider, customerId: '', subscriptionRef: '', nextBillingAt: '', notes: '' }
+        })
       });
       setNewClient(initialClient);
-      setMessage('Cliente criado. O salão e o primeiro ADMIN estão prontos.');
+      setMessage('Cliente SaaS provisionado: tenant, ADMIN, plano, assinatura, módulos e billing estão vinculados.');
       await load();
     } catch (err) {
-      setMessage(err.message || 'Não foi possível cadastrar o cliente.');
+      setMessage(err.message || 'Não foi possível provisionar o cliente.');
     } finally {
       setSaving('');
     }
@@ -234,9 +245,9 @@ export function PlatformAdmin({ setPage }) {
 
   const tabs = [
     ['overview', '◈', 'Visão geral', 'MRR e saúde comercial'],
-    ['clients', '◆', 'Clientes', 'Tenants, acessos e módulos'],
+    ['clients', '◆', 'Clientes', 'Tenants, contratos e acessos'],
     ['sites', '✦', 'Site & Marca', 'White-label dos clientes'],
-    ['plans', '◇', 'Planos', 'Planos e assinaturas'],
+    ['plans', '◇', 'Planos', 'Catálogo comercial'],
     ['infra', '📡', 'Infraestrutura', 'Integrações e observabilidade']
   ];
   const tabTitle = tabs.find(([key]) => key === tab)?.[2] || 'Super Admin';
@@ -316,10 +327,11 @@ export function PlatformAdmin({ setPage }) {
 
         {!loading && !error && tab === 'clients' && (
           <>
-            <NewClientWizard
+            <SaasProvisioningWizard
               value={newClient}
               setValue={setNewClient}
               modules={MODULE_CATALOG}
+              plans={plans}
               saving={saving === 'new-client'}
               onSubmit={createClient}
             />
@@ -369,6 +381,7 @@ export function PlatformAdmin({ setPage }) {
                             )) : <p>Carregando métricas...</p>}
                           </div>
 
+                          <TenantBillingProfile salon={salon} />
                           <ExternalCostControl salon={salon} />
 
                           <div style={box()}>
@@ -392,6 +405,7 @@ export function PlatformAdmin({ setPage }) {
 
                           <div style={box()}>
                             <strong>Plano e assinatura</strong>
+                            <p className="panel-help">TRIAL e PAST_DUE usam a data abaixo como fim da avaliação/período de graça. CANCELED bloqueia operação e revoga sessões. CANCELED só pode voltar para ACTIVE.</p>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, marginTop: 10 }}>
                               <label>
                                 <span>Plano</span>
@@ -407,12 +421,12 @@ export function PlatformAdmin({ setPage }) {
                                 </select>
                               </label>
                               <label>
-                                <span>Vencimento/fim</span>
+                                <span>Fim / período de graça</span>
                                 <input type="date" value={sub.endsAt || ''} onChange={(event) => setSubscriptionDrafts((current) => ({ ...current, [salon.id]: { ...current[salon.id], endsAt: event.target.value } }))} />
                               </label>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                              <button className="primary" type="button" onClick={() => saveSubscription(salon)}>Salvar assinatura</button>
+                              <button className="primary" type="button" disabled={saving === `subscription-${salon.id}`} onClick={() => saveSubscription(salon)}>{saving === `subscription-${salon.id}` ? 'Salvando...' : 'Salvar ciclo de assinatura'}</button>
                             </div>
                           </div>
 
@@ -425,7 +439,7 @@ export function PlatformAdmin({ setPage }) {
                               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={admin.active !== false} onChange={(event) => setAdminDrafts((current) => ({ ...current, [salon.id]: { ...current[salon.id], active: event.target.checked } }))} /> Conta ativa</label>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                              <button className="primary" type="button" onClick={() => saveAdminAccess(salon)}>Salvar acesso</button>
+                              <button className="primary" type="button" disabled={saving === `admin-${salon.id}`} onClick={() => saveAdminAccess(salon)}>{saving === `admin-${salon.id}` ? 'Salvando...' : 'Salvar acesso'}</button>
                             </div>
                           </div>
                         </div>

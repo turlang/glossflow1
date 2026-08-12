@@ -79,8 +79,12 @@ test('Agenda pública bloqueia módulo desabilitado antes de consultar disponibi
     await withMocks({
       salon: {
         findUnique: async ({ where }) => {
-          assert.equal(where.slug, 'glossflow');
-          return { id: salonId, slug: 'glossflow', name: 'GlossFlow', modulesConfigured: true, enabledModules: [], openingHours: '09h às 19h' };
+          if (where.slug) {
+            assert.equal(where.slug, 'glossflow');
+            return { id: salonId, slug: 'glossflow', name: 'GlossFlow', modulesConfigured: true, enabledModules: [], openingHours: '09h às 19h' };
+          }
+          assert.equal(where.id, salonId);
+          return { subscription: null };
         }
       },
       service: { findFirst: async () => { serviceReads += 1; return null; } }
@@ -104,7 +108,9 @@ test('Agenda pública habilitada consulta ocupação apenas do salão resolvido'
   try {
     await withMocks({
       salon: {
-        findUnique: async () => ({ id: salonId, slug: 'glossflow', name: 'GlossFlow', modulesConfigured: true, enabledModules: ['AGENDA'], openingHours: '09h às 19h' })
+        findUnique: async ({ where }) => where.slug
+          ? { id: salonId, slug: 'glossflow', name: 'GlossFlow', modulesConfigured: true, enabledModules: ['AGENDA'], openingHours: '09h às 19h' }
+          : { subscription: null }
       },
       appointment: {
         findMany: async ({ where }) => { whereSeen = where; return []; }

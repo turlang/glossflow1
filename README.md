@@ -1,32 +1,21 @@
 # GlossFlow Smart
 
-SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de estética. O GlossFlow centraliza vitrine pública, Agenda, CRM, Estoque, financeiro, fidelidade, automações, WhatsApp e apoio operacional com IA.
+SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de estética. O GlossFlow centraliza vitrine pública, Agenda, CRM, Estoque, financeiro, fidelidade, automações, WhatsApp, IA e operação comercial da própria plataforma.
 
 ## Estado atual
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-Os **Marcos 1–20 estão concluídos e validados em produção**. O Marco 20 fechou o assistente IA/WhatsApp com base factual por tenant, confirmação server-side de mutações de Agenda, handoff com contexto, política de janela/template, follow-up seguro por provider e métricas operacionais.
+Os **Marcos 1–20 estão concluídos e validados em produção**. O **Marco 21 — Super Admin, planos e ciclo de vida SaaS** está **concluído funcionalmente no PR**, aguardando merge e smoke pós-deploy para receber a validação oficial de produção.
 
-Validação do Marco 20:
+Estado automatizado do Marco 21:
 
-- merge em `main`: `238fdd4c2401424f12af26e5feb660a6f1cb1e1c`;
-- backend: **68/68 testes**;
-- frontend: **54/54 testes**;
-- Quality Gate pós-merge: **success**;
-- Production Gate pós-merge: **success**;
-- checks Vercel: **success**;
-- Production Smoke Validation: **success**.
-
-Resultados acumulados:
-
-- higienização e modularização estrutural concluídas;
-- RBAC e multi-tenant homologados;
-- Agenda comercial operacional;
-- Estoque operacional com reposição e conciliação;
-- CRM de retenção com consentimento e reativação;
-- agente WhatsApp com base factual do tenant, confirmação server-side de mutações, handoff com contexto e política de envio por janela/template;
-- gates, testes automatizados e smoke pós-deploy permanentes.
+- backend: **76/76 testes**;
+- frontend: **58/58 testes**;
+- `npm audit --audit-level=high`: **0 vulnerabilidades** no backend e frontend;
+- TypeScript/ESLint: **success**;
+- builds backend/frontend: **success**;
+- Production Gate do head funcional: **success**.
 
 ## Stack
 
@@ -59,50 +48,35 @@ Resultados acumulados:
 - OpenAI como fallback opcional
 - Twilio / Meta / provider HTTP para WhatsApp
 - Sentry opcional
+- preparação de billing para Mercado Pago, Stripe, manual ou outro provider
 
-## Arquitetura resumida
-
-```text
-Cliente WhatsApp
-      |
-      v
-Webhook / tenant / módulos
-      |
-      +--> histórico + handoff
-      |
-      +--> Assistente IA
-             |
-             +--> Base factual do tenant
-             +--> Ferramentas de consulta
-             +--> Proposta de mutação
-                       |
-                       v
-              Ação pendente no servidor
-                       |
-                 nova mensagem
-                       |
-           CONFIRMAR / CANCELAR AÇÃO
-                       |
-                       v
-            revalidação + execução
-```
+## Arquitetura comercial SaaS
 
 ```text
-Follow-up CRM
-      |
-      +--> opt-out / tenant / módulo
-      +--> conteúdo interno
-      +--> janela de atendimento
-             |
-             +--> aberta  -> texto livre
-             |
-             +--> fechada -> template oficial obrigatório
-      |
-      +--> provider
-             |
-             +--> sucesso -> registra outbound/follow-up
-             +--> falha   -> erro real, sem sucesso falso
+SUPER_ADMIN
+   |
+   +--> Provisionar cliente
+   |      +--> Salon
+   |      +--> ADMIN
+   |      +--> Plano / assinatura
+   |      +--> Módulos contratados
+   |      +--> Perfil de billing
+   |      +--> Auditoria
+   |
+   +--> Ciclo do contrato
+          TRIAL
+            |
+            +--> ACTIVE
+            +--> PAST_DUE
+            +--> CANCELED
+                    |
+                    +--> revoga sessões
+                    +--> bloqueia nova operação
+                    +--> preserva configuração/dados
+                    +--> pode reativar como ACTIVE
 ```
+
+O estado comercial é aplicado antes do entitlement de módulo. `SalonSubscription` continua sendo a fonte do estado operacional atual; informações de preparação de billing e histórico sensível são auditadas sem migração destrutiva do schema.
 
 ## Funcionalidades principais
 
@@ -110,73 +84,87 @@ Follow-up CRM
 - agendamento online;
 - Agenda Enterprise e central comercial;
 - Smart Fit, lista de espera e reaproveitamento de vagas;
-- confirmação, cancelamento, lembretes e rastreamento WhatsApp;
-- CRM com segmentação por aniversário, inatividade e frequência;
-- histórico de cliente e preferência de marketing;
-- follow-up manual e por provider;
-- Estoque operacional com entrada, saída, ajuste físico, histórico e reposição;
+- CRM com segmentação e retenção;
+- Estoque operacional, reposição e conciliação;
 - financeiro, comissões e fidelidade;
-- Super Admin separado do tenant;
-- módulos/entitlements por salão;
-- Site & Marca white-label;
-- agente IA com Groq/fallback;
+- WhatsApp/IA com confirmação server-side, handoff e política de janela/template;
+- Super Admin isolado dos tenants;
+- planos e módulos por salão;
+- Site & Marca e domínio por cliente;
+- custos externos por tenant;
 - PWA, auditoria, segurança e observabilidade.
 
-## Marco 20 — Assistente IA e WhatsApp em produção
+## Marco 21 — Super Admin, planos e ciclo de vida SaaS
 
-O Marco 20 fecha os principais riscos de automação do canal.
+### Provisionamento sem edição manual no banco
 
-### Base factual por salão
+O novo fluxo **Provisionar salão completo** possui cinco etapas: Salão, Administrador, Contrato, Módulos e Revisão. Em uma única operação lógica, o backend cria:
 
-O prompt é montado com fatos cadastrados no tenant: nome, descrição, horário, endereço, telefone, Instagram e catálogo ativo. Disponibilidade e profissionais são obtidos por ferramentas. Informação ausente não deve ser inventada.
+- tenant `Salon`;
+- primeiro usuário `ADMIN` com senha bcrypt;
+- `SalonSubscription` vinculada a plano ativo;
+- módulos efetivamente contratados;
+- perfil inicial de billing;
+- trilha de auditoria SaaS.
 
-### Mutações com confirmação server-side
+Se a sequência falhar depois da criação do tenant, o serviço executa limpeza compensatória para evitar cadastro órfão.
 
-Criar, cancelar e reagendar não são executados diretamente por function calling. A ferramenta exposta ao modelo cria uma **proposta pendente**. Somente uma mensagem posterior reconhecida pelo servidor como confirmação explícita pode executar a mutação.
+### Ciclo de assinatura
 
-Ações pendentes:
+Estados suportados:
 
-- são auditadas;
-- possuem TTL configurável;
-- aceitam cancelamento explícito;
-- permanecem pendentes em mensagens ambíguas;
-- são revalidadas contra a Agenda antes da execução.
+- `TRIAL`: acesso até o fim da avaliação;
+- `ACTIVE`: operação liberada;
+- `PAST_DUE`: janela de graça configurável e bloqueio depois do vencimento;
+- `CANCELED`: operação bloqueada e sessões revogadas sem apagar o salão.
 
-### Handoff com contexto
+O servidor valida as transições. Um contrato `CANCELED` pode permanecer cancelado ou voltar para `ACTIVE`; ele não retorna para `TRIAL`.
 
-O handoff humano registra motivo e contexto recente da conversa quando disponível. Uma falha ao recuperar contexto não impede o encaminhamento.
+### Enforcement contratual
 
-### Política de WhatsApp
+O contrato é revalidado em:
 
-Mensagens iniciadas pelo salão são controladas no servidor:
+- login;
+- refresh de sessão;
+- rotas operacionais autenticadas;
+- rotas de negócio;
+- rotas administrativas críticas do tenant;
+- disponibilidade e criação de novos agendamentos públicos.
 
-- janela de atendimento aberta: texto livre;
-- janela fechada: exige identificador de template oficial configurado;
-- falha do provider: gera evento de falha e não persiste mensagem como enviada;
-- follow-up do CRM só entra na métrica depois de sucesso confirmado pela API do provider.
+Tenants legados sem `SalonSubscription` permanecem compatíveis até migração comercial pelo Super Admin.
 
-### Métricas
+### ADMIN do cliente
 
-O read model `/admin/whatsapp/metrics` acompanha:
+O Super Admin pode atualizar nome, e-mail, estado ativo e senha do administrador principal. Rotação de senha ou desativação revoga as sessões desse usuário. A senha nunca é gravada em auditoria.
 
-- contatos e mensagens;
-- falhas do provider;
-- handoffs;
-- ações propostas, confirmadas, canceladas, expiradas e com falha;
-- taxa operacional de resolução automática;
-- taxa de sucesso do provider.
+### Billing
 
-A tela **WhatsApp · Homologação** mostra esses indicadores e continua sem enviar mensagem real ao provider.
+O painel por tenant registra provider, Customer ID, referência de assinatura, próxima cobrança e observações. **O Marco 21 não cria nem cobra uma assinatura em gateway externo**: esta camada prepara o vínculo comercial para uma integração posterior de billing real.
+
+### White-label, domínio e custos
+
+Site & Marca continua exclusivo do Super Admin. Mudanças de domínio/template/cores/logo/hero são auditadas por tenant sem copiar imagens base64 para os metadados. O painel de custos externos continua registrando custos de WhatsApp, IA, domínio e outros itens por cliente.
+
+### Auditoria dedicada
+
+Eventos principais:
+
+- `SAAS_TENANT_PROVISIONED`;
+- `SAAS_SUBSCRIPTION_CHANGED`;
+- `SAAS_MODULES_UPDATED`;
+- `SAAS_ADMIN_ACCESS_UPDATED`;
+- `SAAS_BILLING_PROFILE_UPDATED`;
+- `SAAS_SITE_BRAND_UPDATED`.
 
 ## Testes e qualidade
 
 ### Backend
 
-**68/68 testes automatizados** cobrindo autenticação, RBAC, Agenda, Estoque, CRM, agente IA, confirmação posterior, janela de atendimento, templates, falha de provider, handoff e métricas.
+**76/76 testes automatizados**, incluindo oito testes específicos do ciclo SaaS para estados, período de graça, compatibilidade legada, matriz de transição, revogação de sessões, provisionamento, rollback compensatório e rotação segura da senha do ADMIN.
 
 ### Frontend
 
-**54/54 testes automatizados** cobrindo Agenda, Estoque, CRM de retenção e envio de follow-up pelo provider somente após confirmação do operador.
+**58/58 testes automatizados**, incluindo quatro testes específicos do wizard de provisionamento do Super Admin.
 
 ### Gates
 
@@ -203,19 +191,16 @@ Workflows permanentes:
 - `Production Gate`;
 - `Production Smoke Validation`.
 
-## Configuração de WhatsApp do Marco 20
+## Configuração do ciclo SaaS
 
-Consulte `backend/.env.example`. Variáveis adicionais incluem:
+Consulte `backend/.env.example`. Variáveis do Marco 21:
 
 ```text
-WHATSAPP_ACTION_CONFIRMATION_TTL_MINUTES
-WHATSAPP_TEMPLATE_RETENTION_BIRTHDAY
-WHATSAPP_TEMPLATE_RETENTION_INACTIVE
-WHATSAPP_TEMPLATE_RETENTION_FREQUENT
-WHATSAPP_TEMPLATE_RETENTION_FOLLOWUP
+SAAS_DEFAULT_TRIAL_DAYS=7
+SAAS_PAST_DUE_GRACE_DAYS=3
 ```
 
-Nunca versionar credenciais reais e nunca desativar `WHATSAPP_DRY_RUN` apenas porque o playground local funciona.
+Esses valores são defaults do servidor quando o Super Admin não informa datas explícitas para TRIAL ou PAST_DUE.
 
 ## Documentação
 
@@ -230,9 +215,10 @@ Nunca versionar credenciais reais e nunca desativar `WHATSAPP_DRY_RUN` apenas po
 - [`docs/usuario/11_ESTOQUE_OPERACIONAL.md`](docs/usuario/11_ESTOQUE_OPERACIONAL.md)
 - [`docs/usuario/12_CRM_RETENCAO.md`](docs/usuario/12_CRM_RETENCAO.md)
 - [`docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`](docs/usuario/13_IA_WHATSAPP_PRODUCAO.md)
+- [`docs/usuario/14_SUPER_ADMIN_SAAS.md`](docs/usuario/14_SUPER_ADMIN_SAAS.md)
 
-## Próximo marco oficial
+## Próximo marco após a validação de produção
 
-**Marco 21 — Super Admin, planos e ciclo de vida SaaS**.
+**Marco 22 — Observabilidade, performance e confiabilidade**.
 
 A sequência canônica está em [`ROADMAP.md`](ROADMAP.md).

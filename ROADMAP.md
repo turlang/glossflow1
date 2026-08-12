@@ -8,25 +8,21 @@ Este documento é a fonte canônica para a evolução do GlossFlow.
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-Os **Marcos 1–20 estão concluídos e validados em produção**. O próximo marco oficial é o **Marco 21 — Super Admin, planos e ciclo de vida SaaS**.
+Os **Marcos 1–20 estão concluídos e validados em produção**. O **Marco 21 — Super Admin, planos e ciclo de vida SaaS** está **CONCLUÍDO NO PR**, com implementação funcional e Production Gate verdes. A validação oficial de produção será registrada somente depois do merge, deploy e `Production Smoke Validation`.
 
-Estado automatizado após o Marco 20:
+Estado automatizado do head funcional do Marco 21:
 
-- backend: **68/68 testes**;
-- frontend: **54/54 testes**;
+- backend: **76/76 testes**;
+- frontend: **58/58 testes**;
 - `npm audit` backend/frontend: **0 vulnerabilidades**;
 - TypeScript/ESLint: **success**;
 - builds backend/frontend: **success**;
-- merge de produção: `238fdd4c2401424f12af26e5feb660a6f1cb1e1c`;
-- GlossFlow Quality Gate pós-merge: **success**;
-- Production Gate pós-merge: **success**;
-- checks Vercel: **success**;
-- Production Smoke Validation: **success**;
-- confirmação de mutações de Agenda validada no servidor;
-- política de janela/template validada;
-- falha de provider sem sucesso falso;
-- handoff com contexto;
-- métricas operacionais de IA/WhatsApp.
+- Production Gate: **success**;
+- provisionamento completo sem edição manual no banco;
+- estados `TRIAL`, `ACTIVE`, `PAST_DUE` e `CANCELED` aplicados pelo servidor;
+- cancelamento revogando sessões sem destruir tenant;
+- billing preparado por tenant sem executar cobrança externa;
+- mudanças sensíveis com auditoria dedicada.
 
 ---
 
@@ -122,154 +118,196 @@ Validação final do Marco 19:
 
 Objetivo cumprido: transformar o agente em atendimento comercial controlado por fatos e regras do servidor, impedindo que o modelo execute mutações sensíveis ou declare sucesso de provider sem evidência.
 
-### Base factual do tenant
+Principais entregas:
 
-- contexto institucional por salão;
-- serviços ativos, preço, duração e descrição;
-- disponibilidade e profissionais consultados por ferramentas;
-- informação ausente tratada como não cadastrada, sem completar lacunas por suposição.
-
-### Confirmação server-side de Agenda
-
-Criar, cancelar e reagendar seguem o fluxo:
-
-```text
-Pedido do cliente
-   ↓
-IA consulta/valida
-   ↓
-Proposta pendente
-   ↓
-NOVA mensagem do cliente
-   ├─ CONFIRMAR      → revalida Agenda → executa
-   ├─ CANCELAR AÇÃO  → cancela proposta
-   └─ ambígua        → mantém pendente, sem mutação
-```
-
-Entregue:
-
-- `confirmed=true` removido do contrato exposto ao modelo;
-- ação pendente persistida em AuditLog;
-- TTL configurável;
-- parser de confirmação conservador;
-- revalidação de serviço, profissional, jornada e conflito antes da execução;
-- proposta encerrada imediatamente no turno de tool calling para impedir encadeamento proposta + execução;
-- estados auditados `PENDING`, `COMPLETED`, `CANCELED`, `FAILED` e `EXPIRED`.
-
-### Handoff humano
-
-- motivo persistido;
-- telefone normalizado;
-- até seis mensagens recentes anexadas quando disponíveis;
-- falha de leitura do contexto não impede o handoff.
-
-### Política de envio WhatsApp
-
-A decisão de canal é do servidor, não da IA:
-
-- janela de atendimento aberta → mensagem livre;
-- janela fechada → template oficial do provider obrigatório;
-- ausência de template → bloqueio antes da chamada externa;
-- falha do provider → `WHATSAPP_PROVIDER_FAILED`, sem `WHATSAPP_SENT` falso;
-- outbound persistido somente após sucesso confirmado pela API do provider.
-
-O CRM ganhou `POST /admin/clients/:id/follow-up/send` com:
-
-- tenant e módulo WhatsApp revalidados;
-- opt-out preservado;
-- confirmação explícita do operador no frontend;
-- política de janela/template;
-- follow-up registrado somente depois de sucesso do provider.
-
-### Templates
-
-O CRUD interno aceita também:
-
-- `RETENTION_BIRTHDAY`;
-- `RETENTION_INACTIVE`;
-- `RETENTION_FREQUENT`;
-- `RETENTION_FOLLOWUP`.
-
-O ambiente documenta os identificadores de template oficial correspondentes para o provider.
-
-### Métricas
-
-Novo read model `/admin/whatsapp/metrics` com:
-
-- mensagens inbound/outbound;
-- falhas do provider;
-- handoffs abertos/fechados;
-- ações propostas, concluídas, canceladas, falhas e expiradas;
-- contatos inbound únicos;
-- taxa operacional de resolução automática;
-- taxa de sucesso do provider.
-
-A taxa de resolução automática é um proxy operacional — resposta outbound sem handoff no período — e não uma prova de satisfação do cliente.
-
-### Interface e documentação
-
-- `WhatsAppAgentTester` mostra status e métricas de 30 dias;
-- playground continua sem enviar mensagem real ao provider;
-- CRM oferece fluxo manual e envio controlado por provider;
-- presets de retenção adicionados à Central de Automações;
-- `backend/.env.example` documenta TTL e templates de retenção;
+- base factual por tenant;
+- ferramentas de consulta de serviços, profissionais e disponibilidade;
+- criação/cancelamento/reagendamento transformados em propostas pendentes;
+- confirmação explícita posterior validada no servidor;
+- revalidação de Agenda antes da execução;
+- handoff humano com contexto recente;
+- política de janela de atendimento e template oficial;
+- falha de provider sem `WHATSAPP_SENT` falso;
+- follow-up CRM por provider com opt-out e confirmação do operador;
+- métricas de automação, provider, handoff e ações;
 - guia `docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`.
 
-### Validação final de produção
+Validação final de produção:
 
-- repository hygiene: **success**;
-- `npm audit` backend/frontend: **0 vulnerabilidades**;
-- TypeScript/ESLint: **success**;
 - backend: **68/68 testes**;
 - frontend: **54/54 testes**;
-- builds backend/frontend: **success**;
 - merge em `main`: `238fdd4c2401424f12af26e5feb660a6f1cb1e1c`;
-- GlossFlow Quality Gate pós-merge: **success**;
-- Production Gate pós-merge: **success**;
+- Quality Gate: **success**;
+- Production Gate: **success**;
 - checks Vercel: **success**;
 - Production Smoke Validation: **success**.
 
-Critério de saída atingido:
+---
 
-- o agente não recebe autoridade para inventar fatos fora da base/tooling;
-- qualquer mutação de Agenda exige confirmação explícita posterior validada pelo servidor;
-- mensagem ambígua não altera Agenda;
-- falha do provider não produz sucesso falso;
-- handoff preserva contexto recente;
-- follow-up respeita opt-out e política de janela/template;
-- operação possui métricas de automação, handoff e provider.
+# Marco 21 — Super Admin, planos e ciclo de vida SaaS — CONCLUÍDO NO PR
+
+Objetivo funcional cumprido: permitir que o `SUPER_ADMIN` provisione e administre um cliente SaaS completo sem editar documentos diretamente no MongoDB e sem destruir o tenant para suspender ou reativar o contrato.
+
+## Provisionamento canônico
+
+Novo fluxo **Provisionar salão completo** dividido em cinco etapas:
+
+1. dados do salão;
+2. administrador principal;
+3. plano e estado inicial do contrato;
+4. módulos contratados;
+5. revisão e provisionamento.
+
+A operação cria:
+
+- `Salon` com slug único;
+- primeiro usuário `ADMIN` com senha bcrypt;
+- `SalonSubscription` ligada a um plano ativo;
+- módulos efetivamente contratados;
+- perfil inicial de billing;
+- eventos dedicados de auditoria.
+
+Se uma etapa interna falhar depois da criação inicial, o backend executa limpeza compensatória de auditorias, sessões, usuários, assinatura e tenant criado, evitando provisionamento órfão.
+
+## Ciclo de vida comercial
+
+Estados canônicos:
+
+```text
+TRIAL
+ ├─ ACTIVE
+ ├─ PAST_DUE
+ └─ CANCELED
+
+ACTIVE
+ ├─ PAST_DUE
+ └─ CANCELED
+
+PAST_DUE
+ ├─ ACTIVE
+ └─ CANCELED
+
+CANCELED
+ └─ ACTIVE
+```
+
+Regras:
+
+- `TRIAL` usa `endsAt` ou `SAAS_DEFAULT_TRIAL_DAYS`;
+- `ACTIVE` libera operação;
+- `PAST_DUE` usa `endsAt` como período de graça ou `SAAS_PAST_DUE_GRACE_DAYS`;
+- `CANCELED` bloqueia operação e revoga sessões do tenant;
+- cancelamento não apaga dados, white-label, módulos ou histórico;
+- contrato cancelado pode ser reativado como `ACTIVE`, sem recriar o salão;
+- tenant legado sem `SalonSubscription` permanece compatível até migração comercial.
+
+## Enforcement do contrato
+
+A situação comercial é validada antes do entitlement de módulo em:
+
+- `/auth/login`;
+- `/auth/refresh`;
+- rotas operacionais autenticadas;
+- rotas de negócio autenticadas;
+- rotas administrativas críticas do tenant;
+- consulta de disponibilidade pública da Agenda;
+- read model público de horários ocupados;
+- criação de novo agendamento público.
+
+O `SUPER_ADMIN` permanece fora desse bloqueio para conseguir corrigir o contrato.
+
+## Acesso do administrador principal
+
+O Super Admin pode alterar:
+
+- nome;
+- e-mail;
+- ativo/inativo;
+- senha.
+
+Rotação de senha ou desativação revoga sessões do administrador. A senha não é incluída nos metadados de auditoria.
+
+## Planos e módulos
+
+O plano representa a oferta comercial/preço; os módulos representam o entitlement efetivo. O fluxo canônico impede atribuir plano arquivado a um novo contrato e permite alterar módulos sem usar a remoção de módulos como substituto do cancelamento financeiro.
+
+## Billing preparado por tenant
+
+Perfil comercial armazenado de forma auditável:
+
+- provider `MANUAL`, `MERCADO_PAGO`, `STRIPE` ou `OTHER`;
+- Customer ID;
+- referência da assinatura externa;
+- próxima cobrança;
+- observações.
+
+Limite intencional: **o Marco 21 não cria, cobra, cancela ou sincroniza uma assinatura no gateway externo**. O objetivo é preparar o vínculo para billing real posterior sem criar efeitos financeiros durante a implantação deste marco.
+
+## White-label e domínio
+
+`Site & Marca` permanece exclusivo do Super Admin. Atualizações registram evento `SAAS_SITE_BRAND_UPDATED` com antes/depois de domínio, template e cores, mais indicadores de alteração de logo/hero. Imagens base64 não são copiadas integralmente para auditoria.
+
+Colisão de `customDomain` entre tenants continua bloqueada.
+
+## Custos externos
+
+O painel existente de custos continua disponível por tenant e complementa o novo ciclo SaaS com custos de WhatsApp, IA, domínio e outros itens comerciais/operacionais.
+
+## Auditoria sensível
+
+Eventos adicionados/consolidados:
+
+- `SAAS_TENANT_PROVISIONED`;
+- `SAAS_SUBSCRIPTION_CHANGED`;
+- `SAAS_MODULES_UPDATED`;
+- `SAAS_ADMIN_ACCESS_UPDATED`;
+- `SAAS_BILLING_PROFILE_UPDATED`;
+- `SAAS_SITE_BRAND_UPDATED`.
+
+## Interface e documentação
+
+- `SaasProvisioningWizard` com cinco etapas;
+- `TenantBillingProfile` dentro do gerenciamento do cliente;
+- `PlatformAdmin` conectado ao contrato canônico;
+- `backend/.env.example` com defaults de TRIAL e PAST_DUE;
+- guia `docs/usuario/14_SUPER_ADMIN_SAAS.md`.
+
+## Cobertura funcional do PR
+
+- backend: **76/76 testes**;
+- frontend: **58/58 testes**;
+- oito testes específicos de lifecycle backend;
+- quatro testes específicos do wizard frontend;
+- `npm audit` backend/frontend: **0 vulnerabilidades**;
+- TypeScript/ESLint: **success**;
+- builds: **success**;
+- Production Gate: **success**.
+
+Critério funcional atingido: um novo salão pode ser provisionado, receber ADMIN, plano, estado comercial, módulos e preparação de billing pelo Super Admin, além de ser suspenso ou reativado sem edição manual no banco.
+
+A marca de **validado em produção** depende ainda do merge do PR, checks de deploy e `Production Smoke Validation` do `main`.
 
 ---
 
-# Próximo ciclo — Evolução comercial
+# Próximo ciclo após a validação do Marco 21
 
-## Marco 21 — Super Admin, planos e ciclo de vida SaaS — PRÓXIMO
+## Marco 22 — Observabilidade, performance e confiabilidade — PRÓXIMO
 
-Objetivo: permitir operação comercial multi-tenant sem intervenção técnica manual.
+Objetivo: operar múltiplos salões com diagnóstico rápido, métricas confiáveis e comportamento previsível sob crescimento.
 
-Escopo:
-
-- onboarding de novo cliente;
-- planos e módulos contratados;
-- estados `TRIAL`, `ACTIVE`, `PAST_DUE` e `CANCELED`;
-- ativação/desativação segura;
-- white-label e domínio;
-- custos externos por tenant;
-- preparação de billing real;
-- auditoria de alterações sensíveis.
-
-Critério de saída: um novo salão pode ser provisionado, configurado e administrado pelo Super Admin sem edição manual de banco.
-
-## Marco 22 — Observabilidade, performance e confiabilidade — PLANEJADO
+Escopo planejado:
 
 - métricas de API e latência;
 - erros por rota/provider;
-- monitoramento de webhooks;
+- monitoramento de webhooks e WhatsApp;
 - tarefas assíncronas quando necessário;
 - índices MongoDB;
-- paginação e redução de N+1;
-- performance de frontend;
+- paginação;
+- redução de N+1;
+- bundle/performance frontend;
 - alertas operacionais.
+
+Critério de saída: falhas relevantes podem ser detectadas e diagnosticadas sem depender de relato do cliente, e os principais read models permanecem previsíveis com crescimento de dados.
 
 ## Marco 23 — Segurança e LGPD comercial — PLANEJADO
 
@@ -304,7 +342,7 @@ Resultado esperado:
 # Prioridade de execução
 
 ```text
-Marco 21 — Super Admin / planos / ciclo de vida SaaS
+Marco 21 — Super Admin / planos / ciclo de vida SaaS  ← fechamento de produção
    ↓
 Marco 22 — Observabilidade e performance
    ↓
@@ -315,7 +353,7 @@ Marco 24 — Release comercial estável
 
 ## Regra de avanço
 
-Um marco somente é considerado concluído quando:
+Um marco somente é considerado concluído em produção quando:
 
 1. código e documentação estão atualizados;
 2. testes relevantes estão verdes;
@@ -332,5 +370,5 @@ Um marco somente é considerado concluído quando:
 - [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md)
 - [`QUALITY_GATE.md`](QUALITY_GATE.md)
 - [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
-- [`docs/usuario/12_CRM_RETENCAO.md`](docs/usuario/12_CRM_RETENCAO.md)
 - [`docs/usuario/13_IA_WHATSAPP_PRODUCAO.md`](docs/usuario/13_IA_WHATSAPP_PRODUCAO.md)
+- [`docs/usuario/14_SUPER_ADMIN_SAAS.md`](docs/usuario/14_SUPER_ADMIN_SAAS.md)

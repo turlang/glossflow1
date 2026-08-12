@@ -16,6 +16,7 @@ import { whatsappOperationsRoutes } from './whatsapp-operations.routes';
 import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
 import { platformAdminRoutes } from './platform-admin.routes';
+import { platformLifecycleRoutes } from './platform-lifecycle.routes';
 import { platformSiteRoutes } from './platform-site.routes';
 import { platformCostRoutes } from './platform-cost.routes';
 import { commercialRoutes } from './commercial.routes';
@@ -23,6 +24,7 @@ import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
+import { enforceTenantSubscriptionAccess } from '../middlewares/subscription-access';
 import { enforceSalonModuleAccess } from '../services/module-access.service';
 
 /**
@@ -39,20 +41,22 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(whatsappWebhookRoutes);
   app.register(twilioWhatsAppWebhookRoutes);
 
-  /** Administração global: clientes, planos, módulos, MRR, Site & Marca, custos inclusos e infraestrutura. */
+  /** Administração global: clientes, planos, ciclo SaaS, Site & Marca, custos e infraestrutura. */
   app.register(async (platformAdmin) => {
     platformAdmin.addHook('preHandler', ensureAuthenticated);
     platformAdmin.addHook('preHandler', requireRoles(['SUPER_ADMIN']));
     platformAdmin.addHook('onResponse', writeAuditLog);
     platformAdmin.register(platformAdminRoutes);
+    platformAdmin.register(platformLifecycleRoutes);
     platformAdmin.register(platformSiteRoutes);
     platformAdmin.register(platformCostRoutes);
   });
 
-  /** Operação do salão, sempre isolada pelo salonId e pelos módulos contratados. */
+  /** Operação do salão, sempre isolada pelo salonId, contrato vigente e módulos contratados. */
   app.register(async (operational) => {
     operational.addHook('preHandler', ensureAuthenticated);
     operational.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION', 'PROFESSIONAL']));
+    operational.addHook('preHandler', enforceTenantSubscriptionAccess);
     operational.addHook('preHandler', async (request, reply) => {
       const path = request.url.split('?')[0];
       if (request.method === 'PUT' && path === '/admin/salon') {
@@ -74,6 +78,8 @@ export async function appRoutes(app: FastifyInstance) {
 
   app.register(async (business) => {
     business.addHook('preHandler', ensureAuthenticated);
+    business.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION']));
+    business.addHook('preHandler', enforceTenantSubscriptionAccess);
     business.addHook('preHandler', async (request, reply) => {
       const path = request.url.split('?')[0];
       if (path.startsWith('/admin/saas/')) {
@@ -84,7 +90,6 @@ export async function appRoutes(app: FastifyInstance) {
         return reply.status(403).send({ message: 'Planos e assinaturas são gerenciados exclusivamente pelo Super Admin.' });
       }
     });
-    business.addHook('preHandler', requireRoles(['ADMIN', 'RECEPTION']));
     business.addHook('preHandler', enforceSalonModuleAccess);
     business.addHook('onResponse', writeAuditLog);
     business.register(businessRoutes);
@@ -94,10 +99,11 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(whatsappOperationsRoutes);
   });
 
-  /** Segurança do próprio tenant continua disponível apenas ao ADMIN do salão. */
+  /** Segurança do próprio tenant continua disponível apenas ao ADMIN com contrato operacional. */
   app.register(async (criticalAdmin) => {
     criticalAdmin.addHook('preHandler', ensureAuthenticated);
     criticalAdmin.addHook('preHandler', requireRoles(['ADMIN']));
+    criticalAdmin.addHook('preHandler', enforceTenantSubscriptionAccess);
     criticalAdmin.addHook('preHandler', enforceSalonModuleAccess);
     criticalAdmin.addHook('onResponse', writeAuditLog);
     criticalAdmin.register(securityRoutes);
