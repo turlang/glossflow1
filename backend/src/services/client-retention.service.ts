@@ -172,6 +172,7 @@ export async function getRetentionOverview(salonId: string, now = new Date()) {
       where: {
         salonId,
         resource: 'RetentionFollowUp',
+        action: 'RETENTION_FOLLOWUP_INITIATED',
         createdAt: { gte: new Date(now.getTime() - 180 * DAY_MS) }
       },
       orderBy: { createdAt: 'desc' },
@@ -185,30 +186,31 @@ export async function getRetentionOverview(salonId: string, now = new Date()) {
 
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const clientById = new Map(clients.map((client) => [client.id, client]));
-  const contactedIds = new Set(followUps.map((item) => item.resourceId).filter((id): id is string => Boolean(id)));
+  const initiatedIds = new Set(followUps.map((item) => item.resourceId).filter((id): id is string => Boolean(id)));
   let reactivated = 0;
 
-  for (const clientId of contactedIds) {
+  for (const clientId of initiatedIds) {
     const client = clientById.get(clientId);
     if (!client) continue;
-    const contact = followUps.find((item) => item.resourceId === clientId);
-    if (!contact) continue;
-    const contactDate = toDate(contact.createdAt);
-    if (!contactDate) continue;
-    const returned = (client.appointments || []).some((appointment) => {
-      const visit = toDate(appointment.startTime);
-      return Boolean(
-        visit
-        && visit > contactDate
-        && visit.getTime() - contactDate.getTime() <= 30 * DAY_MS
-        && !NON_VISIT_STATUSES.has(String(appointment.status || '').toUpperCase())
-      );
+    const clientFollowUps = followUps.filter((item) => item.resourceId === clientId);
+    const returned = clientFollowUps.some((followUp) => {
+      const contactDate = toDate(followUp.createdAt);
+      if (!contactDate) return false;
+      return (client.appointments || []).some((appointment) => {
+        const visit = toDate(appointment.startTime);
+        return Boolean(
+          visit
+          && visit > contactDate
+          && visit.getTime() - contactDate.getTime() <= 30 * DAY_MS
+          && !NON_VISIT_STATUSES.has(String(appointment.status || '').toUpperCase())
+        );
+      });
     });
     if (returned) reactivated += 1;
   }
 
   const eligible = profiles.filter((profile) => profile.marketingAllowed);
-  const contacted = [...contactedIds].filter((id) => profileById.has(id)).length;
+  const initiated = [...initiatedIds].filter((id) => profileById.has(id)).length;
 
   return {
     generatedAt: now.toISOString(),
@@ -220,16 +222,16 @@ export async function getRetentionOverview(salonId: string, now = new Date()) {
       inactive60d: profiles.filter((profile) => profile.tags.includes('INACTIVE_60') || profile.tags.includes('INACTIVE_120')).length,
       inactive120d: profiles.filter((profile) => profile.tags.includes('INACTIVE_120')).length,
       frequent90d: profiles.filter((profile) => profile.tags.includes('FREQUENT')).length,
-      contacted180d: contacted,
+      followUpsInitiated180d: initiated,
       reactivated30d: reactivated,
-      reactivationRate: contacted > 0 ? Number(((reactivated / contacted) * 100).toFixed(1)) : 0
+      reactivationRate: initiated > 0 ? Number(((reactivated / initiated) * 100).toFixed(1)) : 0
     },
     clients: profiles
   };
 }
 
 export async function getClientServiceHistory(salonId: string, clientId: string) {
-  const client = await prisma.client.findFirst({
+  return prisma.client.findFirst({
     where: { id: clientId, salonId },
     select: {
       id: true,
@@ -250,7 +252,6 @@ export async function getClientServiceHistory(salonId: string, clientId: string)
       }
     }
   });
-  return client;
 }
 
 function templateForSegment(segment: RetentionSegment, firstName: string, salonName: string) {
@@ -279,36 +280,39 @@ function fillRetentionTemplate(message: string, clientName: string, salonName: s
     .trim();
 }
 
-/**
- * O Marco 19 registra o contato e devolve um deep-link do WhatsApp. O envio
- * automatizado por provider fica no Marco 20, onde templates oficiais e janela
- * de atendimento serão validados antes de qualquer disparo automático.
- */
-export async function registerRetentionFollowUp(salonId: string, clientId: string, now = new Date()) {
-  const [client, salon] = await Promise.all([
-    prisma.client.findFirst({
-      where: { id: clientId, salonId },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        email: true,
-        birthDate: true,
-        createdAt: true,
-        consents: {
-          where: { type: 'MARKETING' },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { granted: true, createdAt: true }
-        },
-        appointments: {
-          where: { startTime: { lte: now } },
-          orderBy: { startTime: 'desc' },
-          take: 24,
-          select: { id: true, startTime: true, endTime: true, status: true }
-        }
+async function retentionClientContext(salonId: string, clientId: string, now: Date) {
+  return prisma.client.findFirst({
+    where: { id: clientId, salonId },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      birthDate: true,
+      createdAt: true,
+      consents: {
+        where: { type: 'MARKETING' },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { granted: true, createdAt: true }
+      },
+      appointments: {
+        where: { startTime: { lte: now } },
+        orderBy: { startTime: 'desc' },
+        take: 24,
+        select: { id: true, startTime: true, endTime: true, status: true }
       }
-    }),
+    }
+  });
+}
+
+/**
+ * Preparar uma mensagem não conta como contato executado. O Marco 19 só
+ * registra a iniciativa quando a equipe efetivamente aciona "Abrir WhatsApp".
+ */
+export async function prepareRetentionFollowUp(salonId: string, clientId: string, now = new Date()) {
+  const [client, salon] = await Promise.all([
+    retentionClientContext(salonId, clientId, now),
     prisma.salon.findUnique({ where: { id: salonId }, select: { name: true } })
   ]);
 
@@ -329,28 +333,39 @@ export async function registerRetentionFollowUp(salonId: string, clientId: strin
   const phone = normalizePhone(client.phone);
   if (!phone) return { ok: false as const, code: 'INVALID_PHONE' as const, profile };
 
-  await prisma.auditLog.create({
-    data: {
-      action: 'RETENTION_FOLLOWUP_RECORDED',
-      resource: 'RetentionFollowUp',
-      resourceId: client.id,
-      method: 'ADMIN',
-      path: `/admin/clients/${client.id}/follow-up`,
-      salonId,
-      metadata: {
-        phone,
-        segment: profile.primarySegment,
-        reason: profile.reason,
-        templateId: template?.id || null,
-        templateEvent: template?.event || retentionTemplateEvent(profile.primarySegment)
-      }
-    }
-  });
-
   return {
     ok: true as const,
     profile,
     message,
+    templateId: template?.id || null,
+    templateEvent: template?.event || retentionTemplateEvent(profile.primarySegment),
     whatsappUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
   };
+}
+
+export async function recordRetentionFollowUpInitiated(salonId: string, clientId: string, now = new Date()) {
+  const client = await retentionClientContext(salonId, clientId, now);
+  if (!client) return { ok: false as const, code: 'CLIENT_NOT_FOUND' as const };
+  const profile = buildRetentionProfile(client, now);
+  if (!profile.marketingAllowed) return { ok: false as const, code: 'MARKETING_OPT_OUT' as const, profile };
+  const phone = normalizePhone(client.phone);
+  if (!phone) return { ok: false as const, code: 'INVALID_PHONE' as const, profile };
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'RETENTION_FOLLOWUP_INITIATED',
+      resource: 'RetentionFollowUp',
+      resourceId: client.id,
+      method: 'ADMIN',
+      path: `/admin/clients/${client.id}/follow-up/contacted`,
+      salonId,
+      metadata: {
+        phone,
+        segment: profile.primarySegment,
+        reason: profile.reason
+      }
+    }
+  });
+
+  return { ok: true as const, profile };
 }
