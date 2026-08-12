@@ -29,9 +29,16 @@ function hashToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function signAccessToken(user: { id: string; email: string; role: string; salonId: string }) {
+function newRefreshToken() {
+  return crypto.randomBytes(48).toString('hex');
+}
+
+function signAccessToken(
+  user: { id: string; email: string; role: string; salonId: string },
+  sessionId: string
+) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, salonId: user.salonId },
+    { id: user.id, email: user.email, role: user.role, salonId: user.salonId, sessionId },
     getJwtSecret(),
     { expiresIn: `${ACCESS_TOKEN_MINUTES}m` }
   );
@@ -55,7 +62,7 @@ async function contractBlock(user: { role: string; salonId: string }) {
   };
 }
 
-/** Sessões revogáveis são contrato obrigatório do schema corporativo. */
+/** Sessões revogáveis e refresh tokens de uso único são contrato de segurança. */
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/login', async (request, reply) => {
     const { email, password } = loginSchema.parse(request.body);
@@ -71,11 +78,9 @@ export async function authRoutes(app: FastifyInstance) {
     const blocked = await contractBlock(user);
     if (blocked) return reply.status(403).send(blocked);
 
-    const token = signAccessToken(user);
-    const refreshToken = crypto.randomBytes(48).toString('hex');
+    const refreshToken = newRefreshToken();
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000);
-
-    await prisma.userSession.create({
+    const session = await prisma.userSession.create({
       data: {
         userId: user.id,
         salonId: user.salonId,
@@ -86,19 +91,27 @@ export async function authRoutes(app: FastifyInstance) {
       }
     });
 
-    return reply.send({ token, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, salonId: user.salonId } });
+    const token = signAccessToken(user, session.id);
+    return reply.send({
+      token,
+      refreshToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, salonId: user.salonId }
+    });
   });
 
   app.post('/auth/refresh', async (request, reply) => {
     const { refreshToken } = (request.body || {}) as { refreshToken?: string };
     if (!refreshToken) return reply.status(401).send({ message: 'Refresh token não informado.' });
 
+    const currentHash = hashToken(refreshToken);
     const session = await prisma.userSession.findFirst({
-      where: { refreshTokenHash: hashToken(refreshToken), revokedAt: null, expiresAt: { gt: new Date() } },
+      where: { refreshTokenHash: currentHash, revokedAt: null, expiresAt: { gt: new Date() } },
       include: { user: true }
     });
 
-    if (!session || !session.user.active) return reply.status(401).send({ message: 'Sessão expirada ou revogada.' });
+    if (!session || !session.user.active) {
+      return reply.status(401).send({ message: 'Sessão expirada ou revogada.' });
+    }
 
     const blocked = await contractBlock(session.user);
     if (blocked) {
@@ -106,8 +119,39 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(403).send(blocked);
     }
 
-    await prisma.userSession.update({ where: { id: session.id }, data: { lastUsedAt: new Date() } });
-    return reply.send({ token: signAccessToken(session.user), user: { id: session.user.id, name: session.user.name, email: session.user.email, role: session.user.role, salonId: session.user.salonId } });
+    const rotatedRefreshToken = newRefreshToken();
+    const rotated = await prisma.userSession.updateMany({
+      where: {
+        id: session.id,
+        refreshTokenHash: currentHash,
+        revokedAt: null,
+        expiresAt: { gt: new Date() }
+      },
+      data: {
+        refreshTokenHash: hashToken(rotatedRefreshToken),
+        lastUsedAt: new Date()
+      }
+    });
+
+    /**
+     * O update condicional torna o refresh token de uso único também sob
+     * concorrência: somente a primeira requisição consegue trocar o hash.
+     */
+    if (rotated.count !== 1) {
+      return reply.status(401).send({ message: 'Refresh token já utilizado ou sessão revogada.' });
+    }
+
+    return reply.send({
+      token: signAccessToken(session.user, session.id),
+      refreshToken: rotatedRefreshToken,
+      user: {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        role: session.user.role,
+        salonId: session.user.salonId
+      }
+    });
   });
 
   app.post('/auth/logout', async (request, reply) => {
