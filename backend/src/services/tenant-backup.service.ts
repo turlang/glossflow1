@@ -226,7 +226,7 @@ export async function restoreTenantBackup(input: {
     if (data.inventoryMovements.length) await tx.inventoryMovement.createMany({ data: data.inventoryMovements.map((row) => tenantRow(row, input.salonId)) as Prisma.InventoryMovementCreateManyInput[] });
     if (data.financialEntries.length) await tx.financialEntry.createMany({ data: data.financialEntries.map((row) => tenantRow(row, input.salonId)) as Prisma.FinancialEntryCreateManyInput[] });
     if (data.commissionRules.length) await tx.commissionRule.createMany({ data: data.commissionRules.map((row) => tenantRow(row, input.salonId)) as Prisma.CommissionRuleCreateManyInput[] });
-    if (data.loyaltyProgram) await tx.loyaltyProgram.create({ data: tenantRow(data.loyaltyProgram, input.salonId) as Prisma.LoyaltyProgramCreateInput });
+    if (data.loyaltyProgram) await tx.loyaltyProgram.create({ data: tenantRow(data.loyaltyProgram, input.salonId) as unknown as Prisma.LoyaltyProgramUncheckedCreateInput });
     if (data.loyaltyEntries.length) await tx.loyaltyEntry.createMany({ data: data.loyaltyEntries.map((row) => tenantRow(row, input.salonId)) as Prisma.LoyaltyEntryCreateManyInput[] });
     if (data.whatsappTemplates.length) await tx.whatsAppTemplate.createMany({ data: data.whatsappTemplates.map((row) => tenantRow(row, input.salonId)) as Prisma.WhatsAppTemplateCreateManyInput[] });
     if (data.lgpdConsents.length) await tx.lgpdConsent.createMany({ data: data.lgpdConsents.map((row) => tenantRow(row, input.salonId)) as Prisma.LgpdConsentCreateManyInput[] });
