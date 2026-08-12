@@ -102,6 +102,7 @@ test('overview CRM calcula segmentos e métricas apenas do tenant autenticado', 
       assert.equal(body.summary.optedOut, 1);
       assert.equal(body.summary.inactive60d, 2);
       assert.equal(body.summary.inactive120d, 1);
+      assert.equal(body.summary.followUpsInitiated180d, 0);
       assert.equal(body.clients[0].primarySegment, 'BIRTHDAY');
     });
   } finally {
@@ -197,7 +198,7 @@ test('follow-up é bloqueado quando o cliente fez opt-out', async () => {
   }
 });
 
-test('follow-up registra contato e devolve mensagem preparada sem disparo automático', async () => {
+test('follow-up só entra na métrica quando a equipe inicia o contato', async () => {
   const app = buildApp();
   const audits = [];
   try {
@@ -223,18 +224,27 @@ test('follow-up registra contato e devolve mensagem preparada sem disparo autom�
         }
       }
     }, async () => {
-      const response = await app.inject({
+      const preview = await app.inject({
         method: 'POST',
         url: `/admin/clients/${clientId}/follow-up`,
         headers: { authorization: `Bearer ${token('RECEPTION')}` }
       });
-      assert.equal(response.statusCode, 200, response.body);
-      const body = response.json();
+      assert.equal(preview.statusCode, 200, preview.body);
+      const body = preview.json();
       assert.equal(body.ok, true);
       assert.match(body.whatsappUrl, /^https:\/\/wa\.me\//);
       assert.match(body.message, /Faz um tempo/i);
-      const retentionAudit = audits.find((item) => item.resource === 'RetentionFollowUp');
-      assert.ok(retentionAudit, 'evento RetentionFollowUp deve ser auditado');
+      assert.equal(audits.some((item) => item.action === 'RETENTION_FOLLOWUP_INITIATED'), false);
+
+      const initiated = await app.inject({
+        method: 'POST',
+        url: `/admin/clients/${clientId}/follow-up/contacted`,
+        headers: { authorization: `Bearer ${token('RECEPTION')}` }
+      });
+      assert.equal(initiated.statusCode, 200, initiated.body);
+      const retentionAudit = audits.find((item) => item.action === 'RETENTION_FOLLOWUP_INITIATED');
+      assert.ok(retentionAudit, 'início do follow-up deve ser auditado');
+      assert.equal(retentionAudit.resource, 'RetentionFollowUp');
       assert.equal(retentionAudit.resourceId, clientId);
       assert.equal(retentionAudit.metadata.segment, 'INACTIVE_120');
     });
