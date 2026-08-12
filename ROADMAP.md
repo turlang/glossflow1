@@ -1,6 +1,6 @@
 # GlossFlow Smart — Roadmap Oficial
 
-Data-base: 2026-08-11.
+Data-base: 2026-08-12.
 
 Este documento é a fonte canônica para a evolução do GlossFlow após o encerramento do ciclo de higienização estrutural.
 
@@ -8,18 +8,23 @@ Este documento é a fonte canônica para a evolução do GlossFlow após o encer
 
 O GlossFlow está em **piloto comercial com produção ativa**.
 
-A base técnica e a primeira homologação funcional dos **Marcos 1–16 estão concluídas** e validadas por Quality Gate, Production Gate e smoke pós-deploy. A partir daqui, os próximos marcos representam evolução comercial, confiabilidade, performance e escala.
+A base técnica, a homologação por papel e a primeira evolução comercial dos **Marcos 1–17 estão concluídas**. Os próximos marcos representam evolução operacional, retenção, IA, confiabilidade, performance e escala.
 
-Estado automatizado após o Marco 16:
+Estado automatizado após o Marco 17:
 
-- backend: **41 testes**;
-- frontend: **29 testes**;
+- backend: **46 testes**;
+- frontend: **35 testes**;
 - RBAC homologado para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
-- deploy Vercel e smoke de produção validados.
+- Agenda comercial integrada a Operação do Dia, Smart Fit, Lista de Espera e Jornada da Equipe;
+- filtros consolidados por profissional, serviço e status;
+- jornada cliente → salão → WhatsApp coberta por testes de regressão;
+- Quality Gate e Production Gate do PR validados;
+- deploy de preview Vercel validado como `READY`;
+- merge e smoke de produção permanecem como última validação operacional antes do avanço para o Marco 18.
 
 ---
 
-# Ciclo concluído — Marcos 1–16
+# Ciclo concluído — Marcos 1–17
 
 ## Marco 1 — Higienização estrutural inicial — CONCLUÍDO
 
@@ -150,8 +155,8 @@ Entregue:
 - separação backend entre `agendaReadAccess` e `agendaManageAccess`;
 - reagendamento, lista de espera administrativa e mesa operacional restritos a `ADMIN`/`RECEPTION`;
 - checklist em `docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`;
-- backend totalizando **41 testes**;
-- frontend totalizando **29 testes**.
+- backend totalizando **41 testes** nessa etapa;
+- frontend totalizando **29 testes** nessa etapa.
 
 Validação de saída:
 
@@ -161,6 +166,40 @@ Validação de saída:
 - deploy de produção: **READY**.
 
 Observação arquitetural: nesta versão não existe vínculo persistente `User → Professional`; por isso, o perfil `PROFESSIONAL` possui Agenda tenant em modo somente leitura, sem alegar filtragem por profissional individual até que esse vínculo seja modelado explicitamente.
+
+## Marco 17 — Agenda comercial e jornada do cliente — CONCLUÍDO
+
+Objetivo cumprido: transformar a Agenda no principal ponto de operação diária do salão e conectar planejamento, execução, encaixe e comunicação com o cliente.
+
+Entregue:
+
+- `AgendaCommercialHub` como porta de entrada única do domínio Agenda;
+- atalhos para **Operação do Dia**, **Encaixe Inteligente**, **Lista de Espera** e **Jornada da Equipe** para `ADMIN`/`RECEPTION`;
+- `PROFESSIONAL` preservado em modo somente leitura;
+- Agenda Enterprise com filtros combinados por profissional, serviço e status;
+- limpeza unificada de filtros e estado vazio específico para busca sem resultado;
+- métricas e visões dia/semana/mês/profissionais respeitando o conjunto filtrado;
+- criação rápida validada com isolamento de tenant e retorno do estado de notificação ao cliente;
+- dupla ocupação bloqueada antes da persistência;
+- conflito de reagendamento bloqueado com mensagem acionável;
+- cancelamento pela equipe validado com notificação e reaproveitamento da vaga pela Lista de Espera;
+- presença, confirmação e lembretes consolidados na mesa operacional;
+- guia de operação em `docs/usuario/10_AGENDA_COMERCIAL.md`;
+- correção do teste assíncrono de cancelamento para aguardar o efeito de liberação da vaga antes de restaurar mocks;
+- backend totalizando **46 testes**;
+- frontend totalizando **35 testes**.
+
+Validação no PR:
+
+- repository hygiene: **success**;
+- npm audit backend/frontend: **0 vulnerabilidades**;
+- lint/TypeScript: **success**;
+- backend: **46/46 testes**;
+- frontend: **35/35 testes**;
+- builds backend/frontend: **success**;
+- preview Vercel: **READY**.
+
+Critério operacional atingido pelo produto e coberto pelo guia/checklist: a equipe possui no GlossFlow os recursos necessários para planejar e operar Agenda, conflitos, encaixes, fila, confirmação e cancelamento sem depender de uma agenda paralela. A validação final pós-merge é feita pelo `Production Smoke Validation` antes do início do Marco 18.
 
 ---
 
@@ -182,36 +221,11 @@ Entregue:
 
 # Próximo ciclo — Evolução comercial
 
-## Marco 17 — Agenda comercial e jornada do cliente — PRÓXIMO
-
-Objetivo: transformar a Agenda no principal motor operacional do salão.
-
-Escopo:
-
-- revisar experiência de criação e reagendamento no admin;
-- consolidar filtros por profissional, serviço e status;
-- revisar Smart Fit e lista de espera em cenários reais;
-- melhorar comunicação de conflito e indisponibilidade;
-- reforçar lembretes, confirmação e cancelamento;
-- validar jornada pública de agendamento ponta a ponta;
-- validar transição cliente → salão → WhatsApp;
-- ampliar testes de jornada completa;
-- revisar experiência desktop/mobile dos fluxos de Agenda.
-
-Critério de saída:
-
-- criação, reagendamento e cancelamento operam sem inconsistência conhecida;
-- conflito e indisponibilidade possuem mensagens acionáveis;
-- confirmação/lembrete via WhatsApp preservam estado correto;
-- Smart Fit e lista de espera são utilizáveis em operação real;
-- um salão consegue operar o dia inteiro sem depender de planilha ou agenda paralela;
-- Quality Gate, Production Gate e smoke específicos ficam verdes.
-
-## Marco 18 — Estoque operacional e reposição — PLANEJADO
+## Marco 18 — Estoque operacional e reposição — PRÓXIMO
 
 Objetivo: tornar o estoque confiável para uso diário e decisão de compra.
 
-Escopo planejado:
+Escopo:
 
 - revisar entrada, saída e ajuste;
 - histórico de movimentações por produto;
@@ -223,7 +237,10 @@ Escopo planejado:
 
 Critério de saída:
 
-- estoque físico e GlossFlow podem ser conciliados sem inconsistências conhecidas.
+- estoque físico e GlossFlow podem ser conciliados sem inconsistências conhecidas;
+- equipe consegue identificar o que comprar e por quê sem planilha paralela;
+- movimentos preservam saldo e trilha operacional;
+- Quality Gate, Production Gate e smoke específicos ficam verdes.
 
 ## Marco 19 — CRM, retenção e automações — PLANEJADO
 
@@ -352,8 +369,6 @@ Resultado esperado:
 Ordem oficial atual:
 
 ```text
-Marco 17 — Agenda comercial
-   ↓
 Marco 18 — Estoque operacional
    ↓
 Marco 19 — CRM e retenção
@@ -391,3 +406,4 @@ Um marco somente é considerado concluído quando:
 - [`QUALITY_GATE.md`](QUALITY_GATE.md)
 - [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
 - [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
+- [`docs/usuario/10_AGENDA_COMERCIAL.md`](docs/usuario/10_AGENDA_COMERCIAL.md)
