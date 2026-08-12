@@ -1,0 +1,113 @@
+.agenda-commercial-hub {
+  display: grid;
+  gap: 20px;
+}
+
+.agenda-command-center {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.agenda-command-copy h2 {
+  margin: 6px 0 8px;
+}
+
+.agenda-command-copy p {
+  margin: 0;
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.agenda-command-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agenda-command-actions button {
+  min-height: 82px;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  text-align: left;
+}
+
+.agenda-command-actions button strong,
+.agenda-command-actions button span {
+  display: block;
+}
+
+.agenda-command-actions button span {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  opacity: 0.78;
+}
+
+.agenda-flow-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.agenda-flow-strip span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.agenda-flow-strip b {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.75rem;
+}
+
+.calendar-commercial-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+  width: 100%;
+}
+
+.calendar-commercial-filters .field {
+  min-width: 0;
+}
+
+.calendar-clear-filters {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.agenda-filter-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 980px) {
+  .agenda-command-center,
+  .agenda-command-actions,
+  .agenda-flow-strip,
+  .calendar-commercial-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-clear-filters {
+    width: 100%;
+  }
+}
