@@ -6,7 +6,9 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-A sequência de higienização estrutural dos **Marcos 1–15 foi concluída**. O código atual já possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
+A sequência estrutural dos **Marcos 1–16 foi concluída**. Os Marcos 1–15 encerraram a higienização técnica e o Marco 16 homologou o produto por papel (`SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`), alinhando a interface ao RBAC real do backend.
+
+O código atual possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
 
 Fluxos principais já operacionais:
 
@@ -37,7 +39,7 @@ Webhook Twilio
       +--> Resposta ao cliente
 ```
 
-A homologação visual pós-higienização também corrigiu o contraste de controles nativos no tema escuro e o comportamento de telas administrativas com pouco conteúdo.
+A homologação visual pós-higienização corrigiu o contraste de controles nativos no tema escuro e o comportamento de telas administrativas com pouco conteúdo. A homologação funcional seguinte corrigiu permissões e affordances por papel, incluindo Agenda somente leitura para `PROFESSIONAL` e mutações operacionais restritas a `ADMIN`/`RECEPTION`.
 
 ## Stack atual
 
@@ -140,15 +142,14 @@ Documentação técnica:
 - auditoria, segurança e observabilidade;
 - PWA.
 
-## Higienização concluída
+## Marcos 1–16 concluídos
 
-Os Marcos 1–15 encerraram o ciclo estrutural de higienização.
+Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel.
 
 Principais resultados:
 
 - `AdminDashboard.jsx` decomposto por domínio;
-- Agenda frontend modularizada;
-- Agenda backend modularizada;
+- Agenda frontend e backend modularizadas;
 - `buildApp()` extraído para testes HTTP com `Fastify.inject()`;
 - agente WhatsApp separado em contratos, repositório, ferramentas e orquestrador;
 - webhook Twilio separado por segurança, tenant, status e inbound;
@@ -157,15 +158,23 @@ Principais resultados:
 - zero `<style>` dentro de componentes JSX;
 - zero `any` explícito em `backend/src`;
 - repository hygiene impedindo regressões estruturais;
-- documentação operacional de usuário concluída.
+- matriz frontend de acesso por papel alinhada ao backend;
+- `SUPER_ADMIN` isolado da operação tenant;
+- `RECEPTION` limitado aos módulos operacionais autorizados;
+- `PROFESSIONAL` com Agenda somente leitura e sem affordances de mutação;
+- mutações de Agenda, lista de espera e mesa operacional restritas a `ADMIN`/`RECEPTION`;
+- documentação operacional e checklist de homologação por papel.
 
-Relatório completo: [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md).
+Relatórios e checklists:
+
+- [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
+- [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
 
 ## Testes e qualidade
 
 ### Backend
 
-**30 testes automatizados**, cobrindo entre outros:
+**41 testes automatizados**, cobrindo entre outros:
 
 - autenticação e RBAC;
 - isolamento multi-tenant;
@@ -175,7 +184,8 @@ Relatório completo: [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md).
 - CRM;
 - estoque e saldo negativo;
 - assinatura HMAC do Twilio;
-- agente WhatsApp, ferramentas, fallback e handoff humano.
+- agente WhatsApp, ferramentas, fallback e handoff humano;
+- contratos específicos de `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`.
 
 ```bash
 cd backend
@@ -188,7 +198,14 @@ npm run build
 
 ### Frontend
 
-**17 testes automatizados**, com foco atual em Agenda Enterprise, calendário, interação e reagendamento.
+**29 testes automatizados**, cobrindo:
+
+- Agenda Enterprise e calendário;
+- interação e reagendamento;
+- Agenda somente leitura;
+- matriz de menu por papel;
+- navegação direta e normalização de página;
+- matriz de endpoints carregados por papel.
 
 ```bash
 cd frontend
@@ -262,6 +279,8 @@ A raiz não deve conter cópias alternativas do schema Prisma, scripts restaurad
 
 - isolamento por `salonId` nas operações privadas;
 - RBAC para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`;
+- matriz visual de acesso alinhada ao RBAC do servidor;
+- mutações operacionais de Agenda restritas por papel;
 - validação Zod nas entradas HTTP;
 - tokens e segredos somente em variáveis de ambiente;
 - validação de assinatura em webhook Twilio;
@@ -279,7 +298,7 @@ A raiz não deve conter cópias alternativas do schema Prisma, scripts restaurad
 
 ## Próxima fase
 
-A higienização estrutural terminou. O projeto entra agora em um ciclo de **evolução funcional, homologação comercial, performance e operação de produção**.
+O próximo marco oficial é o **Marco 17 — Agenda comercial e jornada do cliente**. O objetivo é transformar a Agenda no principal motor operacional do salão, validando a jornada completa cliente → salão → WhatsApp em cenários reais.
 
 A sequência oficial está em [`ROADMAP.md`](ROADMAP.md).
 
