@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { request } from '../../services/api.js';
 import { SecurityAdmin } from './AdminPlatformModules.jsx';
@@ -29,26 +29,29 @@ describe('SecurityAdmin', () => {
       if (url === '/admin/security/backups') return { summary: 'Snapshot assinado', snapshot: { schema: 'v1' } };
       return { options };
     });
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn(() => 'blob:test'),
-      revokeObjectURL: vi.fn()
-    });
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
   });
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
   it('exibe direitos do titular, retenção e estado de restore', async () => {
     render(<SecurityAdmin clients={clients} />);
     expect(screen.getByRole('heading', { name: 'Direitos do titular — LGPD' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Prévia da política de dados' })).toBeTruthy();
-    expect(screen.getByText('bloqueado por padrão')).toBeTruthy();
+
     await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/security/retention/preview'));
-    expect(screen.getByText('2')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Pronto')).toBeTruthy());
+
+    const backupSection = screen.getByRole('heading', { name: 'Backup lógico assinado' }).closest('section');
+    expect(within(backupSection).getByText((_, element) => element.tagName === 'SMALL' && element.textContent.includes('bloqueado por padrão'))).toBeTruthy();
+
+    const retentionSection = screen.getByRole('heading', { name: 'Prévia da política de dados' }).closest('section');
+    const whatsappLabel = within(retentionSection).getByText('Eventos WhatsApp com conteúdo a redigir');
+    expect(whatsappLabel.previousElementSibling.textContent).toBe('2');
   });
 
   it('eliminação exige seleção, motivo e frase explícita antes de chamar a API', async () => {
