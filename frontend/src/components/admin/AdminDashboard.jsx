@@ -3,7 +3,8 @@ import { currency } from '../../utils/format.js';
 import { dashboardMenuForRole, defaultDashboardTabForRole } from '../../config/role-access.js';
 import { OnboardingChecklist, ExecutiveDashboard, AdvancedMetricsAdmin } from './AdminOverview.jsx';
 import { ServicesAdmin, ProfessionalsAdmin, PortfolioAdmin } from './AdminCatalog.jsx';
-import { UsersAdmin, ClientsAdmin } from './AdminOperations.jsx';
+import { UsersAdmin } from './AdminOperations.jsx';
+import { CRMRetentionHub } from './crm/CRMRetentionHub.jsx';
 import { InventoryAdmin } from './inventory/InventoryOperations.jsx';
 import { FinancialAdmin, CommissionsAdmin, LoyaltyAdmin, SubscriptionAdmin } from './AdminFinance.jsx';
 import { AutomationsAdmin, AIAssistantAdmin } from './AdminIntelligence.jsx';
@@ -20,7 +21,7 @@ const MENU = [
   { key: 'appointments', label: 'Agenda', description: 'Operação, encaixes e jornada do cliente', icon: '▦' },
   { key: 'inventory', label: 'Estoque', description: 'Reposição, custos e conciliação física', icon: '▣' },
   { key: 'users', label: 'Usuários', description: 'Acessos e permissões', icon: '◉' },
-  { key: 'clients', label: 'Clientes', description: 'CRM e fidelidade', icon: '◎' },
+  { key: 'clients', label: 'Clientes', description: 'CRM, retenção e relacionamento', icon: '◎' },
   { key: 'financial', label: 'Financeiro', description: 'Caixa, receita e despesa', icon: 'R$' },
   { key: 'commissions', label: 'Comissões', description: 'Regras e projeções', icon: '%' },
   { key: 'loyalty', label: 'Fidelidade', description: 'Pontos e recompensas', icon: '★' },
@@ -109,7 +110,7 @@ export function AdminDashboard({ role, salon, services, professionals, portfolio
           {tab === 'appointments' && <AgendaCommercialHub role={role} appointments={appointments} professionals={professionals} services={services} reload={reload} setPage={setPage} />}
           {tab === 'inventory' && <InventoryAdmin inventory={inventory} reload={reload} />}
           {tab === 'users' && <UsersAdmin users={users} reload={reload} />}
-          {tab === 'clients' && <ClientsAdmin clients={clients} reload={reload} />}
+          {tab === 'clients' && <CRMRetentionHub clients={clients} reload={reload} />}
           {tab === 'financial' && <FinancialAdmin financialEntries={financialEntries} reload={reload} />}
           {tab === 'commissions' && <CommissionsAdmin commissions={commissions} professionals={professionals} reload={reload} />}
           {tab === 'loyalty' && <LoyaltyAdmin loyalty={loyalty} clients={clients} reload={reload} />}
