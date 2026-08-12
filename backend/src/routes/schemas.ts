@@ -181,7 +181,20 @@ export const salonSubscriptionSchema = z.object({
 
 export const whatsappTemplateSchema = z.object({
   name: z.string().min(2),
-  event: z.enum(['APPOINTMENT_CREATED', 'REMINDER', 'BIRTHDAY', 'PROMOTION', 'AFTER_SERVICE', 'INACTIVE_CLIENT', 'REVIEW_REQUEST', 'NO_SHOW']),
+  event: z.enum([
+    'APPOINTMENT_CREATED',
+    'REMINDER',
+    'BIRTHDAY',
+    'PROMOTION',
+    'AFTER_SERVICE',
+    'INACTIVE_CLIENT',
+    'REVIEW_REQUEST',
+    'NO_SHOW',
+    'RETENTION_BIRTHDAY',
+    'RETENTION_INACTIVE',
+    'RETENTION_FREQUENT',
+    'RETENTION_FOLLOWUP'
+  ]),
   message: z.string().min(10),
   active: z.coerce.boolean().optional().default(true)
 });
