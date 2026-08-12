@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { processTwilioInbound } from '../services/twilio-whatsapp/inbound.service';
 import { processTwilioStatusCallback } from '../services/twilio-whatsapp/status.service';
 import { TwilioForm, validTwilioSignature, webhookUrl } from '../services/twilio-whatsapp/security';
+import { recordDependencyMetric } from './metrics';
 
 function signatureFromRequest(request: FastifyRequest) {
   const header = request.headers['x-twilio-signature'];
@@ -17,6 +18,30 @@ function validateTwilioRequest(request: FastifyRequest, params: TwilioForm) {
     url,
     valid: !authToken || validTwilioSignature(url, params, signature, authToken)
   };
+}
+
+async function observeWebhookWork(operation: string, work: () => Promise<unknown>) {
+  const startedAt = Date.now();
+  try {
+    await work();
+    recordDependencyMetric({
+      dependency: 'twilio-webhook',
+      operation,
+      ok: true,
+      latencyMs: Date.now() - startedAt,
+      createdAt: new Date().toISOString()
+    });
+  } catch (error) {
+    recordDependencyMetric({
+      dependency: 'twilio-webhook',
+      operation,
+      ok: false,
+      latencyMs: Date.now() - startedAt,
+      errorCode: error instanceof Error ? error.name || 'PROCESSING_ERROR' : 'PROCESSING_ERROR',
+      createdAt: new Date().toISOString()
+    });
+    throw error;
+  }
 }
 
 /**
@@ -49,7 +74,7 @@ export async function twilioWhatsAppWebhookRoutes(app: FastifyInstance) {
 
     reply.status(200).send({ received: true });
     setImmediate(() => {
-      void processTwilioStatusCallback(app, params)
+      void observeWebhookWork('status-callback', () => processTwilioStatusCallback(app, params))
         .catch((error) => app.log.error(error, 'Erro ao processar status de entrega Twilio.'));
     });
     return reply;
@@ -73,7 +98,7 @@ export async function twilioWhatsAppWebhookRoutes(app: FastifyInstance) {
       .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
 
     setImmediate(() => {
-      void processTwilioInbound(app, params)
+      void observeWebhookWork('inbound-processing', () => processTwilioInbound(app, params))
         .catch((error) => app.log.error(error, 'Erro no processamento assíncrono do webhook Twilio WhatsApp.'));
     });
     return reply;

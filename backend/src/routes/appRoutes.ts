@@ -19,6 +19,7 @@ import { platformAdminRoutes } from './platform-admin.routes';
 import { platformLifecycleRoutes } from './platform-lifecycle.routes';
 import { platformSiteRoutes } from './platform-site.routes';
 import { platformCostRoutes } from './platform-cost.routes';
+import { observabilityRoutes } from './observability.routes';
 import { commercialRoutes } from './commercial.routes';
 import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
@@ -50,6 +51,7 @@ export async function appRoutes(app: FastifyInstance) {
     platformAdmin.register(platformLifecycleRoutes);
     platformAdmin.register(platformSiteRoutes);
     platformAdmin.register(platformCostRoutes);
+    platformAdmin.register(observabilityRoutes);
   });
 
   /** Operação do salão, sempre isolada pelo salonId, contrato vigente e módulos contratados. */

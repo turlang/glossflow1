@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { buildApp } from './app';
 import { assertRequiredProductionEnv, buildId } from './config/environment';
+import { syncCriticalMongoIndexes } from './services/database-indexes.service';
 import { ensureSuperAdminFromEnv } from './services/super-admin-bootstrap.service';
 import { startReminderScheduler } from './services/reminder-scheduler.service';
 
@@ -14,6 +15,13 @@ async function start() {
   const host = process.env.HOST || '0.0.0.0';
 
   await ensureSuperAdminFromEnv({
+    info: (message) => app.log.info(message),
+    warn: (message) => app.log.warn(message)
+  });
+
+  // createIndexes é idempotente e não destrutivo. Uma falha isolada de índice
+  // é registrada, mas não derruba um deploy que ainda consegue servir tráfego.
+  await syncCriticalMongoIndexes({
     info: (message) => app.log.info(message),
     warn: (message) => app.log.warn(message)
   });
