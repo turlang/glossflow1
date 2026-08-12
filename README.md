@@ -6,7 +6,7 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-A sequência estrutural e comercial dos **Marcos 1–19 está concluída no PR do Marco 19**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel, o Marco 17 consolidou a Agenda como central operacional, o Marco 18 transformou o Estoque em fluxo diário de reposição e conciliação, e o Marco 19 transformou o CRM em uma central de retenção acionável.
+A sequência estrutural e comercial dos **Marcos 1–19 está concluída e validada em produção**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel, o Marco 17 consolidou a Agenda como central operacional, o Marco 18 transformou o Estoque em fluxo diário de reposição e conciliação, e o Marco 19 transformou o CRM em uma central de retenção acionável.
 
 O código possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
 
@@ -338,7 +338,7 @@ Nunca use credenciais de demonstração fixas em produção. Crie o Super Admin 
 
 ## Próxima fase
 
-Após integração e smoke do Marco 19, o próximo marco oficial é o **Marco 20 — Assistente IA e WhatsApp em produção**, voltado a atendimento comercial confiável, ações confirmadas e automação segura por provider.
+O próximo marco oficial é o **Marco 20 — Assistente IA e WhatsApp em produção**, voltado a atendimento comercial confiável, ações confirmadas e automação segura por provider.
 
 A sequência oficial está em [`ROADMAP.md`](ROADMAP.md).
 
