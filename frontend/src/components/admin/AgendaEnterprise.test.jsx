@@ -9,13 +9,18 @@ const professionals = [
   { id: 'p2', name: 'Bia', specialty: 'Unhas' }
 ];
 
+const services = [
+  { id: 's1', name: 'Corte', price: 120 },
+  { id: 's2', name: 'Manicure', price: 90 }
+];
+
 const appointments = [
   {
     id: 'a1',
     clientName: 'Carla',
     professionalId: 'p1',
     professional: professionals[0],
-    service: { id: 's1', name: 'Corte', price: 120 },
+    service: services[0],
     startTime: '2026-08-11T09:00:00.000Z',
     endTime: '2026-08-11T10:00:00.000Z',
     status: 'CONFIRMED'
@@ -25,12 +30,24 @@ const appointments = [
     clientName: 'Dani',
     professionalId: 'p2',
     professional: professionals[1],
-    service: { id: 's2', name: 'Manicure', price: 90 },
+    service: services[1],
     startTime: '2026-08-12T10:00:00.000Z',
     endTime: '2026-08-12T11:00:00.000Z',
-    status: 'CONFIRMED'
+    status: 'COMPLETED'
   }
 ];
+
+function renderAgenda(props = {}) {
+  return render(
+    <AgendaEnterprise
+      appointments={appointments}
+      professionals={professionals}
+      services={services}
+      reload={vi.fn()}
+      {...props}
+    />
+  );
+}
 
 describe('AgendaEnterprise', () => {
   beforeEach(() => {
@@ -44,21 +61,21 @@ describe('AgendaEnterprise', () => {
   });
 
   it('abre por padrão na visualização semanal', () => {
-    render(<AgendaEnterprise appointments={appointments} professionals={professionals} reload={vi.fn()} />);
+    renderAgenda();
     expect(screen.getByRole('tabpanel', { name: 'Agenda semanal' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Semana' }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('troca para a visualização diária por clique', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<AgendaEnterprise appointments={appointments} professionals={professionals} reload={vi.fn()} />);
+    renderAgenda();
     await user.click(screen.getByRole('tab', { name: 'Dia' }));
     expect(screen.getByRole('tabpanel', { name: 'Agenda do dia' })).toBeTruthy();
   });
 
   it('navega entre tabs com teclado', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<AgendaEnterprise appointments={appointments} professionals={professionals} reload={vi.fn()} />);
+    renderAgenda();
     const weekTab = screen.getByRole('tab', { name: 'Semana' });
     weekTab.focus();
     await user.keyboard('{ArrowRight}');
@@ -68,7 +85,7 @@ describe('AgendaEnterprise', () => {
 
   it('abre um dia específico a partir da visão mensal', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<AgendaEnterprise appointments={appointments} professionals={professionals} reload={vi.fn()} />);
+    renderAgenda();
     await user.click(screen.getByRole('tab', { name: 'Mês' }));
     await user.click(screen.getByRole('button', { name: 'Abrir agenda de 2026-08-12' }));
     expect(screen.getByRole('tabpanel', { name: 'Agenda do dia' })).toBeTruthy();
@@ -77,7 +94,7 @@ describe('AgendaEnterprise', () => {
 
   it('filtra a agenda pelo profissional selecionado', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<AgendaEnterprise appointments={appointments} professionals={professionals} reload={vi.fn()} />);
+    renderAgenda();
     expect(screen.getByText('Carla')).toBeTruthy();
     expect(screen.getByText('Dani')).toBeTruthy();
     await user.selectOptions(screen.getByLabelText('Profissional'), 'p2');
@@ -85,8 +102,40 @@ describe('AgendaEnterprise', () => {
     expect(screen.getByText('Dani')).toBeTruthy();
   });
 
+  it('combina filtro por serviço com o período visível', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderAgenda();
+    await user.selectOptions(screen.getByLabelText('Serviço'), 's1');
+    expect(screen.getByText('Carla')).toBeTruthy();
+    expect(screen.queryByText('Dani')).toBeNull();
+    expect(screen.getByText(/1 agendamento\(s\)/i)).toBeTruthy();
+  });
+
+  it('filtra por status comercial sem alterar os dados de origem', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderAgenda();
+    await user.selectOptions(screen.getByLabelText('Status'), 'COMPLETED');
+    expect(screen.queryByText('Carla')).toBeNull();
+    expect(screen.getByText('Dani')).toBeTruthy();
+    expect(appointments).toHaveLength(2);
+  });
+
+  it('limpa profissional, serviço e status de uma só vez', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderAgenda();
+    await user.selectOptions(screen.getByLabelText('Profissional'), 'p1');
+    await user.selectOptions(screen.getByLabelText('Serviço'), 's1');
+    await user.selectOptions(screen.getByLabelText('Status'), 'CONFIRMED');
+    await user.click(screen.getByRole('button', { name: 'Limpar filtros' }));
+    expect(screen.getByLabelText('Profissional').value).toBe('');
+    expect(screen.getByLabelText('Serviço').value).toBe('');
+    expect(screen.getByLabelText('Status').value).toBe('');
+    expect(screen.getByText('Carla')).toBeTruthy();
+    expect(screen.getByText('Dani')).toBeTruthy();
+  });
+
   it('remove drag e reagendamento quando a Agenda está em modo somente leitura', () => {
-    render(<AgendaEnterprise appointments={appointments} professionals={professionals} reload={vi.fn()} readOnly />);
+    renderAgenda({ readOnly: true });
     expect(screen.getByText('Visualização somente leitura para o perfil Profissional.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Reagendar/i })).toBeNull();
     expect(screen.getByText('Carla').closest('article').draggable).toBe(false);
