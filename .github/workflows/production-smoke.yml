@@ -18,6 +18,23 @@ jobs:
       API_URL: https://glossflow-api.onrender.com
       WEB_URL: https://glossflow1.vercel.app
     steps:
+      - name: Resolve expected production build
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            EXPECTED_BUILD_FULL="${{ github.event.workflow_run.head_sha }}"
+          else
+            EXPECTED_BUILD_FULL="$(git ls-remote https://github.com/turlang/glossflow1.git refs/heads/main | awk '{print $1}')"
+          fi
+
+          if [ -z "$EXPECTED_BUILD_FULL" ]; then
+            echo "Could not resolve the expected main build."
+            exit 1
+          fi
+
+          EXPECTED_BUILD="${EXPECTED_BUILD_FULL:0:12}"
+          echo "Expected production build: $EXPECTED_BUILD"
+          echo "EXPECTED_BUILD=$EXPECTED_BUILD" >> "$GITHUB_ENV"
+
       - name: Allow production deploys to converge
         if: github.event_name == 'workflow_run'
         run: sleep 20
@@ -29,11 +46,11 @@ jobs:
             --max-time 45 "$WEB_URL/" > /tmp/frontend.html
           grep -q 'GlossFlow' /tmp/frontend.html
 
-      - name: Wait for traced backend health contract
+      - name: Wait for exact backend production build
         run: |
           HEALTH_READY=false
-          for attempt in $(seq 1 12); do
-            echo "Health build attempt $attempt/12"
+          for attempt in $(seq 1 24); do
+            echo "Health build attempt $attempt/24; expected $EXPECTED_BUILD"
             if curl --silent --show-error --max-time 45 \
               --dump-header /tmp/health.headers \
               "$API_URL/health" > /tmp/health.json; then
@@ -44,7 +61,8 @@ jobs:
               echo "Health build: ${BUILD_BODY:-missing}"
               if jq -e 'type == "object" and .ok == true and (.build | type == "string") and (.build | length > 0)' /tmp/health.json > /dev/null 2>&1 \
                 && [ -n "$BUILD_HEADER" ] \
-                && [ "$BUILD_HEADER" = "$BUILD_BODY" ]; then
+                && [ "$BUILD_HEADER" = "$BUILD_BODY" ] \
+                && [ "$BUILD_BODY" = "$EXPECTED_BUILD" ]; then
                 HEALTH_READY=true
                 break
               fi
@@ -53,7 +71,7 @@ jobs:
           done
 
           if [ "$HEALTH_READY" != "true" ]; then
-            echo "Backend did not converge to the build-traceable Marco 22 health contract."
+            echo "Backend did not converge to expected production build $EXPECTED_BUILD."
             cat /tmp/health.json || true
             exit 1
           fi
@@ -63,12 +81,13 @@ jobs:
           READY=false
           HEALTH_BUILD="$(jq -r '.build' /tmp/health.json)"
           for attempt in $(seq 1 12); do
-            echo "Readiness attempt $attempt/12"
+            echo "Readiness attempt $attempt/12 for build $EXPECTED_BUILD"
             if curl --silent --show-error --max-time 45 "$API_URL/ready" > /tmp/ready.json; then
               cat /tmp/ready.json
               READY_BUILD="$(jq -r '.build // empty' /tmp/ready.json)"
               if jq -e 'type == "object" and .ok == true and .database.ok == true and (.build | type == "string") and (.build | length > 0)' /tmp/ready.json > /dev/null 2>&1 \
-                && [ "$READY_BUILD" = "$HEALTH_BUILD" ]; then
+                && [ "$READY_BUILD" = "$HEALTH_BUILD" ] \
+                && [ "$READY_BUILD" = "$EXPECTED_BUILD" ]; then
                 READY=true
                 break
               fi
@@ -77,7 +96,7 @@ jobs:
           done
 
           if [ "$READY" != "true" ]; then
-            echo "Backend did not converge to the Marco 22 readiness contract with MongoDB and matching build ID."
+            echo "Backend readiness did not converge to expected build $EXPECTED_BUILD with MongoDB ready."
             cat /tmp/ready.json || true
             exit 1
           fi
@@ -107,6 +126,7 @@ jobs:
 
       - name: Summary
         run: |
+          echo "Expected build: $EXPECTED_BUILD"
           echo "Frontend: OK"
           echo "Backend build: $(jq -r '.build' /tmp/health.json)"
           echo "Backend health: OK"
