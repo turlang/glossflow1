@@ -278,6 +278,7 @@ export default function App() {
         isAuthenticated && !isSuperAdmin
           ? (
             <AdminDashboard
+              role={authRole}
               salon={backofficeSalon}
               services={services}
               professionals={professionals}
