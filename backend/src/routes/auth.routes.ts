@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
+import { getTenantSubscriptionAccess } from '../services/saas-lifecycle.service';
 import { loginSchema } from './schemas';
 
 const ACCESS_TOKEN_MINUTES = Number(process.env.ACCESS_TOKEN_MINUTES || 30);
@@ -36,6 +37,24 @@ function signAccessToken(user: { id: string; email: string; role: string; salonI
   );
 }
 
+function accessMessage(code: string) {
+  if (code === 'TRIAL_EXPIRED') return 'O período de avaliação deste salão terminou.';
+  if (code === 'PAST_DUE_BLOCKED') return 'O acesso está temporariamente bloqueado por pendência da assinatura.';
+  return 'A assinatura deste salão está cancelada.';
+}
+
+async function contractBlock(user: { role: string; salonId: string }) {
+  if (user.role === 'SUPER_ADMIN') return null;
+  const access = await getTenantSubscriptionAccess(user.salonId);
+  if (access.allowed) return null;
+  return {
+    message: accessMessage(access.code),
+    code: access.code,
+    subscriptionStatus: access.status,
+    endsAt: access.endsAt
+  };
+}
+
 /** Sessões revogáveis são contrato obrigatório do schema corporativo. */
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/login', async (request, reply) => {
@@ -48,6 +67,9 @@ export async function authRoutes(app: FastifyInstance) {
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return reply.status(401).send({ message: 'Usuário ou senha inválidos.' });
+
+    const blocked = await contractBlock(user);
+    if (blocked) return reply.status(403).send(blocked);
 
     const token = signAccessToken(user);
     const refreshToken = crypto.randomBytes(48).toString('hex');
@@ -77,6 +99,12 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     if (!session || !session.user.active) return reply.status(401).send({ message: 'Sessão expirada ou revogada.' });
+
+    const blocked = await contractBlock(session.user);
+    if (blocked) {
+      await prisma.userSession.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
+      return reply.status(403).send(blocked);
+    }
 
     await prisma.userSession.update({ where: { id: session.id }, data: { lastUsedAt: new Date() } });
     return reply.send({ token: signAccessToken(session.user), user: { id: session.user.id, name: session.user.name, email: session.user.email, role: session.user.role, salonId: session.user.salonId } });
