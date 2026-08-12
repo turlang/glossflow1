@@ -1,3 +1,5 @@
+import { recordDependencyMetric } from '../routes/metrics';
+
 export type AIProvider = 'groq' | 'openai';
 
 export type AIResponseItem = {
@@ -95,18 +97,42 @@ export async function requestAIResponse(payload: Record<string, unknown>): Promi
     providerPayload.reasoning = { effort: 'low' };
   }
 
-  const response = await fetch(config.endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify(providerPayload)
-  });
+  const startedAt = Date.now();
+  let response: Response;
+  try {
+    response = await fetch(config.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify(providerPayload)
+    });
+  } catch (error) {
+    recordDependencyMetric({
+      dependency: `ai-${config.provider}`,
+      operation: 'responses',
+      ok: false,
+      latencyMs: Date.now() - startedAt,
+      errorCode: 'NETWORK_ERROR',
+      createdAt: new Date().toISOString()
+    });
+    throw error;
+  }
 
   const data = await response.json().catch(() => ({})) as AIResponse & {
     error?: { message?: string; code?: string; type?: string };
   };
+
+  recordDependencyMetric({
+    dependency: `ai-${config.provider}`,
+    operation: 'responses',
+    ok: response.ok,
+    latencyMs: Date.now() - startedAt,
+    statusCode: response.status,
+    errorCode: response.ok ? undefined : data.error?.code || data.error?.type || `HTTP_${response.status}`,
+    createdAt: new Date().toISOString()
+  });
 
   if (!response.ok) {
     const detail = data.error?.message || data.error?.code || data.error?.type || `HTTP ${response.status}`;
