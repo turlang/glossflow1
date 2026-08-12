@@ -89,12 +89,17 @@ export function CRMRetentionHub({ clients, reload }) {
     try {
       const result = await request(`/admin/clients/${client.id}/follow-up`, { method: 'POST' });
       setPrepared({ client, ...result });
-      await loadRetention();
     } catch (err) {
       setError(err?.message || 'Não foi possível preparar o follow-up.');
     } finally {
       setBusyClientId('');
     }
+  }
+
+  function registerFollowUpInitiated(clientId) {
+    void request(`/admin/clients/${clientId}/follow-up/contacted`, { method: 'POST' })
+      .then(() => loadRetention())
+      .catch((err) => setError(err?.message || 'O WhatsApp foi aberto, mas não foi possível registrar o follow-up no CRM.'));
   }
 
   return (
@@ -208,7 +213,15 @@ export function CRMRetentionHub({ clients, reload }) {
             <h2>{prepared.client.name}</h2>
             <p>{prepared.message}</p>
           </div>
-          <a className="primary button-link" href={prepared.whatsappUrl} target="_blank" rel="noreferrer">Abrir WhatsApp</a>
+          <a
+            className="primary button-link"
+            href={prepared.whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => registerFollowUpInitiated(prepared.client.id)}
+          >
+            Abrir WhatsApp
+          </a>
         </section>
       )}
 
