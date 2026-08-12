@@ -1,0 +1,135 @@
+name: Marco 24 Public Responsive Validation
+
+on:
+  push:
+    branches:
+      - feature/marco24-release-commercial
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  responsive-public:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WEB_URL: https://glossflow1.vercel.app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install isolated Playwright runtime
+        run: |
+          mkdir -p /tmp/glossflow-playwright
+          cd /tmp/glossflow-playwright
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --no-package-lock playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Validate public responsive journeys
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/responsive-artifacts"
+          cat > /tmp/glossflow-playwright/check.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          import path from 'node:path';
+
+          const baseUrl = process.env.WEB_URL;
+          const outputDir = path.join(process.env.GITHUB_WORKSPACE, 'responsive-artifacts');
+          const pages = [
+            { key: 'public', url: `${baseUrl}/` },
+            { key: 'booking', url: `${baseUrl}/?action=booking` },
+            { key: 'commercial', url: `${baseUrl}/?action=commercial` }
+          ];
+          const viewports = [
+            { key: 'desktop-1366', width: 1366, height: 768 },
+            { key: 'desktop-1920', width: 1920, height: 1080 },
+            { key: 'tablet-portrait', width: 768, height: 1024 },
+            { key: 'mobile-large', width: 430, height: 932 },
+            { key: 'mobile-small', width: 360, height: 800 }
+          ];
+
+          const browser = await chromium.launch({ headless: true });
+          const report = [];
+          let failed = false;
+
+          for (const viewport of viewports) {
+            for (const target of pages) {
+              const context = await browser.newContext({ viewport });
+              const page = await context.newPage();
+              const pageErrors = [];
+              page.on('pageerror', (error) => pageErrors.push(String(error.message || error)));
+
+              const response = await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+              await page.waitForTimeout(2500);
+
+              const state = await page.evaluate(() => {
+                const root = document.documentElement;
+                const body = document.body;
+                return {
+                  title: document.title,
+                  bodyTextLength: (body?.innerText || '').trim().length,
+                  documentWidth: root.scrollWidth,
+                  viewportWidth: window.innerWidth,
+                  horizontalOverflow: root.scrollWidth > window.innerWidth + 1,
+                  apiFailureVisible: (body?.innerText || '').includes('Não foi possível conectar à API.'),
+                  bookingUnavailable: (body?.innerText || '').includes('Agendamento online indisponível')
+                };
+              });
+
+              const screenshotName = `${target.key}-${viewport.key}.png`;
+              await page.screenshot({
+                path: path.join(outputDir, screenshotName),
+                fullPage: true
+              });
+
+              const ok = Boolean(response?.ok())
+                && state.bodyTextLength > 80
+                && !state.horizontalOverflow
+                && !state.apiFailureVisible
+                && !state.bookingUnavailable
+                && pageErrors.length === 0;
+
+              if (!ok) failed = true;
+
+              report.push({
+                page: target.key,
+                viewport,
+                status: response?.status() ?? null,
+                ok,
+                ...state,
+                pageErrors,
+                screenshot: screenshotName
+              });
+
+              console.log(JSON.stringify(report.at(-1)));
+              await context.close();
+            }
+          }
+
+          await browser.close();
+          fs.writeFileSync(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
+
+          if (failed) {
+            console.error('Marco 24 responsive validation found a blocking public regression.');
+            process.exit(1);
+          }
+          EOF
+
+          cd /tmp/glossflow-playwright
+          node check.mjs
+
+      - name: Upload responsive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marco24-responsive-evidence
+          path: responsive-artifacts
+          if-no-files-found: error
+          retention-days: 14
