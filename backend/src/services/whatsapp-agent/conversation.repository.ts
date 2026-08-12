@@ -4,7 +4,7 @@ import { AgentSalon, ConversationMessage, normalizePhone } from './contracts';
 export async function findSalonByWhatsApp(displayPhoneNumber: string): Promise<AgentSalon | null> {
   const target = normalizePhone(displayPhoneNumber);
   if (!target) return null;
-  const salons = await prisma.salon.findMany({ select: { id: true, name: true, description: true, whatsapp: true, openingHours: true } });
+  const salons = await prisma.salon.findMany({ select: { id: true, name: true, description: true, whatsapp: true, openingHours: true, address: true, phone: true, instagram: true } });
   return salons.find((salon) => normalizePhone(salon.whatsapp) === target) || null;
 }
 
@@ -46,8 +46,27 @@ export async function hasOpenHumanHandoff(salonId: string, phone: string) {
 }
 
 export async function openHumanHandoff(salonId: string, phone: string, reason: string) {
+  let context: ConversationMessage[] = [];
+  try {
+    context = (await conversationHistory(salonId, phone)).slice(-6);
+  } catch {
+    // Falha ao montar contexto não pode impedir o encaminhamento humano.
+  }
+
   return prisma.auditLog.create({
-    data: { action: 'HANDOFF_OPEN', resource: 'WhatsAppHandoff', resourceId: normalizePhone(phone), method: 'AGENT', path: '/webhooks/whatsapp', salonId, metadata: { phone: normalizePhone(phone), reason: reason.slice(0, 500) } }
+    data: {
+      action: 'HANDOFF_OPEN',
+      resource: 'WhatsAppHandoff',
+      resourceId: normalizePhone(phone),
+      method: 'AGENT',
+      path: '/webhooks/whatsapp',
+      salonId,
+      metadata: {
+        phone: normalizePhone(phone),
+        reason: reason.slice(0, 500),
+        context: context.map((item) => ({ direction: item.direction, text: item.text.slice(0, 1000) }))
+      }
+    }
   });
 }
 
