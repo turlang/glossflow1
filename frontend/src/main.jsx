@@ -10,6 +10,7 @@ import './admin-shell.css';
 import './admin-operations.css';
 import './responsive.css';
 import './agenda-enterprise.css';
+import './agenda-commercial.css';
 import './admin-business.css';
 import './admin-platform.css';
 import './admin-mobile.css';
