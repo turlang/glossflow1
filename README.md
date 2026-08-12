@@ -6,7 +6,7 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 O projeto está em **piloto comercial com ambiente de produção ativo**.
 
-A sequência estrutural dos **Marcos 1–16 foi concluída**. Os Marcos 1–15 encerraram a higienização técnica e o Marco 16 homologou o produto por papel (`SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`), alinhando a interface ao RBAC real do backend.
+A sequência estrutural e comercial dos **Marcos 1–17 foi concluída**. Os Marcos 1–15 encerraram a higienização técnica, o Marco 16 homologou o produto por papel (`SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`) e o Marco 17 consolidou a Agenda como central operacional do salão.
 
 O código atual possui separação por domínio, gates de qualidade, testes automatizados, smoke pós-deploy e validação de produção.
 
@@ -37,6 +37,23 @@ Webhook Twilio
       +--> Agenda / Lista de espera / Agente IA
       +--> Guards / Fallback
       +--> Resposta ao cliente
+```
+
+```text
+Agenda comercial
+      |
+      +--> Planejamento Enterprise
+      |      +--> Dia / Semana / Mês / Profissionais
+      |      +--> filtros por profissional / serviço / status
+      |
+      +--> Operação do Dia
+      |      +--> criar / mover / presença / status
+      |
+      +--> Smart Fit
+      +--> Lista de Espera
+      +--> Jornada da Equipe
+      |
+      +--> confirmação / lembretes / cancelamento / WhatsApp
 ```
 
 A homologação visual pós-higienização corrigiu o contraste de controles nativos no tema escuro e o comportamento de telas administrativas com pouco conteúdo. A homologação funcional seguinte corrigiu permissões e affordances por papel, incluindo Agenda somente leitura para `PROFESSIONAL` e mutações operacionais restritas a `ADMIN`/`RECEPTION`.
@@ -123,10 +140,13 @@ Documentação técnica:
 - agendamento online;
 - capacidades por profissional;
 - jornada, pausas e bloqueios de equipe;
+- central de Agenda comercial para `ADMIN`/`RECEPTION`;
 - Agenda Enterprise com visões dia/semana/mês/profissionais;
+- filtros combinados por profissional, serviço e status;
 - reagendamento acessível e validação de conflitos no backend;
-- Agenda Operacional e Smart Fit;
-- lista de espera;
+- Agenda Operacional para criação rápida e acompanhamento do dia;
+- Smart Fit para encaixe inteligente;
+- lista de espera e reaproveitamento de vagas;
 - confirmação, cancelamento e gerenciamento pelo cliente;
 - lembretes automáticos;
 - rastreamento de entrega do WhatsApp;
@@ -142,9 +162,9 @@ Documentação técnica:
 - auditoria, segurança e observabilidade;
 - PWA.
 
-## Marcos 1–16 concluídos
+## Marcos 1–17 concluídos
 
-Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel.
+Os Marcos 1–15 encerraram o ciclo estrutural de higienização. O Marco 16 encerrou a primeira homologação funcional por papel. O Marco 17 transformou os recursos já existentes de Agenda em um fluxo comercial integrado.
 
 Principais resultados:
 
@@ -163,24 +183,32 @@ Principais resultados:
 - `RECEPTION` limitado aos módulos operacionais autorizados;
 - `PROFESSIONAL` com Agenda somente leitura e sem affordances de mutação;
 - mutações de Agenda, lista de espera e mesa operacional restritas a `ADMIN`/`RECEPTION`;
-- documentação operacional e checklist de homologação por papel.
+- Agenda comercial com atalhos para Operação do Dia, Smart Fit, Lista de Espera e Jornada da Equipe;
+- filtros consolidados por profissional, serviço e status;
+- testes de jornada cobrindo criação, conflito, reagendamento, cancelamento, presença, confirmação e lembretes;
+- documentação operacional e checklists por papel e por fluxo de Agenda.
 
-Relatórios e checklists:
+Relatórios e guias:
 
 - [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
 - [`docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md`](docs/usuario/09_HOMOLOGACAO_POR_PAPEL.md)
+- [`docs/usuario/10_AGENDA_COMERCIAL.md`](docs/usuario/10_AGENDA_COMERCIAL.md)
 
 ## Testes e qualidade
 
 ### Backend
 
-**41 testes automatizados**, cobrindo entre outros:
+**46 testes automatizados**, cobrindo entre outros:
 
 - autenticação e RBAC;
 - isolamento multi-tenant;
 - validação Zod;
 - reagendamento e conflito de Agenda;
 - mutações de agendamento;
+- criação rápida da Agenda comercial;
+- conflito antes da persistência;
+- cancelamento com notificação e reaproveitamento de vaga;
+- presença, confirmação e lembretes operacionais;
 - CRM;
 - estoque e saldo negativo;
 - assinatura HMAC do Twilio;
@@ -198,10 +226,12 @@ npm run build
 
 ### Frontend
 
-**29 testes automatizados**, cobrindo:
+**35 testes automatizados**, cobrindo:
 
 - Agenda Enterprise e calendário;
 - interação e reagendamento;
+- filtros por profissional, serviço e status;
+- central comercial de Agenda;
 - Agenda somente leitura;
 - matriz de menu por papel;
 - navegação direta e normalização de página;
@@ -298,7 +328,7 @@ A raiz não deve conter cópias alternativas do schema Prisma, scripts restaurad
 
 ## Próxima fase
 
-O próximo marco oficial é o **Marco 17 — Agenda comercial e jornada do cliente**. O objetivo é transformar a Agenda no principal motor operacional do salão, validando a jornada completa cliente → salão → WhatsApp em cenários reais.
+O próximo marco oficial é o **Marco 18 — Estoque operacional e reposição**. O objetivo é tornar o estoque confiável para uso diário, conciliação física e decisão de compra.
 
 A sequência oficial está em [`ROADMAP.md`](ROADMAP.md).
 
