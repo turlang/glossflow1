@@ -1,7 +1,10 @@
+import console from 'node:console';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import process from 'node:process';
+import { fileURLToPath, URL } from 'node:url';
 
-const assetsDir = new URL('../dist/assets/', import.meta.url);
+const assetsDir = fileURLToPath(new URL('../dist/assets/', import.meta.url));
 const maxJsKb = Number(process.env.BUNDLE_MAX_JS_KB || 320);
 const maxCssKb = Number(process.env.BUNDLE_MAX_CSS_KB || 180);
 
@@ -10,7 +13,7 @@ const measured = [];
 
 for (const file of files) {
   if (!file.endsWith('.js') && !file.endsWith('.css')) continue;
-  const info = await stat(join(assetsDir.pathname, file));
+  const info = await stat(join(assetsDir, file));
   measured.push({ file, bytes: info.size, kb: Number((info.size / 1024).toFixed(2)) });
 }
 
