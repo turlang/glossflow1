@@ -1,9 +1,9 @@
 import { FastifyInstance } from 'fastify';
-import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { getTenant } from './helpers';
 import { eraseClientPersonalData, exportClientPersonalData } from '../services/lgpd.service';
 import { previewTenantRetention, runTenantRetention } from '../services/data-retention.service';
+import { createTenantBackup, restoreTenantBackup, verifyTenantBackup } from '../services/tenant-backup.service';
 import { z } from 'zod';
 
 /** Segurança corporativa com delegates explícitos do schema canônico. */
@@ -23,6 +23,7 @@ export async function securityRoutes(app: FastifyInstance) {
       activeSessions,
       consents,
       lastBackup: backups[0] || null,
+      restoreEnabled: String(process.env.BACKUP_RESTORE_ENABLED || 'false').toLowerCase() === 'true',
       corporateModelsReady: true,
       setupHint: null,
       controls: [
@@ -30,7 +31,8 @@ export async function securityRoutes(app: FastifyInstance) {
         { name: 'Rate limit', status: 'Ativo', description: 'Reduz abuso por IP, superfície e tenant autenticado.' },
         { name: 'LGPD', status: consents ? 'Em uso' : 'Pronto', description: 'Exporta, registra consentimentos e permite eliminação controlada de dados pessoais.' },
         { name: 'Sessões', status: activeSessions ? 'Monitorando' : 'Sem sessões extras', description: 'Access tokens são vinculados a sessões revogáveis e refresh tokens rotacionam a cada uso.' },
-        { name: 'Retenção', status: 'Controlada', description: 'Políticas explícitas permitem prévia antes de redigir ou eliminar registros antigos.' }
+        { name: 'Retenção', status: 'Controlada', description: 'Políticas explícitas permitem prévia antes de redigir ou eliminar registros antigos.' },
+        { name: 'Backup', status: 'Assinado', description: 'Snapshot operacional possui assinatura HMAC; restore exige modo de recuperação explicitamente habilitado.' }
       ]
     };
   });
@@ -78,6 +80,7 @@ export async function securityRoutes(app: FastifyInstance) {
     const { clientId } = z.object({ clientId: z.string() }).parse(request.params);
     const bundle = await exportClientPersonalData(tenant.salonId, clientId);
     if (!bundle) return reply.status(404).send({ message: 'Cliente não encontrado.' });
+    reply.header('Cache-Control', 'no-store');
     return bundle;
   });
 
@@ -127,23 +130,39 @@ export async function securityRoutes(app: FastifyInstance) {
     return runTenantRetention({ salonId: tenant.salonId, userId: tenant.id });
   });
 
+  /** Cria um snapshot assinado e registra somente metadados do backup no banco. */
   app.post('/admin/security/backups', async (request, reply) => {
     const tenant = getTenant(request);
-    const [clients, appointments, services, professionals, products] = await Promise.all([
-      prisma.client.count({ where: { salonId: tenant.salonId } }),
-      prisma.appointment.count({ where: { salonId: tenant.salonId } }),
-      prisma.service.count({ where: { salonId: tenant.salonId } }),
-      prisma.professional.count({ where: { salonId: tenant.salonId } }),
-      prisma.inventoryProduct.count({ where: { salonId: tenant.salonId } })
-    ]);
-    const checksum = crypto.createHash('sha256').update(`${tenant.salonId}:${Date.now()}:${clients}:${appointments}`).digest('hex').slice(0, 16);
-    return reply.status(201).send(await prisma.backupJob.create({
-      data: {
-        kind: 'MANUAL',
-        status: 'COMPLETED',
-        summary: `Snapshot lógico ${checksum}: ${clients} clientes, ${appointments} agendamentos, ${services} serviços, ${professionals} profissionais, ${products} produtos.`,
-        salonId: tenant.salonId
-      }
-    }));
+    const { envelope, counts } = await createTenantBackup(tenant.salonId);
+    const summary = `Snapshot assinado ${envelope.signature.slice(0, 12)}: ${counts.clients} clientes, ${counts.appointments} agendamentos, ${counts.services} serviços, ${counts.professionals} profissionais e ${counts.inventoryProducts} produtos.`;
+    const job = await prisma.backupJob.create({
+      data: { kind: 'MANUAL_SIGNED', status: 'COMPLETED', summary, salonId: tenant.salonId }
+    });
+    reply.header('Cache-Control', 'no-store');
+    return reply.status(201).send({ ...job, counts, snapshot: envelope });
+  });
+
+  app.post('/admin/security/backups/validate', async (request, reply) => {
+    const tenant = getTenant(request);
+    const body = z.object({ snapshot: z.unknown() }).parse(request.body);
+    try {
+      const snapshot = verifyTenantBackup(body.snapshot, tenant.salonId);
+      return { ok: true, schema: snapshot.schema, createdAt: snapshot.createdAt };
+    } catch (error) {
+      return reply.status(400).send({ message: error instanceof Error ? error.message : 'Backup inválido.' });
+    }
+  });
+
+  app.post('/admin/security/backups/restore', async (request, reply) => {
+    const tenant = getTenant(request);
+    const body = z.object({
+      confirmation: z.literal('RESTAURAR BACKUP'),
+      snapshot: z.unknown()
+    }).parse(request.body);
+    try {
+      return await restoreTenantBackup({ salonId: tenant.salonId, requestedByUserId: tenant.id, snapshot: body.snapshot });
+    } catch (error) {
+      return reply.status(400).send({ message: error instanceof Error ? error.message : 'Restore não pôde ser executado.' });
+    }
   });
 }
