@@ -16,6 +16,7 @@ import { whatsappOperationsRoutes } from './whatsapp-operations.routes';
 import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
 import { platformAdminRoutes } from './platform-admin.routes';
+import { platformMaintenanceRoutes } from './platform-maintenance.routes';
 import { platformLifecycleRoutes } from './platform-lifecycle.routes';
 import { platformSiteRoutes } from './platform-site.routes';
 import { platformCostRoutes } from './platform-cost.routes';
@@ -54,6 +55,18 @@ export async function appRoutes(app: FastifyInstance) {
     platformAdmin.register(platformSiteRoutes);
     platformAdmin.register(platformCostRoutes);
     platformAdmin.register(observabilityRoutes);
+  });
+
+  /**
+   * Manutenção destrutiva fica isolada do hook de auditoria. O próprio reset
+   * remove auditorias e sessões e deve terminar com somente o SUPER_ADMIN e
+   * o tenant técnico. Ainda exige autenticação, rate limit e papel SUPER_ADMIN.
+   */
+  app.register(async (platformMaintenance) => {
+    platformMaintenance.addHook('preHandler', ensureAuthenticated);
+    platformMaintenance.addHook('preHandler', enforceTenantRateLimit);
+    platformMaintenance.addHook('preHandler', requireRoles(['SUPER_ADMIN']));
+    platformMaintenance.register(platformMaintenanceRoutes);
   });
 
   /** Operação do salão, sempre isolada pelo salonId, contrato vigente e módulos contratados. */
