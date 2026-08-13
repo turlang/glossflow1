@@ -1,0 +1,198 @@
+require('dotenv/config');
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
+
+const PLATFORM_SLUG = 'glossflow-platform';
+const RESET_CONFIRMATION = 'RESET_GLOSSFLOW_TEST_DATA';
+
+function env(name) {
+  return String(process.env[name] || '').trim();
+}
+
+function assertExecutionAllowed({ execute, nodeEnv, confirmation, allowProduction }) {
+  if (!execute) return;
+
+  if (confirmation !== RESET_CONFIRMATION) {
+    throw new Error(`RESET_CONFIRM deve ser exatamente ${RESET_CONFIRMATION}.`);
+  }
+
+  if (nodeEnv === 'production' && allowProduction !== 'true') {
+    throw new Error('Em produção, ALLOW_PRODUCTION_DATA_RESET=true é obrigatório.');
+  }
+}
+
+async function resolveProtectedPlatformState(client = prisma) {
+  const email = env('SUPER_ADMIN_EMAIL').toLowerCase();
+  if (!email) throw new Error('SUPER_ADMIN_EMAIL é obrigatório para proteger a conta que será preservada.');
+
+  const superAdmin = await client.user.findUnique({
+    where: { email },
+    include: { salon: true }
+  });
+
+  if (!superAdmin) throw new Error(`SUPER_ADMIN ${email} não encontrado. Abortando sem remover dados.`);
+  if (superAdmin.role !== 'SUPER_ADMIN') throw new Error(`O usuário ${email} não possui papel SUPER_ADMIN. Abortando.`);
+  if (!superAdmin.active) throw new Error(`O SUPER_ADMIN ${email} está inativo. Reative-o antes do reset.`);
+  if (!superAdmin.salon || superAdmin.salon.slug !== PLATFORM_SLUG) {
+    throw new Error(`SUPER_ADMIN deve pertencer ao tenant técnico ${PLATFORM_SLUG}. Abortando.`);
+  }
+
+  return { superAdmin, platformSalon: superAdmin.salon };
+}
+
+const FULLY_CLEARED = [
+  ['auditLog', 'Auditoria'],
+  ['userSession', 'Sessões'],
+  ['backupJob', 'Backups'],
+  ['lgpdConsent', 'Consentimentos LGPD'],
+  ['loyaltyEntry', 'Movimentações de fidelidade'],
+  ['loyaltyProgram', 'Programas de fidelidade'],
+  ['commissionRule', 'Regras de comissão'],
+  ['financialEntry', 'Financeiro'],
+  ['inventoryMovement', 'Movimentações de estoque'],
+  ['inventoryProduct', 'Produtos de estoque'],
+  ['waitlistEntry', 'Lista de espera'],
+  ['appointment', 'Agendamentos'],
+  ['client', 'Clientes'],
+  ['whatsAppTemplate', 'Templates WhatsApp'],
+  ['aiSuggestion', 'Sugestões IA'],
+  ['portfolioItem', 'Portfólio'],
+  ['professional', 'Profissionais'],
+  ['service', 'Serviços'],
+  ['salonSubscription', 'Assinaturas dos salões'],
+  ['subscriptionPlan', 'Planos comerciais']
+];
+
+async function preview(client, protectedState) {
+  const rows = [];
+  for (const [delegate, label] of FULLY_CLEARED) {
+    rows.push({ label, count: await client[delegate].count() });
+  }
+
+  rows.push({
+    label: 'Usuários removidos',
+    count: await client.user.count({ where: { id: { not: protectedState.superAdmin.id } } })
+  });
+  rows.push({
+    label: 'Salões/tenants removidos',
+    count: await client.salon.count({ where: { id: { not: protectedState.platformSalon.id } } })
+  });
+
+  return rows;
+}
+
+async function executeReset(client, protectedState) {
+  // Ordem deliberada: dependências primeiro, entidades-raiz por último.
+  for (const [delegate] of FULLY_CLEARED) {
+    await client[delegate].deleteMany();
+  }
+
+  await client.user.deleteMany({ where: { id: { not: protectedState.superAdmin.id } } });
+  await client.salon.deleteMany({ where: { id: { not: protectedState.platformSalon.id } } });
+
+  await client.salon.update({
+    where: { id: protectedState.platformSalon.id },
+    data: {
+      name: 'GlossFlow Platform',
+      description: 'Tenant técnico reservado à administração global da plataforma GlossFlow.',
+      phone: '0000000000',
+      whatsapp: '',
+      address: 'Plataforma GlossFlow',
+      openingHours: '24/7',
+      instagram: '',
+      heroImage: '',
+      heroTitle: null,
+      logoUrl: null,
+      primaryColor: null,
+      secondaryColor: null,
+      accentColor: null,
+      siteTemplate: null,
+      customDomain: null,
+      modulesConfigured: false,
+      enabledModules: []
+    }
+  });
+
+  await client.user.update({
+    where: { id: protectedState.superAdmin.id },
+    data: {
+      role: 'SUPER_ADMIN',
+      active: true,
+      salonId: protectedState.platformSalon.id
+    }
+  });
+}
+
+async function verifyCleanState(client, protectedState) {
+  const users = await client.user.findMany({ select: { id: true, email: true, role: true, salonId: true } });
+  const salons = await client.salon.findMany({ select: { id: true, slug: true } });
+
+  if (users.length !== 1 || users[0].id !== protectedState.superAdmin.id || users[0].role !== 'SUPER_ADMIN') {
+    throw new Error('Verificação falhou: a base não ficou com exatamente um SUPER_ADMIN.');
+  }
+  if (salons.length !== 1 || salons[0].id !== protectedState.platformSalon.id || salons[0].slug !== PLATFORM_SLUG) {
+    throw new Error('Verificação falhou: a base não ficou apenas com o tenant técnico da plataforma.');
+  }
+
+  for (const [delegate, label] of FULLY_CLEARED) {
+    const count = await client[delegate].count();
+    if (count !== 0) throw new Error(`Verificação falhou: ${label} ainda possui ${count} registro(s).`);
+  }
+
+  return { superAdminEmail: users[0].email, platformSlug: salons[0].slug };
+}
+
+async function main() {
+  const execute = process.argv.includes('--execute');
+  assertExecutionAllowed({
+    execute,
+    nodeEnv: process.env.NODE_ENV,
+    confirmation: env('RESET_CONFIRM'),
+    allowProduction: env('ALLOW_PRODUCTION_DATA_RESET').toLowerCase()
+  });
+
+  const protectedState = await resolveProtectedPlatformState(prisma);
+  const rows = await preview(prisma, protectedState);
+
+  console.log('\nGlossFlow — limpeza controlada de dados de teste');
+  console.log(`SUPER_ADMIN preservado: ${protectedState.superAdmin.email}`);
+  console.log(`Tenant técnico preservado: ${protectedState.platformSalon.slug}`);
+  console.table(rows);
+
+  if (!execute) {
+    console.log('\nDRY-RUN: nenhum dado foi removido.');
+    console.log(`Para executar: RESET_CONFIRM=${RESET_CONFIRMATION} npm run data:reset:clean -- --execute`);
+    console.log('Em produção acrescente ALLOW_PRODUCTION_DATA_RESET=true no mesmo comando.');
+    return;
+  }
+
+  await executeReset(prisma, protectedState);
+  const verified = await verifyCleanState(prisma, protectedState);
+
+  console.log('\n✅ Limpeza concluída e verificada.');
+  console.log(`✅ Único login preservado: ${verified.superAdminEmail}`);
+  console.log(`✅ Único tenant preservado: ${verified.platformSlug}`);
+  console.log('✅ Todas as sessões foram removidas; faça login novamente.');
+}
+
+if (require.main === module) {
+  main()
+    .catch((error) => {
+      console.error(`❌ ${error.message}`);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
+
+module.exports = {
+  PLATFORM_SLUG,
+  RESET_CONFIRMATION,
+  assertExecutionAllowed,
+  resolveProtectedPlatformState,
+  preview,
+  executeReset,
+  verifyCleanState
+};
