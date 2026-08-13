@@ -26,6 +26,7 @@ import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
 import { clientPortalPublicRoutes, operationsSuiteRoutes } from './operations-suite.routes';
 import { organizationNetworkRoutes } from './organization-network.routes';
+import { transactionalHomologationRoutes } from './transactional-homologation.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceTenantRateLimit } from '../middlewares/rate-limit';
@@ -105,6 +106,7 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(whatsappOperationsRoutes);
     business.register(organizationNetworkRoutes);
     business.register(operationsSuiteRoutes);
+    business.register(transactionalHomologationRoutes);
   });
 
   app.register(async (criticalAdmin) => {
