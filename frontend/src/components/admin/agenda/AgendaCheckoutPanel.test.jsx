@@ -45,9 +45,10 @@ describe('AgendaCheckoutPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir checkout' }));
 
     expect(requestMock).toHaveBeenCalledWith(`/admin/pos/appointments/${appointments[0].id}/checkout-preview`);
-    expect(await screen.findByText('Corte Premium')).toBeTruthy();
-    expect(screen.getByText('R$ 120,00')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Carla' })).toBeTruthy();
+    expect(screen.getAllByText('R$ 120,00').length).toBeGreaterThan(0);
     expect(screen.getByRole('option', { name: /Pacote Essencial/ })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /Cadeira 1/ })).toBeTruthy();
   });
 
   it('consome pacote sem inventar cobrança do serviço no browser', async () => {
@@ -60,7 +61,7 @@ describe('AgendaCheckoutPanel', () => {
 
     await user.selectOptions(screen.getByLabelText('Atendimento'), appointments[0].id);
     await user.click(screen.getByRole('button', { name: 'Abrir checkout' }));
-    await screen.findByText('Corte Premium');
+    await screen.findByRole('heading', { name: 'Pacote do cliente' });
     await user.selectOptions(screen.getByLabelText('Crédito aplicável'), '507f1f77bcf86cd799439014');
     await user.click(screen.getByRole('button', { name: 'Concluir atendimento e venda' }));
 
