@@ -1,6 +1,7 @@
 import React from 'react';
 import { ROLES } from '../../utils/auth.js';
 import { AgendaEnterprise } from './AgendaEnterprise.jsx';
+import { AgendaCheckoutPanel } from './agenda/AgendaCheckoutPanel.jsx';
 
 const MANAGER_ROLES = new Set([ROLES.ADMIN, ROLES.RECEPTION]);
 
@@ -53,7 +54,7 @@ export function AgendaCommercialHub({ role, appointments, professionals, service
             <span><b>1</b> Cliente solicita</span>
             <span><b>2</b> Agenda valida capacidade</span>
             <span><b>3</b> Salão opera o atendimento</span>
-            <span><b>4</b> WhatsApp confirma e comunica</span>
+            <span><b>4</b> Checkout conclui PDV e financeiro</span>
           </div>
         )}
       </section>
@@ -65,6 +66,8 @@ export function AgendaCommercialHub({ role, appointments, professionals, service
         reload={reload}
         readOnly={!canManage}
       />
+
+      {canManage && <AgendaCheckoutPanel appointments={appointments} reload={reload} />}
     </div>
   );
 }
