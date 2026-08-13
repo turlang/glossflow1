@@ -25,6 +25,7 @@ import { commercialRoutes } from './commercial.routes';
 import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
 import { clientPortalPublicRoutes, operationsSuiteRoutes } from './operations-suite.routes';
+import { organizationNetworkRoutes } from './organization-network.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceTenantRateLimit } from '../middlewares/rate-limit';
@@ -88,6 +89,12 @@ export async function appRoutes(app: FastifyInstance) {
       const path = request.url.split('?')[0];
       if (path.startsWith('/admin/saas/')) return reply.status(410).send({ message: 'Rota administrativa global migrada para o Super Admin da plataforma.' });
       if ((request.method === 'POST' && path === '/admin/subscription/plans') || (request.method === 'PUT' && path === '/admin/subscription')) return reply.status(403).send({ message: 'Planos e assinaturas são gerenciados exclusivamente pelo Super Admin.' });
+      if (request.method === 'POST' && path === '/admin/organizations/locations') {
+        return reply.status(410).send({
+          code: 'CONSENT_REQUIRED',
+          message: 'Vínculo direto de unidade desativado. Gere um convite e aceite-o como ADMIN da unidade de destino.'
+        });
+      }
     });
     business.addHook('preHandler', enforceSalonModuleAccess);
     business.addHook('onResponse', writeAuditLog);
@@ -96,6 +103,7 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(growthRoutes);
     business.register(whatsappAgentRoutes);
     business.register(whatsappOperationsRoutes);
+    business.register(organizationNetworkRoutes);
     business.register(operationsSuiteRoutes);
   });
 
