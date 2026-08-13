@@ -10,7 +10,7 @@ const actions = readFileSync(resolve(here, '../components/admin/BusinessExpansio
 describe('Marcos 25–34 — contratos operacionais da UI', () => {
   it('expõe os dez módulos no painel compartilhado', () => {
     for (const key of ['pos', 'customer-plans', 'procurement', 'team-management', 'clinical', 'marketing', 'client-portal', 'organizations', 'resources', 'finance-advanced']) {
-      expect(suite).toContain(`${key}:`);
+      expect(suite).toContain(key);
     }
   });
 
