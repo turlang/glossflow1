@@ -37,7 +37,11 @@ function notFound(message = 'Salão não encontrado.') {
  * 1. X-Salon-Slug ou ?salon=slug (homologação/preview);
  * 2. domínio próprio cadastrado no salão;
  * 3. subdomínio de PUBLIC_ROOT_DOMAIN, ex. ana.glossflow.com.br;
- * 4. DEFAULT_PUBLIC_SALON_SLUG para a demonstração principal.
+ * 4. DEFAULT_PUBLIC_SALON_SLUG para a demonstração principal;
+ * 5. tenant técnico glossflow-platform apenas quando a base comercial está vazia.
+ *
+ * O último fallback mantém health/smoke/login funcionais depois de uma limpeza
+ * completa dos dados de teste, sem recriar silenciosamente um salão comercial.
  */
 export async function getPublicSalon(request: FastifyRequest) {
   const query = (request.query || {}) as { salon?: string };
@@ -74,8 +78,12 @@ export async function getPublicSalon(request: FastifyRequest) {
 
   const fallbackSlug = cleanSlug(process.env.DEFAULT_PUBLIC_SALON_SLUG || 'glossflow') || 'glossflow';
   const fallback = await prisma.salon.findUnique({ where: { slug: fallbackSlug } });
-  if (!fallback) throw notFound('Salão público padrão não encontrado. Configure DEFAULT_PUBLIC_SALON_SLUG ou execute o seed.');
-  return fallback;
+  if (fallback) return fallback;
+
+  const platformFallback = await prisma.salon.findUnique({ where: { slug: 'glossflow-platform' } });
+  if (platformFallback) return platformFallback;
+
+  throw notFound('Nenhum salão público ou tenant técnico da plataforma foi encontrado.');
 }
 
 /** Compatibilidade interna durante a migração da antiga vitrine única. */
