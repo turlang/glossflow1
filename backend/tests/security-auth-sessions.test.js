@@ -193,3 +193,54 @@ test('produção rejeita access token legado sem sessionId', async () => {
     process.env.NODE_ENV = originalNodeEnv;
   }
 });
+
+test('logout por access token revoga a sessão exata mesmo sem refresh token e com JWT expirado', async () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  const expiredToken = jwt.sign({
+    id: userId,
+    email: 'super@example.test',
+    role: 'SUPER_ADMIN',
+    salonId,
+    sessionId
+  }, process.env.JWT_SECRET, { expiresIn: -1 });
+
+  const updates = [];
+
+  try {
+    await withMocks({
+      userSession: {
+        updateMany: async (args) => {
+          updates.push(args);
+          return { count: 1 };
+        }
+      }
+    }, async () => {
+      const app = buildApp();
+      try {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/auth/logout',
+          headers: { authorization: `Bearer ${expiredToken}` },
+          payload: {}
+        });
+
+        assert.equal(response.statusCode, 204, response.body);
+        assert.equal(updates.length, 1);
+        assert.equal(updates[0].where.id, sessionId);
+        assert.equal(updates[0].where.userId, userId);
+        assert.equal(updates[0].where.salonId, salonId);
+        assert.ok(Array.isArray(updates[0].where.OR));
+        assert.deepEqual(updates[0].where.OR, [
+          { revokedAt: null },
+          { revokedAt: { isSet: false } }
+        ]);
+        assert.ok(updates[0].data.revokedAt instanceof Date);
+      } finally {
+        await app.close();
+      }
+    });
+  } finally {
+    process.env.NODE_ENV = originalNodeEnv;
+  }
+});

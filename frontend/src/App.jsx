@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { isAuthExpiredError, onAuthExpired, request } from './services/api.js';
+import { isAuthExpiredError, logoutSession, markAuthenticatedSession, onAuthExpired, request } from './services/api.js';
 import { emptyBackofficeData, loadTenantBackofficeData } from './services/backoffice-data.js';
 import { Header, PublicShowcase, BookingPage, LoginPage } from './components/public/PublicExperience.jsx';
 import { SkeletonPage, StateMessage } from './components/ui/Feedback.jsx';
@@ -68,6 +68,37 @@ export default function App() {
 
   function clearTenantAdminData() {
     setBackoffice(emptyBackofficeData());
+  }
+
+  function handleLogin(token) {
+    // LoginPage persiste os dois tokens antes de chamar onLogin. Registramos o
+    // novo ciclo no cliente HTTP para invalidar refreshes que pertençam a uma
+    // sessão anterior e, em seguida, sincronizamos o estado React.
+    markAuthenticatedSession();
+    setAuthToken(token);
+  }
+
+  function finishLocalLogout() {
+    setAuthToken('');
+    clearTenantAdminData();
+    setError('');
+    setLoading(false);
+    setPage('login');
+  }
+
+  /**
+   * Os shells administrativos antigos removem os tokens e então navegam para
+   * `login`. Esta função transforma essa intenção em logout real: atualiza o
+   * estado React imediatamente e revoga a UserSession no servidor em paralelo.
+   */
+  function navigateFromAuthenticatedShell(nextPage) {
+    if (nextPage === 'login') {
+      const accessToken = authToken || localStorage.getItem('glossflow.token') || '';
+      finishLocalLogout();
+      void logoutSession({ accessToken });
+      return;
+    }
+    setPage(nextPage);
   }
 
   /** Resolve `?action=` uma única vez no bootstrap da SPA. */
@@ -227,13 +258,13 @@ export default function App() {
         )}
 
         {!loading && !error && page === 'login' && (
-          <LoginPage setPage={setPage} onLogin={setAuthToken} />
+          <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'platform-admin' && (
           isAuthenticated && isSuperAdmin
-            ? <PlatformAdmin setPage={setPage} />
-            : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+            ? <PlatformAdmin setPage={navigateFromAuthenticatedShell} />
+            : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'agent-test' && (
@@ -241,13 +272,13 @@ export default function App() {
             ? <WhatsAppAgentTester setPage={setPage} />
             : isAuthenticated && !isSuperAdmin
               ? <StateMessage title="Módulo não habilitado" text="O agente precisa dos módulos WhatsApp e Inteligência Artificial habilitados." danger />
-              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+              : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'professional-services' && (
           isAuthenticated && !isSuperAdmin
             ? <ProfessionalCapabilitiesAdmin salon={backofficeSalon} services={services} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} />
-            : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+            : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'professional-schedule' && (
@@ -255,7 +286,7 @@ export default function App() {
             ? <ProfessionalScheduleAdmin setPage={setPage} />
             : isAuthenticated && !isSuperAdmin
               ? <StateMessage title="Módulo não habilitado" text="A jornada da equipe faz parte do módulo Agenda." danger />
-              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+              : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'operational-agenda' && (
@@ -263,7 +294,7 @@ export default function App() {
             ? <OperationalAgendaBoard appointments={appointments} professionals={professionals} reload={reloadBackofficeData} setPage={setPage} />
             : isAuthenticated && !isSuperAdmin
               ? <StateMessage title="Módulo não habilitado" text="A agenda operacional faz parte do módulo Agenda." danger />
-              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+              : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'smart-fit' && (
@@ -271,7 +302,7 @@ export default function App() {
             ? <SmartFitAdmin services={services} professionals={professionals} setPage={setPage} />
             : isAuthenticated && !isSuperAdmin
               ? <StateMessage title="Módulo não habilitado" text="O encaixe inteligente faz parte do módulo Agenda." danger />
-              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+              : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'waitlist' && (
@@ -279,7 +310,7 @@ export default function App() {
             ? <WaitlistAdmin setPage={setPage} />
             : isAuthenticated && !isSuperAdmin
               ? <StateMessage title="Módulo não habilitado" text="A lista de espera faz parte do módulo Agenda." danger />
-              : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+              : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
 
         {!loading && !error && page === 'admin' && (
@@ -302,12 +333,12 @@ export default function App() {
                 whatsappTemplates={whatsappTemplates}
                 insights={insights}
                 reload={reloadBackofficeData}
-                setPage={setPage}
+                setPage={navigateFromAuthenticatedShell}
                 theme={theme}
                 toggleTheme={toggleTheme}
               />
             )
-            : <LoginPage setPage={setPage} onLogin={setAuthToken} />
+            : <LoginPage setPage={setPage} onLogin={handleLogin} />
         )}
       </Suspense>
     </div>
