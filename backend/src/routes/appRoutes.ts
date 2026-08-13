@@ -24,17 +24,13 @@ import { observabilityRoutes } from './observability.routes';
 import { commercialRoutes } from './commercial.routes';
 import { analyticsRoutes } from './analytics.routes';
 import { growthRoutes } from './growth.routes';
+import { clientPortalPublicRoutes, operationsSuiteRoutes } from './operations-suite.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceTenantRateLimit } from '../middlewares/rate-limit';
 import { enforceTenantSubscriptionAccess } from '../middlewares/subscription-access';
 import { enforceSalonModuleAccess } from '../services/module-access.service';
 
-/**
- * Composição central das rotas.
- * SUPER_ADMIN administra a plataforma e os tenants; ADMIN/RECEPTION/PROFESSIONAL
- * operam exclusivamente o salão presente no salonId do JWT.
- */
 export async function appRoutes(app: FastifyInstance) {
   app.register(platformRoutes);
   app.register(commercialRoutes);
@@ -43,8 +39,8 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(appointmentRoutes);
   app.register(whatsappWebhookRoutes);
   app.register(twilioWhatsAppWebhookRoutes);
+  app.register(clientPortalPublicRoutes);
 
-  /** Administração global: clientes, planos, ciclo SaaS, Site & Marca, custos e infraestrutura. */
   app.register(async (platformAdmin) => {
     platformAdmin.addHook('preHandler', ensureAuthenticated);
     platformAdmin.addHook('preHandler', enforceTenantRateLimit);
@@ -57,11 +53,6 @@ export async function appRoutes(app: FastifyInstance) {
     platformAdmin.register(observabilityRoutes);
   });
 
-  /**
-   * Manutenção destrutiva fica isolada do hook de auditoria. O próprio reset
-   * remove auditorias e sessões e deve terminar com somente o SUPER_ADMIN e
-   * o tenant técnico. Ainda exige autenticação, rate limit e papel SUPER_ADMIN.
-   */
   app.register(async (platformMaintenance) => {
     platformMaintenance.addHook('preHandler', ensureAuthenticated);
     platformMaintenance.addHook('preHandler', enforceTenantRateLimit);
@@ -69,7 +60,6 @@ export async function appRoutes(app: FastifyInstance) {
     platformMaintenance.register(platformMaintenanceRoutes);
   });
 
-  /** Operação do salão, sempre isolada pelo salonId, contrato vigente e módulos contratados. */
   app.register(async (operational) => {
     operational.addHook('preHandler', ensureAuthenticated);
     operational.addHook('preHandler', enforceTenantRateLimit);
@@ -77,12 +67,7 @@ export async function appRoutes(app: FastifyInstance) {
     operational.addHook('preHandler', enforceTenantSubscriptionAccess);
     operational.addHook('preHandler', async (request, reply) => {
       const path = request.url.split('?')[0];
-      if (request.method === 'PUT' && path === '/admin/salon') {
-        return reply.status(403).send({
-          code: 'PLATFORM_MANAGED_SETTING',
-          message: 'Site & Marca é configurado exclusivamente pelo Super Admin da plataforma.'
-        });
-      }
+      if (request.method === 'PUT' && path === '/admin/salon') return reply.status(403).send({ code: 'PLATFORM_MANAGED_SETTING', message: 'Site & Marca é configurado exclusivamente pelo Super Admin da plataforma.' });
     });
     operational.addHook('preHandler', enforceSalonModuleAccess);
     operational.addHook('onResponse', writeAuditLog);
@@ -101,13 +86,8 @@ export async function appRoutes(app: FastifyInstance) {
     business.addHook('preHandler', enforceTenantSubscriptionAccess);
     business.addHook('preHandler', async (request, reply) => {
       const path = request.url.split('?')[0];
-      if (path.startsWith('/admin/saas/')) {
-        return reply.status(410).send({ message: 'Rota administrativa global migrada para o Super Admin da plataforma.' });
-      }
-      /** Plano/assinatura são controlados pelo SUPER_ADMIN. O salão pode apenas consultar seu plano atual. */
-      if ((request.method === 'POST' && path === '/admin/subscription/plans') || (request.method === 'PUT' && path === '/admin/subscription')) {
-        return reply.status(403).send({ message: 'Planos e assinaturas são gerenciados exclusivamente pelo Super Admin.' });
-      }
+      if (path.startsWith('/admin/saas/')) return reply.status(410).send({ message: 'Rota administrativa global migrada para o Super Admin da plataforma.' });
+      if ((request.method === 'POST' && path === '/admin/subscription/plans') || (request.method === 'PUT' && path === '/admin/subscription')) return reply.status(403).send({ message: 'Planos e assinaturas são gerenciados exclusivamente pelo Super Admin.' });
     });
     business.addHook('preHandler', enforceSalonModuleAccess);
     business.addHook('onResponse', writeAuditLog);
@@ -116,9 +96,9 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(growthRoutes);
     business.register(whatsappAgentRoutes);
     business.register(whatsappOperationsRoutes);
+    business.register(operationsSuiteRoutes);
   });
 
-  /** Segurança do próprio tenant continua disponível apenas ao ADMIN com contrato operacional. */
   app.register(async (criticalAdmin) => {
     criticalAdmin.addHook('preHandler', ensureAuthenticated);
     criticalAdmin.addHook('preHandler', enforceTenantRateLimit);
