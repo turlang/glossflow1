@@ -78,7 +78,7 @@ export async function securityRoutes(app: FastifyInstance) {
 
   app.get('/admin/security/lgpd/export/:clientId', async (request, reply) => {
     const tenant = getTenant(request);
-    const { clientId } = z.object({ id: z.string() }).parse({ id: (request.params as { clientId?: string }).clientId });
+    const { clientId } = z.object({ clientId: z.string() }).parse(request.params);
     const bundle = await exportClientPersonalData(tenant.salonId, clientId);
     if (!bundle) return reply.status(404).send({ message: 'Cliente não encontrado.' });
     reply.header('Cache-Control', 'no-store');
