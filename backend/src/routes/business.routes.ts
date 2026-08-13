@@ -7,6 +7,7 @@ import { businessLoyaltyRoutes } from './business/loyalty.routes';
 import { businessRetentionRoutes } from './business/retention.routes';
 import { businessSubscriptionRoutes } from './business/subscription.routes';
 import { businessWhatsappTemplateRoutes } from './business/whatsapp-templates.routes';
+import { evolutionHardeningRoutes } from './evolution-hardening.routes';
 
 /**
  * Agregador do domínio comercial. Cada submódulo preserva as URLs públicas
@@ -21,4 +22,5 @@ export async function businessRoutes(app: FastifyInstance) {
   app.register(businessSubscriptionRoutes);
   app.register(businessWhatsappTemplateRoutes);
   app.register(businessAiRoutes);
+  app.register(evolutionHardeningRoutes);
 }
