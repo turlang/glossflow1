@@ -118,3 +118,33 @@ test('salonId assinado no JWT prevalece sobre cabeçalho público na rota admini
     await app.close();
   }
 });
+
+test('base comercial vazia usa tenant técnico para manter login e smoke funcionais', async () => {
+  const app = buildApp();
+  const platformSalon = {
+    id: '507f1f77bcf86cd799439012',
+    slug: 'glossflow-platform',
+    name: 'GlossFlow Platform'
+  };
+  const slugs = [];
+
+  try {
+    await withMocks({
+      salon: {
+        findUnique: async ({ where }) => {
+          slugs.push(where.slug);
+          if (where.slug === 'glossflow-platform') return platformSalon;
+          return null;
+        },
+        findFirst: async () => null
+      }
+    }, async () => {
+      const response = await app.inject({ method: 'GET', url: '/public/salon' });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(response.json().slug, 'glossflow-platform');
+      assert.deepEqual(slugs, ['glossflow', 'glossflow-platform']);
+    });
+  } finally {
+    await app.close();
+  }
+});
