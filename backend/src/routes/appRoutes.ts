@@ -29,6 +29,7 @@ import { organizationNetworkRoutes } from './organization-network.routes';
 import { transactionalHomologationRoutes } from './transactional-homologation.routes';
 import { operationalHomologationRoutes } from './operational-homologation.routes';
 import { evolutionHardeningRoutes } from './evolution-hardening.routes';
+import { appointmentCheckoutRoutes } from './appointment-checkout.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceTenantRateLimit } from '../middlewares/rate-limit';
@@ -111,6 +112,7 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(transactionalHomologationRoutes);
     business.register(operationalHomologationRoutes);
     business.register(evolutionHardeningRoutes);
+    business.register(appointmentCheckoutRoutes);
   });
 
   app.register(async (criticalAdmin) => {
