@@ -46,7 +46,7 @@ describe('AgendaCheckoutPanel', () => {
 
     expect(requestMock).toHaveBeenCalledWith(`/admin/pos/appointments/${appointments[0].id}/checkout-preview`);
     expect(await screen.findByRole('heading', { name: 'Carla' })).toBeTruthy();
-    expect(screen.getAllByText('R$ 120,00').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Valor')).toHaveValue(120);
     expect(screen.getByRole('option', { name: /Pacote Essencial/ })).toBeTruthy();
     expect(screen.getByRole('option', { name: /Cadeira 1/ })).toBeTruthy();
   });
@@ -69,7 +69,7 @@ describe('AgendaCheckoutPanel', () => {
       method: 'POST',
       body: JSON.stringify({ packageId: '507f1f77bcf86cd799439014', payments: [] })
     });
-    expect(await screen.findByText(/VEN-TESTE/)).toBeTruthy();
+    expect(await screen.findByRole('status')).toHaveTextContent('VEN-TESTE');
     expect(reload).toHaveBeenCalled();
   });
 });
