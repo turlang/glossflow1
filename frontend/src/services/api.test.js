@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isAuthExpiredError, onAuthExpired, request } from './api.js';
+import {
+  isAuthExpiredError,
+  logoutSession,
+  markAuthenticatedSession,
+  onAuthExpired,
+  request
+} from './api.js';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -145,5 +151,76 @@ describe('HTTP client authentication lifecycle', () => {
     expect(localStorage.getItem('glossflow.token')).toBe('access-login-novo');
     expect(localStorage.getItem('glossflow.refreshToken')).toBe('refresh-login-novo');
     expect(fetchMock.mock.calls.some(([, options]) => options?.headers?.Authorization === 'Bearer access-login-novo')).toBe(true);
+  });
+
+  it('logout revoga a sessão usando credenciais lembradas mesmo após o shell apagar o storage', async () => {
+    localStorage.setItem('glossflow.token', 'access-atual');
+    localStorage.setItem('glossflow.refreshToken', 'refresh-atual');
+    markAuthenticatedSession();
+
+    // Reproduz o comportamento legado dos shells: eles apagam o storage antes
+    // de avisar o App que o usuário clicou em Sair.
+    localStorage.removeItem('glossflow.token');
+    localStorage.removeItem('glossflow.refreshToken');
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await expect(logoutSession({ accessToken: 'access-atual' })).resolves.toBe(true);
+
+    expect(localStorage.getItem('glossflow.token')).toBeNull();
+    expect(localStorage.getItem('glossflow.refreshToken')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [input, options] = fetchMock.mock.calls[0];
+    expect(requestUrl(input).endsWith('/auth/logout')).toBe(true);
+    expect(options?.headers?.Authorization).toBe('Bearer access-atual');
+    expect(JSON.parse(options?.body || '{}')).toEqual({ refreshToken: 'refresh-atual' });
+  });
+
+  it('refresh que termina depois do logout não consegue recriar tokens locais', async () => {
+    localStorage.setItem('glossflow.token', 'access-antigo');
+    localStorage.setItem('glossflow.refreshToken', 'refresh-antigo');
+    markAuthenticatedSession();
+
+    let signalRefreshStarted;
+    const refreshStarted = new Promise((resolve) => { signalRefreshStarted = resolve; });
+    let releaseRefresh;
+    const refreshBarrier = new Promise((resolve) => { releaseRefresh = resolve; });
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, options = {}) => {
+      const url = requestUrl(input);
+      const authorization = options.headers?.Authorization;
+
+      if (url.endsWith('/auth/refresh')) {
+        signalRefreshStarted();
+        await refreshBarrier;
+        return jsonResponse({ token: 'access-reidratado', refreshToken: 'refresh-reidratado' });
+      }
+
+      if (url.endsWith('/auth/logout')) {
+        return new Response(null, { status: 204 });
+      }
+
+      if (authorization === 'Bearer access-antigo') {
+        return jsonResponse({ message: 'Unauthorized' }, 401);
+      }
+
+      return jsonResponse({ message: 'Unauthorized' }, 401);
+    });
+
+    const pendingProtectedRequest = request('/platform-admin/overview');
+    await refreshStarted;
+
+    await expect(logoutSession()).resolves.toBe(true);
+    expect(localStorage.getItem('glossflow.token')).toBeNull();
+    expect(localStorage.getItem('glossflow.refreshToken')).toBeNull();
+
+    releaseRefresh();
+
+    await expect(pendingProtectedRequest).rejects.toMatchObject({ code: 'AUTH_EXPIRED' });
+    expect(localStorage.getItem('glossflow.token')).toBeNull();
+    expect(localStorage.getItem('glossflow.refreshToken')).toBeNull();
+    expect(fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith('/auth/logout'))).toHaveLength(1);
   });
 });
