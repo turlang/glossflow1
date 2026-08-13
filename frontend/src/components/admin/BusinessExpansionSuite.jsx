@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { request } from '../../services/api.js';
 import { currency } from '../../utils/format.js';
+import { BusinessExpansionActions } from './BusinessExpansionActions.jsx';
 
 const CONFIG = {
   pos: {
@@ -71,7 +72,7 @@ function describe(item) {
   return `${item.type || item._group || 'Registro'} • ${String(item.id || '').slice(-8)}`;
 }
 
-export function BusinessExpansionSuite({ module, clients = [], professionals = [] }) {
+export function BusinessExpansionSuite({ module, clients = [], professionals = [], services = [], inventory = [], appointments = [] }) {
   const config = CONFIG[module] || CONFIG.pos;
   const [data, setData] = useState(null);
   const [form, setForm] = useState({ ...DEFAULTS[module] });
@@ -235,6 +236,18 @@ export function BusinessExpansionSuite({ module, clients = [], professionals = [
           <p className="panel-help full-span">O vínculo cria somente a estrutura corporativa. Clientes, agenda, estoque, financeiro e usuários continuam isolados por tenant.</p>
         </section>
       )}
+
+      <BusinessExpansionActions
+        module={module}
+        data={data}
+        clients={clients}
+        professionals={professionals}
+        services={services}
+        inventory={inventory}
+        appointments={appointments}
+        onChanged={load}
+        setStatus={setStatus}
+      />
 
       <section className="panel-card">
         <h2>Registros recentes</h2>
