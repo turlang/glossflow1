@@ -74,10 +74,9 @@ function ActionButtons({ title, items, actionLabel, actionPath, onChanged, setSt
   );
 }
 
-export function BusinessExpansionActions({ module, data, clients = [], professionals = [], services = [], inventory = [], appointments = [], onChanged, setStatus }) {
+export function BusinessExpansionActions({ module, data, clients = [], professionals = [], inventory = [], appointments = [], onChanged, setStatus }) {
   const clientOptions = optionsFrom(clients);
   const professionalOptions = optionsFrom(professionals);
-  const serviceOptions = optionsFrom(services);
   const inventoryOptions = optionsFrom(inventory, (item) => `${item.name} • estoque ${item.quantity ?? 0}`);
   const appointmentOptions = optionsFrom(appointments, (item) => `${item.clientName || 'Cliente'} • ${new Date(item.startTime).toLocaleString('pt-BR')}`);
 
