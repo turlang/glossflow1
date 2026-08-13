@@ -157,12 +157,45 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post('/auth/logout', async (request, reply) => {
     const { refreshToken } = (request.body || {}) as { refreshToken?: string };
+    const authorization = request.headers.authorization;
+
+    /**
+     * O access token assinado identifica a UserSession mesmo se o refresh token
+     * tiver sido rotacionado por uma chamada concorrente. `ignoreExpiration`
+     * permite que um cliente encerre a própria sessão mesmo com access token
+     * vencido; assinatura, userId, salonId e sessionId continuam validados.
+     */
+    if (authorization?.startsWith('Bearer ')) {
+      try {
+        const payload = jwt.verify(
+          authorization.slice('Bearer '.length),
+          getJwtSecret(),
+          { ignoreExpiration: true }
+        ) as { id?: string; salonId?: string; sessionId?: string };
+
+        if (payload.id && payload.salonId && payload.sessionId) {
+          await prisma.userSession.updateMany({
+            where: {
+              id: payload.sessionId,
+              userId: payload.id,
+              salonId: payload.salonId,
+              ...notRevokedUserSessionWhere()
+            },
+            data: { revokedAt: new Date() }
+          });
+        }
+      } catch {
+        // Logout é idempotente: token inválido não deve impedir a limpeza local.
+      }
+    }
+
     if (refreshToken) {
       await prisma.userSession.updateMany({
         where: { refreshTokenHash: hashToken(refreshToken), ...notRevokedUserSessionWhere() },
         data: { revokedAt: new Date() }
       });
     }
+
     return reply.status(204).send();
   });
 }
