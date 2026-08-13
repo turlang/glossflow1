@@ -8,10 +8,12 @@ Esta checklist valida os módulos adicionados após a Release Comercial do Marco
 
 - [ ] Branch/release contém os Marcos 25–34.
 - [ ] `npm ci`, Prisma Generate, TypeScript e build backend passam.
-- [ ] Testes backend passam, incluindo `marcos25-34-contract.test.js`.
+- [ ] Testes backend passam, incluindo `marcos25-34-contract.test.js` e `marco32-multiunit-security.test.js`.
 - [ ] ESLint, Vitest e build frontend passam.
 - [ ] Tenant QA possui módulos novos habilitados pelo Super Admin.
 - [ ] Existem ao menos 2 clientes, 2 profissionais, 2 serviços e 2 produtos de estoque para teste.
+- [ ] Existem dois tenants QA distintos para validar o Marco 32 sem tocar em clientes reais.
+- [ ] `JWT_SECRET` seguro está configurado; opcionalmente usar `MULTIUNIT_INVITE_SECRET` dedicado para convites multiunidade.
 - [ ] Nenhum reset destrutivo será executado em base com dados reais.
 - [ ] Snapshot/backup de QA disponível antes da homologação transacional.
 
@@ -93,11 +95,18 @@ Esta checklist valida os módulos adicionados após a Release Comercial do Marco
 
 ## Marco 32 — Multiunidade / Redes
 
-- [ ] Criar organização/rede e registrar unidade.
-- [ ] Associação de unidade não concede acesso automático aos dados de outro tenant.
-- [ ] Registros corporativos permanecem isolados pelo tenant administrador.
-- [ ] Somente ADMIN acessa o módulo.
-- [ ] Compartilhamento de CRM/estoque entre unidades só pode ser habilitado por política futura explícita.
+- [ ] No tenant administrador, criar organização/rede.
+- [ ] Gerar convite para o **slug exato** de um segundo tenant QA.
+- [ ] Conferir que o convite tem assinatura HMAC e validade máxima de 72 horas.
+- [ ] Tentar aceitar o convite no tenant errado e confirmar `403`.
+- [ ] Entrar como ADMIN no tenant convidado e aceitar o convite.
+- [ ] Confirmar criação de uma única `OrganizationLocation` para a unidade convidada.
+- [ ] Repetir o aceite e confirmar que nenhum vínculo duplicado é criado.
+- [ ] Tentar usar a rota antiga `POST /admin/organizations/locations` e confirmar `410 CONSENT_REQUIRED`.
+- [ ] Associação de unidade não concede acesso automático a clientes, agenda, estoque, financeiro ou usuários do outro tenant.
+- [ ] Registros corporativos permanecem controlados pelo tenant administrador da organização.
+- [ ] Somente ADMIN pode gerar ou aceitar convites.
+- [ ] Compartilhamento de CRM/estoque entre unidades continua desabilitado até existir política futura explícita.
 
 **Resultado Marco 32:** [ ] PASS [ ] FAIL
 
@@ -131,9 +140,10 @@ Esta checklist valida os módulos adicionados após a Release Comercial do Marco
 - [ ] Módulo desabilitado retorna `403 MODULE_DISABLED`.
 - [ ] ADMIN acessa módulos contratados; RECEPTION respeita operações ADMIN-only; PROFESSIONAL não recebe a suite comercial.
 - [ ] Super Admin continua separado da operação do tenant.
-- [ ] Auditoria não armazena senha, token bruto do portal ou corpo clínico sensível completo.
+- [ ] Auditoria não armazena senha, token bruto do portal ou conteúdo clínico sensível completo.
 - [ ] Rate limit continua aplicado.
 - [ ] Nenhum segredo real foi versionado.
+- [ ] Convites multiunidade não carregam segredo no payload e têm assinatura validada em tempo constante.
 
 ## Reset e higiene
 
@@ -144,8 +154,8 @@ Esta checklist valida os módulos adicionados após a Release Comercial do Marco
 
 ## Produção e regressão
 
-- [ ] Quality Gate verde.
-- [ ] Production Gate verde.
+- [ ] Quality Gate verde no SHA final.
+- [ ] Production Gate verde no SHA final.
 - [ ] Vercel `READY` no SHA do merge.
 - [ ] Render `/health` e `/ready` servem o mesmo SHA, com `database.ok=true`.
 - [ ] Production Smoke Validation verde.
