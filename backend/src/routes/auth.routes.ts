@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { getTenantSubscriptionAccess } from '../services/saas-lifecycle.service';
+import { activeUserSessionWhere, notRevokedUserSessionWhere } from '../services/user-session.service';
 import { loginSchema } from './schemas';
 
 const ACCESS_TOKEN_MINUTES = Number(process.env.ACCESS_TOKEN_MINUTES || 30);
@@ -87,6 +88,7 @@ export async function authRoutes(app: FastifyInstance) {
         refreshTokenHash: hashToken(refreshToken),
         userAgent: String(request.headers['user-agent'] || ''),
         ip: request.ip || '',
+        revokedAt: null,
         expiresAt
       }
     });
@@ -105,7 +107,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     const currentHash = hashToken(refreshToken);
     const session = await prisma.userSession.findFirst({
-      where: { refreshTokenHash: currentHash, revokedAt: null, expiresAt: { gt: new Date() } },
+      where: { refreshTokenHash: currentHash, ...activeUserSessionWhere() },
       include: { user: true }
     });
 
@@ -124,8 +126,7 @@ export async function authRoutes(app: FastifyInstance) {
       where: {
         id: session.id,
         refreshTokenHash: currentHash,
-        revokedAt: null,
-        expiresAt: { gt: new Date() }
+        ...activeUserSessionWhere()
       },
       data: {
         refreshTokenHash: hashToken(rotatedRefreshToken),
@@ -158,7 +159,7 @@ export async function authRoutes(app: FastifyInstance) {
     const { refreshToken } = (request.body || {}) as { refreshToken?: string };
     if (refreshToken) {
       await prisma.userSession.updateMany({
-        where: { refreshTokenHash: hashToken(refreshToken), revokedAt: null },
+        where: { refreshTokenHash: hashToken(refreshToken), ...notRevokedUserSessionWhere() },
         data: { revokedAt: new Date() }
       });
     }
