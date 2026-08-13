@@ -24,6 +24,7 @@ const TENANT_ACTIONS = new Set(TENANT_BACKOFFICE_PAGES.filter((page) => page !==
 export function resolveInitialPage({ action, authenticated, role }) {
   if (action === 'booking') return 'booking';
   if (action === 'commercial') return 'commercial';
+  if (action === 'client-portal') return 'client-portal';
 
   if (action === 'platform-admin') {
     return authenticated && isSuperAdmin(role) ? 'platform-admin' : 'login';

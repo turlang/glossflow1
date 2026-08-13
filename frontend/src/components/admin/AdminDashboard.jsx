@@ -10,6 +10,7 @@ import { FinancialAdmin, CommissionsAdmin, LoyaltyAdmin, SubscriptionAdmin } fro
 import { AutomationsAdmin, AIAssistantAdmin } from './AdminIntelligence.jsx';
 import { SecurityAdmin, EcosystemAdmin, ObservabilityAdmin, UXPremiumAdmin, PWAAdmin } from './AdminPlatformModules.jsx';
 import { AgendaCommercialHub } from './AgendaCommercialHub.jsx';
+import { BusinessExpansionSuite } from './BusinessExpansionSuite.jsx';
 
 const MENU = [
   { key: 'executive', label: 'Dashboard', description: 'Receita, lucro e crescimento', icon: '📊' },
@@ -28,6 +29,16 @@ const MENU = [
   { key: 'subscription', label: 'Assinatura', description: 'Planos do SaaS', icon: '◇' },
   { key: 'automations', label: 'Automações', description: 'WhatsApp e relacionamento', icon: '⚡' },
   { key: 'assistant', label: 'Assistente IA', description: 'Perguntas e decisões', icon: '🤖' },
+  { key: 'pos', label: 'PDV / Checkout', description: 'Venda, pagamentos e estorno', icon: '🧾' },
+  { key: 'customer-plans', label: 'Pacotes', description: 'Memberships, créditos e gift cards', icon: '🎁' },
+  { key: 'procurement', label: 'Compras', description: 'Fornecedores e pedidos', icon: '📦' },
+  { key: 'team-management', label: 'Equipe & Folha', description: 'Ponto, metas e folha', icon: '👥' },
+  { key: 'clinical', label: 'Anamnese', description: 'Prontuário e consentimentos', icon: '🩺' },
+  { key: 'marketing', label: 'Marketing 360', description: 'Campanhas, avaliações e cupons', icon: '📣' },
+  { key: 'client-portal', label: 'Portal do Cliente', description: 'Links seguros e benefícios', icon: '🔐' },
+  { key: 'organizations', label: 'Multiunidade', description: 'Redes e unidades', icon: '🏢' },
+  { key: 'resources', label: 'Recursos', description: 'Salas, macas e equipamentos', icon: '🛏️' },
+  { key: 'finance-advanced', label: 'Financeiro Avançado', description: 'Caixa, contas, conciliação e fiscal', icon: '🏦' },
   { key: 'security', label: 'Segurança', description: 'Auditoria, sessões e LGPD', icon: '🛡️' },
   { key: 'ecosystem', label: 'Ecossistema', description: 'Integrações', icon: '🔌' },
   { key: 'observability', label: 'Observabilidade', description: 'Saúde e métricas', icon: '📡' },
@@ -35,7 +46,11 @@ const MENU = [
   { key: 'pwa', label: 'App/PWA', description: 'Instalação e offline', icon: '📱' }
 ];
 
-/** Shell administrativo: navegação, indicadores e composição dos domínios. */
+const EXPANSION_TABS = new Set([
+  'pos', 'customer-plans', 'procurement', 'team-management', 'clinical',
+  'marketing', 'client-portal', 'organizations', 'resources', 'finance-advanced'
+]);
+
 export function AdminDashboard({ role, salon, services, professionals, portfolio, appointments, inventory, users, clients, financialEntries, commissions, loyalty, subscription, whatsappTemplates, insights, reload, setPage, theme, toggleTheme }) {
   const allowedMenu = useMemo(() => dashboardMenuForRole(role, MENU), [role]);
   const [tab, setTab] = useState(() => defaultDashboardTabForRole(role));
@@ -117,6 +132,7 @@ export function AdminDashboard({ role, salon, services, professionals, portfolio
           {tab === 'subscription' && <SubscriptionAdmin subscription={subscription} reload={reload} />}
           {tab === 'automations' && <AutomationsAdmin whatsappTemplates={whatsappTemplates} insights={insights} reload={reload} />}
           {tab === 'assistant' && <AIAssistantAdmin services={services} professionals={professionals} appointments={appointments} inventory={inventory} clients={clients} financialEntries={financialEntries} insights={insights} />}
+          {EXPANSION_TABS.has(tab) && <BusinessExpansionSuite module={tab} clients={clients} professionals={professionals} />}
           {tab === 'security' && <SecurityAdmin clients={clients} />}
           {tab === 'ecosystem' && <EcosystemAdmin />}
           {tab === 'observability' && <ObservabilityAdmin />}
