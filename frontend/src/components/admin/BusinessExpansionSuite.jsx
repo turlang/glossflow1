@@ -78,11 +78,27 @@ export function BusinessExpansionSuite({ module, clients = [], professionals = [
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [portalUrl, setPortalUrl] = useState('');
+  const [inviteOrganizationId, setInviteOrganizationId] = useState('');
+  const [targetSalonSlug, setTargetSalonSlug] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
+  const [joinToken, setJoinToken] = useState('');
 
   async function load() {
     setBusy(true);
     try {
-      setData(await request(config.endpoint));
+      if (module === 'organizations') {
+        const [owned, memberships] = await Promise.all([
+          request(config.endpoint),
+          request('/admin/organizations/memberships')
+        ]);
+        setData({
+          ...owned,
+          memberships: memberships.memberships || [],
+          joinedOrganizations: memberships.organizations || []
+        });
+      } else {
+        setData(await request(config.endpoint));
+      }
       setStatus('');
     } catch (error) {
       setStatus(error.message);
@@ -94,10 +110,15 @@ export function BusinessExpansionSuite({ module, clients = [], professionals = [
   useEffect(() => {
     setForm({ ...DEFAULTS[module] });
     setPortalUrl('');
+    setInviteOrganizationId('');
+    setTargetSalonSlug('');
+    setInviteToken('');
+    setJoinToken('');
     void load();
   }, [module]);
 
   const rows = useMemo(() => rowsFrom(data).slice(0, 40), [data]);
+  const organizations = data?.organizations || [];
 
   function payload() {
     const normalized = { ...form };
@@ -131,6 +152,43 @@ export function BusinessExpansionSuite({ module, clients = [], professionals = [
     }
   }
 
+  async function createNetworkInvite(event) {
+    event.preventDefault();
+    if (!inviteOrganizationId || !targetSalonSlug.trim()) return;
+    setBusy(true);
+    try {
+      const response = await request(`/admin/organizations/${inviteOrganizationId}/invite`, {
+        method: 'POST',
+        body: JSON.stringify({ targetSalonSlug: targetSalonSlug.trim(), expiresInHours: 24 })
+      });
+      setInviteToken(response.token || '');
+      setStatus('Convite gerado. Envie o token somente ao ADMIN da unidade de destino.');
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function acceptNetworkInvite(event) {
+    event.preventDefault();
+    if (!joinToken.trim()) return;
+    setBusy(true);
+    try {
+      await request('/admin/organizations/join', {
+        method: 'POST',
+        body: JSON.stringify({ token: joinToken.trim() })
+      });
+      setJoinToken('');
+      setStatus('Convite aceito. A unidade foi vinculada sem compartilhar dados operacionais entre tenants.');
+      await load();
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="inventory-layout">
       <section className="panel-card inventory-summary full-span">
@@ -155,6 +213,28 @@ export function BusinessExpansionSuite({ module, clients = [], professionals = [
         <button className="primary full" type="submit" disabled={busy}>Salvar</button>
         {portalUrl && <label className="full-span">Link temporário do cliente<input readOnly value={portalUrl} onFocus={(event) => event.target.select()} /></label>}
       </form>
+
+      {module === 'organizations' && (
+        <section className="panel-card form-grid">
+          <h2 className="full-span">Vincular unidades com consentimento</h2>
+          <form className="full-span form-grid" onSubmit={createNetworkInvite}>
+            <label>Rede / organização
+              <select required value={inviteOrganizationId} onChange={(event) => setInviteOrganizationId(event.target.value)}>
+                <option value="">Selecione</option>
+                {organizations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <label>Slug da unidade convidada<input required value={targetSalonSlug} onChange={(event) => setTargetSalonSlug(event.target.value)} placeholder="salao-unidade-2" /></label>
+            <button className="secondary full" type="submit" disabled={busy}>Gerar convite de 24 horas</button>
+            {inviteToken && <label className="full-span">Token do convite<input readOnly value={inviteToken} onFocus={(event) => event.target.select()} /></label>}
+          </form>
+          <form className="full-span form-grid" onSubmit={acceptNetworkInvite}>
+            <label className="full-span">Aceitar convite recebido<textarea required value={joinToken} onChange={(event) => setJoinToken(event.target.value)} placeholder="Cole aqui o token enviado pelo administrador da rede" /></label>
+            <button className="primary full" type="submit" disabled={busy}>Aceitar como esta unidade</button>
+          </form>
+          <p className="panel-help full-span">O vínculo cria somente a estrutura corporativa. Clientes, agenda, estoque, financeiro e usuários continuam isolados por tenant.</p>
+        </section>
+      )}
 
       <section className="panel-card">
         <h2>Registros recentes</h2>
