@@ -132,7 +132,7 @@ export function AdminDashboard({ role, salon, services, professionals, portfolio
           {tab === 'subscription' && <SubscriptionAdmin subscription={subscription} reload={reload} />}
           {tab === 'automations' && <AutomationsAdmin whatsappTemplates={whatsappTemplates} insights={insights} reload={reload} />}
           {tab === 'assistant' && <AIAssistantAdmin services={services} professionals={professionals} appointments={appointments} inventory={inventory} clients={clients} financialEntries={financialEntries} insights={insights} />}
-          {EXPANSION_TABS.has(tab) && <BusinessExpansionSuite module={tab} clients={clients} professionals={professionals} />}
+          {EXPANSION_TABS.has(tab) && <BusinessExpansionSuite module={tab} clients={clients} professionals={professionals} services={services} inventory={inventory} appointments={appointments} />}
           {tab === 'security' && <SecurityAdmin clients={clients} />}
           {tab === 'ecosystem' && <EcosystemAdmin />}
           {tab === 'observability' && <ObservabilityAdmin />}
