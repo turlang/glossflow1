@@ -41,10 +41,17 @@ export async function transactionalHomologationRoutes(app: FastifyInstance) {
     for (const sale of sales) {
       const revenue = await prisma.financialEntry.findFirst({ where: { salonId, type: 'REVENUE', category: 'PDV', description: `Venda ${sale.number}` } });
       if (!revenue && sale.status !== 'REFUNDED') findings.push({ severity: 'ERROR', domain: 'POS_FINANCE', reference: sale.number, message: 'Venda paga sem lançamento financeiro PDV correspondente.' });
+
       for (const item of sale.items.filter((entry) => entry.kind === 'PRODUCT' && entry.inventoryProductId)) {
         const movement = await prisma.inventoryMovement.findFirst({ where: { salonId, productId: item.inventoryProductId!, type: 'OUT', reason: `Venda ${sale.number}` } });
         if (!movement || movement.quantity < item.quantity) findings.push({ severity: 'ERROR', domain: 'POS_STOCK', reference: sale.number, message: `Baixa de estoque ausente/incompleta para ${item.description}.` });
+
+        if (sale.status === 'REFUNDED') {
+          const restored = await prisma.inventoryMovement.findFirst({ where: { salonId, productId: item.inventoryProductId!, type: 'IN', reason: `Estorno ${sale.number}` } });
+          if (!restored || restored.quantity < item.quantity) findings.push({ severity: 'ERROR', domain: 'POS_REFUND_STOCK', reference: sale.number, message: `Estorno sem reposição completa de estoque para ${item.description}.` });
+        }
       }
+
       if (sale.status === 'REFUNDED') {
         const refund = await prisma.financialEntry.findFirst({ where: { salonId, type: 'EXPENSE', category: 'REFUND', description: `Estorno ${sale.number}` } });
         if (!refund) findings.push({ severity: 'ERROR', domain: 'POS_REFUND', reference: sale.number, message: 'Venda estornada sem lançamento financeiro de estorno.' });
@@ -58,12 +65,16 @@ export async function transactionalHomologationRoutes(app: FastifyInstance) {
         const received = movements.reduce((sum, movement) => sum + movement.quantity, 0);
         if (received < quantity) findings.push({ severity: 'ERROR', domain: 'PROCUREMENT_STOCK', reference: order.number, message: `Recebimento de estoque incompleto para produto ${productId}.` });
       }
+
+      const payable = await prisma.receivablePayable.findFirst({ where: { salonId, type: 'PAYABLE', description: { contains: order.number } } });
+      if (!payable) findings.push({ severity: 'WARN', domain: 'PROCUREMENT_FINANCE', reference: order.number, message: 'Pedido recebido sem conta a pagar identificável pelo número do pedido.' });
     }
 
     const now = new Date();
     for (const item of clientPackages) {
       if (item.remainingCredits < 0) findings.push({ severity: 'ERROR', domain: 'PACKAGES', reference: item.id, message: 'Pacote com saldo de créditos negativo.' });
       if (item.status === 'ACTIVE' && item.expiresAt <= now) findings.push({ severity: 'WARN', domain: 'PACKAGES', reference: item.id, message: 'Pacote vencido ainda marcado como ACTIVE.' });
+      if (item.status === 'CONSUMED' && item.remainingCredits !== 0) findings.push({ severity: 'ERROR', domain: 'PACKAGES', reference: item.id, message: 'Pacote CONSUMED possui saldo diferente de zero.' });
     }
 
     const errors = findings.filter((finding) => finding.severity === 'ERROR').length;
