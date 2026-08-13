@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { AuthContext } from '../routes/helpers';
 import { prisma } from '../lib/prisma';
+import { activeUserSessionWhere } from '../services/user-session.service';
 
 function resolveJwtSecret() {
   const secret = process.env.JWT_SECRET?.trim();
@@ -21,8 +22,7 @@ async function resolveSessionBoundContext(payload: AuthContext) {
       id: payload.sessionId,
       userId: payload.id,
       salonId: payload.salonId,
-      revokedAt: null,
-      expiresAt: { gt: new Date() }
+      ...activeUserSessionWhere()
     },
     include: {
       user: {
