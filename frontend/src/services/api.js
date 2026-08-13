@@ -6,6 +6,7 @@
  * - anexar JWT administrativo quando existir;
  * - renovar access token uma única vez em 401;
  * - compartilhar um único refresh entre chamadas concorrentes;
+ * - encerrar a sessão local/remota sem permitir reidratação por refresh antigo;
  * - persistir o comprovante de agendamento público;
  * - normalizar mensagens de erro da API.
  *
@@ -20,12 +21,41 @@ const AUTH_EXPIRED_CODE = 'AUTH_EXPIRED';
 const AUTH_EXPIRED_MESSAGE = 'Sua sessão expirou. Entre novamente para continuar.';
 const BOOKING_CONFIRMED_EVENT = 'glossflow:booking-confirmed';
 
+function storageValue(key) {
+  if (typeof localStorage === 'undefined') return '';
+  return localStorage.getItem(key) || '';
+}
+
 /**
  * Um refresh token é de uso único no backend. Requisições protegidas podem
  * receber 401 simultaneamente, então todas precisam compartilhar a mesma
  * rotação em vez de tentar consumir o mesmo refresh token em paralelo.
  */
 let refreshInFlight = null;
+let authGeneration = 0;
+let lastAccessToken = storageValue('glossflow.token');
+let lastRefreshToken = storageValue('glossflow.refreshToken');
+
+function rememberSession(accessToken, refreshToken) {
+  if (accessToken) lastAccessToken = accessToken;
+  if (refreshToken) lastRefreshToken = refreshToken;
+}
+
+function invalidateRefreshGeneration() {
+  authGeneration += 1;
+  refreshInFlight = null;
+}
+
+/**
+ * Registra uma autenticação recém-concluída. Além de manter uma cópia efêmera
+ * das credenciais atuais, invalida qualquer refresh iniciado pela sessão
+ * anterior para impedir que uma resposta atrasada sobrescreva o novo login.
+ */
+export function markAuthenticatedSession() {
+  invalidateRefreshGeneration();
+  lastAccessToken = storageValue('glossflow.token');
+  lastRefreshToken = storageValue('glossflow.refreshToken');
+}
 
 /**
  * Erro tipado de sessão expirada. A UI usa o `code` para distinguir expiração
@@ -78,11 +108,18 @@ function apiErrorMessage(data) {
 /** Limpa a sessão local e avisa o App quando a autenticação realmente expirou. */
 function clearSession({ notify = true } = {}) {
   const hadSession = Boolean(
-    localStorage.getItem('glossflow.token') || localStorage.getItem('glossflow.refreshToken')
+    storageValue('glossflow.token') || storageValue('glossflow.refreshToken') || lastAccessToken || lastRefreshToken
   );
 
-  localStorage.removeItem('glossflow.token');
-  localStorage.removeItem('glossflow.refreshToken');
+  invalidateRefreshGeneration();
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('glossflow.token');
+    localStorage.removeItem('glossflow.refreshToken');
+  }
+
+  lastAccessToken = '';
+  lastRefreshToken = '';
 
   if (notify && hadSession && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
@@ -90,7 +127,7 @@ function clearSession({ notify = true } = {}) {
 }
 
 /** Executa uma rotação específica sem permitir que chamadas concorrentes disputem o token. */
-async function performRefresh(refreshToken) {
+async function performRefresh(refreshToken, generation) {
   const response = await fetch(`${API_URL}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...publicTenantHeaders() },
@@ -100,8 +137,20 @@ async function performRefresh(refreshToken) {
   if (!response.ok) return null;
 
   const data = await response.json();
+
+  // Logout ou um novo login aconteceu enquanto a rotação estava em voo.
+  if (generation !== authGeneration) return null;
+
+  // Só a sessão que ainda possui o refresh que originou a chamada pode aceitar
+  // a rotação. Se o token sumiu (logout) ou mudou (novo login), descartamos a
+  // resposta para que ela nunca reidrate credenciais antigas no navegador.
+  if (storageValue('glossflow.refreshToken') !== refreshToken) {
+    return storageValue('glossflow.token') || null;
+  }
+
   if (data.token) localStorage.setItem('glossflow.token', data.token);
   if (data.refreshToken) localStorage.setItem('glossflow.refreshToken', data.refreshToken);
+  rememberSession(data.token, data.refreshToken);
   return data.token || null;
 }
 
@@ -110,15 +159,16 @@ async function performRefresh(refreshToken) {
  * Retorna `null` sem lançar quando a renovação não é mais possível.
  */
 async function refreshAccessToken() {
-  const refreshToken = localStorage.getItem('glossflow.refreshToken');
+  const refreshToken = storageValue('glossflow.refreshToken');
   if (!refreshToken) return null;
 
-  if (refreshInFlight?.refreshToken === refreshToken) {
+  const generation = authGeneration;
+  if (refreshInFlight?.refreshToken === refreshToken && refreshInFlight?.generation === generation) {
     return refreshInFlight.promise;
   }
 
-  const promise = performRefresh(refreshToken);
-  refreshInFlight = { refreshToken, promise };
+  const promise = performRefresh(refreshToken, generation);
+  refreshInFlight = { refreshToken, generation, promise };
 
   try {
     return await promise;
@@ -129,6 +179,34 @@ async function refreshAccessToken() {
 
 function isAuthBootstrapPath(path) {
   return path === '/auth/login' || path === '/auth/refresh';
+}
+
+/**
+ * Encerra a sessão do navegador imediatamente e tenta revogar a mesma sessão no
+ * servidor. A falha de rede não impede o logout local. O access token também é
+ * enviado porque ele identifica a UserSession mesmo quando o refresh acabou de
+ * ser rotacionado por uma chamada concorrente.
+ */
+export async function logoutSession({ accessToken = '', refreshToken = '' } = {}) {
+  const tokenForServer = accessToken || storageValue('glossflow.token') || lastAccessToken;
+  const refreshForServer = refreshToken || storageValue('glossflow.refreshToken') || lastRefreshToken;
+
+  clearSession({ notify: false });
+
+  try {
+    const response = await fetch(`${API_URL}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...publicTenantHeaders(),
+        ...(tokenForServer ? { Authorization: `Bearer ${tokenForServer}` } : {})
+      },
+      body: JSON.stringify(refreshForServer ? { refreshToken: refreshForServer } : {})
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -156,7 +234,7 @@ function persistBookingConfirmation(path, options, data) {
 
 /** Retenta com uma credencial mais nova quando a sessão mudou durante uma chamada antiga. */
 function hasNewerAccessToken(tokenUsed) {
-  const currentToken = localStorage.getItem('glossflow.token');
+  const currentToken = storageValue('glossflow.token');
   return Boolean(currentToken && currentToken !== tokenUsed);
 }
 
@@ -165,15 +243,16 @@ function hasNewerAccessToken(tokenUsed) {
  * `retry=false` impede loop infinito se o endpoint continuar retornando 401.
  */
 export async function request(path, options = {}, retry = true) {
-  let token = localStorage.getItem('glossflow.token');
+  let token = storageValue('glossflow.token');
+  rememberSession(token, storageValue('glossflow.refreshToken'));
 
-  if (!token && retry && !isAuthBootstrapPath(path) && localStorage.getItem('glossflow.refreshToken')) {
-    const refreshTokenBefore = localStorage.getItem('glossflow.refreshToken');
+  if (!token && retry && !isAuthBootstrapPath(path) && storageValue('glossflow.refreshToken')) {
+    const refreshTokenBefore = storageValue('glossflow.refreshToken');
     token = await refreshAccessToken();
 
     if (!token) {
-      const currentToken = localStorage.getItem('glossflow.token');
-      const currentRefresh = localStorage.getItem('glossflow.refreshToken');
+      const currentToken = storageValue('glossflow.token');
+      const currentRefresh = storageValue('glossflow.refreshToken');
 
       // Uma nova autenticação pode ter sido concluída enquanto o refresh antigo
       // ainda estava em voo. Nunca apagamos credenciais mais novas nesse caso.
@@ -204,7 +283,7 @@ export async function request(path, options = {}, retry = true) {
     }
 
     if (retry) {
-      const refreshTokenBefore = localStorage.getItem('glossflow.refreshToken');
+      const refreshTokenBefore = storageValue('glossflow.refreshToken');
       const newToken = await refreshAccessToken();
       if (newToken) return request(path, options, false);
 
@@ -212,7 +291,7 @@ export async function request(path, options = {}, retry = true) {
         return request(path, options, false);
       }
 
-      const currentRefresh = localStorage.getItem('glossflow.refreshToken');
+      const currentRefresh = storageValue('glossflow.refreshToken');
       if (currentRefresh && currentRefresh !== refreshTokenBefore) {
         return request(path, options, false);
       }
