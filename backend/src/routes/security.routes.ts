@@ -4,6 +4,7 @@ import { getTenant } from './helpers';
 import { eraseClientPersonalData, exportClientPersonalData } from '../services/lgpd.service';
 import { previewTenantRetention, runTenantRetention } from '../services/data-retention.service';
 import { createTenantBackup, restoreTenantBackup, verifyTenantBackup } from '../services/tenant-backup.service';
+import { activeUserSessionWhere, notRevokedUserSessionWhere } from '../services/user-session.service';
 import { z } from 'zod';
 
 /** Segurança corporativa com delegates explícitos do schema canônico. */
@@ -12,7 +13,7 @@ export async function securityRoutes(app: FastifyInstance) {
     const tenant = getTenant(request);
     const [auditCount, activeSessions, consents, backups] = await Promise.all([
       prisma.auditLog.count({ where: { salonId: tenant.salonId } }),
-      prisma.userSession.count({ where: { salonId: tenant.salonId, revokedAt: null, expiresAt: { gt: new Date() } } }),
+      prisma.userSession.count({ where: { salonId: tenant.salonId, ...activeUserSessionWhere() } }),
       prisma.lgpdConsent.count({ where: { salonId: tenant.salonId, granted: true } }),
       prisma.backupJob.findMany({ where: { salonId: tenant.salonId }, orderBy: { createdAt: 'desc' }, take: 1 })
     ]);
@@ -56,7 +57,7 @@ export async function securityRoutes(app: FastifyInstance) {
     const tenant = getTenant(request);
     const { id } = z.object({ id: z.string() }).parse(request.params);
     return prisma.userSession.updateMany({
-      where: { id, salonId: tenant.salonId, revokedAt: null },
+      where: { id, salonId: tenant.salonId, ...notRevokedUserSessionWhere() },
       data: { revokedAt: new Date() }
     });
   });
@@ -68,7 +69,7 @@ export async function securityRoutes(app: FastifyInstance) {
     return prisma.userSession.updateMany({
       where: {
         salonId: tenant.salonId,
-        revokedAt: null,
+        ...notRevokedUserSessionWhere(),
         ...(!body.includeCurrent && tenant.sessionId ? { id: { not: tenant.sessionId } } : {})
       },
       data: { revokedAt: new Date() }
@@ -77,7 +78,7 @@ export async function securityRoutes(app: FastifyInstance) {
 
   app.get('/admin/security/lgpd/export/:clientId', async (request, reply) => {
     const tenant = getTenant(request);
-    const { clientId } = z.object({ clientId: z.string() }).parse(request.params);
+    const { clientId } = z.object({ id: z.string() }).parse({ id: (request.params as { clientId?: string }).clientId });
     const bundle = await exportClientPersonalData(tenant.salonId, clientId);
     if (!bundle) return reply.status(404).send({ message: 'Cliente não encontrado.' });
     reply.header('Cache-Control', 'no-store');
