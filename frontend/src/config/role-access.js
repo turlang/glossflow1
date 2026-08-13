@@ -10,11 +10,15 @@ export const DASHBOARD_MENU_KEYS_BY_ROLE = Object.freeze({
     'executive', 'onboarding', 'analytics', 'services', 'professionals', 'portfolio',
     'appointments', 'inventory', 'users', 'clients', 'financial', 'commissions',
     'loyalty', 'subscription', 'automations', 'assistant', 'security', 'ecosystem',
-    'observability', 'ux', 'pwa'
+    'observability', 'ux', 'pwa',
+    'pos', 'customer-plans', 'procurement', 'team-management', 'clinical',
+    'marketing', 'client-portal', 'organizations', 'resources', 'finance-advanced'
   ]),
   [ROLES.RECEPTION]: Object.freeze([
     'executive', 'onboarding', 'services', 'professionals', 'portfolio', 'appointments',
-    'inventory', 'clients', 'loyalty', 'automations', 'assistant', 'ux', 'pwa'
+    'inventory', 'clients', 'loyalty', 'automations', 'assistant', 'ux', 'pwa',
+    'pos', 'customer-plans', 'procurement', 'team-management',
+    'marketing', 'client-portal', 'resources'
   ]),
   [ROLES.PROFESSIONAL]: Object.freeze(['executive', 'appointments', 'ux', 'pwa'])
 });

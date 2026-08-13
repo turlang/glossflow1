@@ -13,7 +13,17 @@ const TITLE_TO_MODULE = {
   'Fidelidade': 'FIDELIDADE',
   'Automações': 'WHATSAPP',
   'Assistente IA': 'IA',
-  'Métricas Avançadas': 'ANALYTICS'
+  'Métricas Avançadas': 'ANALYTICS',
+  'PDV / Checkout': 'POS',
+  'Pacotes': 'PACOTES',
+  'Compras': 'COMPRAS',
+  'Equipe & Folha': 'EQUIPE',
+  'Anamnese': 'CLINICO',
+  'Marketing 360': 'MARKETING',
+  'Portal do Cliente': 'PORTAL_CLIENTE',
+  'Multiunidade': 'MULTIUNIDADE',
+  'Recursos': 'RECURSOS',
+  'Financeiro Avançado': 'FINANCEIRO_ADV'
 };
 
 const PLATFORM_ONLY_TITLES = new Set([
@@ -100,10 +110,6 @@ function findBackofficeNav() {
   ) || null;
 }
 
-/**
- * Camada visual de entitlements do salão.
- * O sino é montado no fluxo normal do header e somente para role ADMIN.
- */
 export function ModuleVisibilityGuard({ salon }) {
   const [notificationHost, setNotificationHost] = useState(null);
 

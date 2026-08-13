@@ -413,3 +413,456 @@ model BackupJob {
 
   @@index([salonId])
 }
+
+// -----------------------------------------------------------------------------
+// Marcos 25–34 — expansão comercial do GlossFlow
+// Novos domínios usam salonId como chave explícita de isolamento. Relações com
+// modelos legados permanecem por ids escalares para permitir evolução gradual
+// sem acoplar migrações operacionais aos cadastros existentes.
+// -----------------------------------------------------------------------------
+
+model Sale {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  number        String
+  clientId      String?  @db.ObjectId
+  appointmentId String?  @db.ObjectId
+  subtotal      Float
+  discount      Float    @default(0)
+  total         Float
+  status        String   @default("PAID")
+  notes         String   @default("")
+  salonId       String   @db.ObjectId
+  createdAt     DateTime @default(now())
+  closedAt      DateTime?
+  items         SaleItem[]
+  payments      SalePayment[]
+
+  @@index([salonId])
+  @@index([createdAt])
+  @@index([clientId])
+}
+
+model SaleItem {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  saleId             String   @db.ObjectId
+  sale               Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  kind               String
+  description        String
+  quantity           Int
+  unitPrice          Float
+  total              Float
+  serviceId          String?  @db.ObjectId
+  inventoryProductId String?  @db.ObjectId
+  professionalId     String?  @db.ObjectId
+  salonId            String   @db.ObjectId
+  createdAt          DateTime @default(now())
+
+  @@index([salonId])
+  @@index([saleId])
+}
+
+model SalePayment {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  saleId            String   @db.ObjectId
+  sale              Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  method            String
+  amount            Float
+  status            String   @default("CAPTURED")
+  externalReference String?
+  salonId           String   @db.ObjectId
+  createdAt         DateTime @default(now())
+
+  @@index([salonId])
+  @@index([saleId])
+}
+
+model PackageOffer {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  description  String   @default("")
+  price        Float
+  totalCredits Int
+  serviceIds   String[] @default([]) @db.ObjectId
+  validityDays Int      @default(90)
+  active       Boolean  @default(true)
+  salonId      String   @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+model ClientPackage {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientId         String   @db.ObjectId
+  packageOfferId   String   @db.ObjectId
+  remainingCredits Int
+  status           String   @default("ACTIVE")
+  purchasedAt      DateTime @default(now())
+  expiresAt        DateTime
+  salonId          String   @db.ObjectId
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([clientId])
+}
+
+model MembershipPlan {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  description   String   @default("")
+  monthlyPrice  Float
+  benefits      Json?
+  active        Boolean  @default(true)
+  salonId       String   @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+model ClientMembership {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientId      String   @db.ObjectId
+  planId        String   @db.ObjectId
+  status        String   @default("ACTIVE")
+  startedAt     DateTime @default(now())
+  nextBillingAt DateTime?
+  canceledAt    DateTime?
+  salonId       String   @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([clientId])
+}
+
+model GiftCard {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  code           String   @unique
+  clientId       String?  @db.ObjectId
+  purchaserName  String   @default("")
+  recipientName  String   @default("")
+  initialBalance Float
+  balance        Float
+  status         String   @default("ACTIVE")
+  expiresAt      DateTime?
+  salonId        String   @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([clientId])
+}
+
+model Supplier {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  document  String   @default("")
+  phone     String   @default("")
+  email     String   @default("")
+  contact   String   @default("")
+  notes     String   @default("")
+  active    Boolean  @default(true)
+  salonId   String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+model PurchaseOrder {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  supplierId String   @db.ObjectId
+  number     String
+  status     String   @default("OPEN")
+  items      Json
+  total      Float
+  orderedAt  DateTime @default(now())
+  expectedAt DateTime?
+  receivedAt DateTime?
+  notes      String   @default("")
+  salonId    String   @db.ObjectId
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([supplierId])
+}
+
+model TimeClockEntry {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  professionalId String   @db.ObjectId
+  type           String
+  occurredAt     DateTime @default(now())
+  notes          String   @default("")
+  salonId        String   @db.ObjectId
+  createdAt      DateTime @default(now())
+
+  @@index([salonId])
+  @@index([professionalId])
+  @@index([occurredAt])
+}
+
+model StaffGoal {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  professionalId String   @db.ObjectId
+  metric         String
+  target         Float
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         String   @default("ACTIVE")
+  salonId        String   @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([professionalId])
+}
+
+model PayrollRun {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  periodStart DateTime
+  periodEnd   DateTime
+  status      String   @default("DRAFT")
+  entries     Json
+  grossTotal  Float
+  notes       String   @default("")
+  salonId     String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([periodStart])
+}
+
+model ClinicalRecord {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientId      String   @db.ObjectId
+  appointmentId String?  @db.ObjectId
+  recordType    String   @default("ANAMNESIS")
+  answers       Json?
+  allergies     String   @default("")
+  notes         String   @default("")
+  photoUrls     String[] @default([])
+  signedBy      String   @default("")
+  signedAt      DateTime?
+  consentText   String   @default("")
+  salonId       String   @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([clientId])
+}
+
+model MarketingCampaign {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  channel     String
+  segment     String   @default("ALL")
+  message     String
+  status      String   @default("DRAFT")
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  metrics     Json?
+  salonId     String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([status])
+}
+
+model ReviewRequest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientId  String   @db.ObjectId
+  channel   String   @default("WHATSAPP")
+  status    String   @default("PENDING")
+  reviewUrl String   @default("")
+  sentAt    DateTime?
+  ratedAt   DateTime?
+  rating    Int?
+  salonId   String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([clientId])
+}
+
+model Coupon {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  code           String
+  description    String   @default("")
+  discountType   String   @default("PERCENT")
+  discountValue  Float
+  startsAt       DateTime?
+  expiresAt      DateTime?
+  usageLimit     Int?
+  usedCount      Int      @default(0)
+  active         Boolean  @default(true)
+  salonId        String   @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([code])
+}
+
+model ClientPortalAccess {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  tokenHash  String    @unique
+  clientId   String    @db.ObjectId
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  salonId    String    @db.ObjectId
+  createdAt  DateTime  @default(now())
+
+  @@index([salonId])
+  @@index([clientId])
+}
+
+model Organization {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  document  String   @default("")
+  status    String   @default("ACTIVE")
+  salonId   String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+model OrganizationLocation {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId  String   @db.ObjectId
+  locationSalonId String   @db.ObjectId
+  label           String
+  status          String   @default("ACTIVE")
+  salonId         String   @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([organizationId])
+  @@index([locationSalonId])
+}
+
+model BusinessResource {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  type      String
+  capacity  Int      @default(1)
+  active    Boolean  @default(true)
+  notes     String   @default("")
+  salonId   String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+model ResourceReservation {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  resourceId    String   @db.ObjectId
+  appointmentId String?  @db.ObjectId
+  startTime     DateTime
+  endTime       DateTime
+  status        String   @default("RESERVED")
+  notes         String   @default("")
+  salonId       String   @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([resourceId])
+  @@index([startTime])
+}
+
+model CostCenter {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String   @default("")
+  active      Boolean  @default(true)
+  salonId     String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+model CashSession {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  openedBy      String   @db.ObjectId
+  openedAt      DateTime @default(now())
+  openingAmount Float
+  closedAt      DateTime?
+  closingAmount Float?
+  status        String   @default("OPEN")
+  notes         String   @default("")
+  salonId       String   @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([openedAt])
+}
+
+model ReceivablePayable {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  type          String
+  description   String
+  category      String   @default("")
+  amount        Float
+  dueDate       DateTime
+  settledAt     DateTime?
+  status        String   @default("OPEN")
+  paymentMethod String?
+  costCenterId  String?  @db.ObjectId
+  salonId       String   @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model FinancialReconciliation {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  provider    String
+  periodStart DateTime
+  periodEnd   DateTime
+  expected    Float
+  settled     Float
+  difference  Float
+  status      String   @default("PENDING")
+  details     Json?
+  salonId     String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([salonId])
+}
+
+model FiscalDocument {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  saleId     String?  @db.ObjectId
+  externalId String?
+  number     String   @default("")
+  status     String   @default("PENDING")
+  amount     Float
+  provider   String   @default("")
+  issuedAt   DateTime?
+  payload    Json?
+  salonId    String   @db.ObjectId
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([salonId])
+  @@index([saleId])
+}
