@@ -69,15 +69,15 @@ A branch possui um commit exclusivo (`96318951...`) com versão inicial do diagn
 - registro em `appRoutes.ts`;
 - teste `marco35-transactional-homologation.test.js`.
 
-Portanto a branch é **superseded**, não deve ser mesclada. Preservar apenas pelo histórico do commit/PR se necessário.
+Portanto a branch é **superseded**, não deve ser mesclada.
 
 ### `agent/marco-35-consolidacao`
 
-A comparação encontrou três commits exclusivos. Dois conteúdos estavam claramente superados pelo catálogo atual, mas havia uma peça útil que não tinha chegado ao `main`:
+A comparação encontrou três commits exclusivos. Dois conteúdos estavam superados pelo catálogo atual, mas havia uma peça útil que não tinha chegado ao `main`:
 
 - `platform-module-readiness.routes.ts` — endpoint read-only `/platform-admin/modules/readiness`.
 
-O Marco 36 recuperou seletivamente essa rota para o candidato atual, registrando-a somente dentro do wrapper `SUPER_ADMIN` e usando o **catálogo de maturidade atual**, sem trazer de volta percentuais/descrições antigos.
+O Marco 36 recuperou seletivamente essa rota para o candidato atual, registrando-a somente dentro do wrapper `SUPER_ADMIN` e usando o **catálogo de maturidade atual**, sem trazer de volta percentuais/descrições antigos. Um teste dedicado também garante o registro no wrapper correto e a matriz 8/8/3.
 
 Após o merge do Marco 36 e gates verdes, essa branch passa a ser candidata à remoção.
 
@@ -85,24 +85,31 @@ Após o merge do Marco 36 e gates verdes, essa branch passa a ser candidata à r
 
 O único commit exclusivo adiciona apenas `.noop` com conteúdo `ignore`. Não contém capacidade de produto e é candidata à remoção.
 
-## Branches que exigem conferência final antes da exclusão
+## Conferência final das branches ambíguas
 
-Estas refs devem ser comparadas individualmente com `main` antes da remoção, mesmo quando o nome sugere correção já absorvida:
+### `fix/auth-refresh-single-flight-v2`
 
-- `fix/auth-refresh-single-flight-v2`;
-- `fix/logout-explicit-handler`;
-- `fix/logout-session-lifecycle`;
-- `fix/mongodb-session-null-semantics-ci`;
-- qualquer branch nova criada após esta auditoria.
+A branch diverge porque possui seis commits próprios em `frontend/src/services/api.js` e testes. A versão atual do `main` já contém a proteção single-flight e adiciona hardening posterior com `authGeneration`, invalidação de refresh em logout/novo login, proteção contra reidratação por resposta atrasada e logout remoto. A branch é **superseded** e não deve ser mesclada.
 
-A regra é simples: se houver commit exclusivo com mudança funcional ainda ausente em `main`, recuperar seletivamente em PR atual; nunca mesclar a branch velha inteira.
+### `fix/logout-explicit-handler`
 
-## Resultado da auditoria até aqui
+A comparação mostrou a branch como ancestral de `main`: zero commits exclusivos e `main` 62 commits à frente. Candidata segura à remoção.
 
-- nenhum PR aberto na baseline auditada;
+### `fix/logout-session-lifecycle`
+
+A branch possui cinco commits próprios em auth/logout, App e cliente HTTP. O `main` contém a evolução posterior desse mesmo ciclo, incluindo `logoutSession`, geração de autenticação, revogação server-side e testes mais recentes. A branch é **superseded** e não deve ser mesclada.
+
+### `fix/mongodb-session-null-semantics-ci`
+
+A comparação mostrou a branch como ancestral de `main`: zero commits exclusivos e `main` 70 commits à frente. Candidata segura à remoção.
+
+## Resultado da auditoria
+
+- nenhum PR estava aberto na baseline auditada;
 - `main` e produção estavam sincronizados no fechamento do Marco 35;
 - branches antigas não representam automaticamente código faltante;
 - uma capacidade útil realmente ausente foi encontrada e recuperada seletivamente: readiness de módulos para SUPER_ADMIN;
+- as quatro branches inicialmente ambíguas foram resolvidas como ancestrais ou superseded;
 - nenhuma branch antiga foi mesclada novamente;
 - nenhuma limpeza destrutiva de dados foi executada.
 
@@ -110,7 +117,6 @@ A regra é simples: se houver commit exclusivo com mudança funcional ainda ause
 
 1. Quality Gate e Production Gate do candidato Marco 36 verdes;
 2. rota de readiness e teste aprovados;
-3. branches ambíguas comparadas individualmente;
-4. PR do Marco 36 mesclado;
-5. somente então remover refs históricas classificadas como seguras;
-6. revalidar `main` e Production Smoke após qualquer promoção de código para produção.
+3. PR do Marco 36 revisado/mesclado;
+4. somente então remover refs históricas classificadas como seguras;
+5. revalidar `main` e Production Smoke após qualquer promoção de código para produção.
