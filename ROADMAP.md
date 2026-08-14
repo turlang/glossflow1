@@ -1,254 +1,373 @@
 # GlossFlow Smart — Roadmap Oficial
 
-Data-base: 2026-08-12.
+Data-base: 2026-08-13.
 
-Este documento é a fonte canônica para a evolução do GlossFlow. A Issue #19 é a evidência canônica de encerramento de produção do Marco 24 para evitar que um commit documental posterior altere novamente o SHA já homologado.
+Este documento é a fonte canônica da evolução do GlossFlow. A execução e evidências do ciclo atual são registradas na **Issue #28 — Marco 35: Consolidação e homologação dos 19 módulos**.
 
 ## Estado do produto
 
-O GlossFlow está em **produção ativa e Release Candidate comercial**.
+O GlossFlow está em **produção ativa**. Os Marcos 1–24 consolidaram a fundação comercial; os Marcos 25–34 ampliaram o catálogo operacional; o **Marco 35** integra, endurece e homologa os 19 módulos antes de qualquer nova expansão de domínio.
 
-Os **Marcos 1–23 estão concluídos e validados em produção**. O **Marco 24 — Release comercial estável** está **CONCLUÍDO FUNCIONALMENTE / RELEASE CANDIDATE**, pendente exclusivamente de:
-
-```text
-merge PR #20
-  ↓
-Vercel + Render no SHA exato do merge
-  ↓
-/ready com MongoDB no mesmo build
-  ↓
-Production Smoke Validation final verde
-  ↓
-Issue #19 closed/completed
-```
-
-Quando essa sequência for cumprida, o Marco 24 é considerado **VALIDADO EM PRODUÇÃO** sem necessidade de novo commit documental.
+A produção foi comprovada com exact-build smoke até a Etapa 5 do Marco 35. As Etapas 6–7 estão no `main` e aguardam o deploy final único do backend no Render para o fechamento oficial.
 
 ---
 
-# Ciclo concluído em produção — Marcos 1–23
+# Ciclo 1 — Fundação comercial — Marcos 1–24
 
 ## Marcos 1–15 — Fundação, higiene e modularização — CONCLUÍDOS
 
-A base foi higienizada, modularizada e protegida por gates permanentes. Inclui Admin, Agenda Enterprise, backend testável, rotas modulares, agente WhatsApp, webhook, domínio comercial, documentação e hygiene final.
+- base full-stack higienizada;
+- rotas e serviços modularizados;
+- Admin, Agenda e operação comercial;
+- WhatsApp/IA inicial;
+- gates permanentes;
+- documentação e runbooks.
 
 ## Marco 16 — Homologação funcional por papel — CONCLUÍDO
 
-RBAC homologado para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`; Agenda do profissional permanece somente leitura enquanto não existe associação explícita `User ↔ Professional`.
+RBAC para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`.
 
-## Marco 17 — Agenda comercial e jornada do cliente — CONCLUÍDO
+## Marco 17 — Agenda comercial — CONCLUÍDO
 
-Central de operação diária, Smart Fit, lista de espera, confirmações, conflitos e comunicação.
+Agenda operacional, Smart Fit, lista de espera, conflitos, reagendamento, confirmação e comunicação.
 
-## Marco 18 — Estoque operacional e reposição — CONCLUÍDO
+## Marco 18 — Estoque — CONCLUÍDO
 
-Movimentação, conciliação, ruptura, histórico, capital e plano de reposição.
+Entradas, saídas, ajustes, conciliação, mínimo/ruptura, histórico e reposição.
 
-## Marco 19 — CRM, retenção e automações — CONCLUÍDO
+## Marco 19 — CRM e retenção — CONCLUÍDO
 
-Segmentação, histórico, consentimento, opt-out e follow-up.
+Cadastro, histórico, segmentação, consentimento, opt-out, follow-up e retenção.
 
-## Marco 20 — Assistente IA e WhatsApp — CONCLUÍDO
+## Marco 20 — IA e WhatsApp — CONCLUÍDO NA BASE FUNCIONAL
 
-Base factual, confirmação server-side, handoff, política de janela/template e métricas.
+Base factual, confirmação server-side, handoff, política de janela/template, webhook, métricas e guards. A homologação de sender definitivo continua dependente do provider de cada tenant.
 
 ## Marco 21 — Super Admin e ciclo de vida SaaS — CONCLUÍDO
 
-Provisionamento, estados `TRIAL/ACTIVE/PAST_DUE/CANCELED`, módulos, billing preparado, white-label e auditoria.
+Provisionamento, `TRIAL/ACTIVE/PAST_DUE/CANCELED`, módulos/entitlements, white-label, billing preparado e auditoria.
 
-## Marco 22 — Observabilidade, performance e confiabilidade — CONCLUÍDO
+## Marco 22 — Observabilidade e confiabilidade — CONCLUÍDO
 
-Entregue:
+`X-Request-Id`, Build ID, `/health`, `/ready`, MongoDB readiness, métricas, Prometheus, painel global, índices e budgets de performance.
 
-- `X-Request-Id` e Build ID rastreável;
-- `/health` para liveness;
-- `/ready` com ping real do MongoDB;
-- p50/p95/p99, erros, slow requests, memória e métricas por dependência;
-- exportação Prometheus;
-- painel global de observabilidade para `SUPER_ADMIN`;
-- instrumentação de IA, MongoDB e webhooks;
-- índices MongoDB idempotentes;
-- paginação CRM;
-- code splitting e budget permanente de bundle.
+## Marco 23 — Segurança e LGPD — CONCLUÍDO E VALIDADO
 
-O incidente de deploy stale foi registrado e o smoke foi posteriormente endurecido para rejeitar build antigo.
+Sessões revogáveis, refresh rotation, RBAC, rate limit, auditoria, LGPD export/anonymization, retenção controlada, backup assinado e restore guardado.
 
-## Marco 23 — Segurança e LGPD comercial — CONCLUÍDO E VALIDADO EM PRODUÇÃO
+## Marco 24 — Release comercial estável — CONCLUÍDO
 
-### Sessões e autenticação
+O ciclo de release foi promovido e validado; o fluxo permanente passou a exigir:
 
-- access token vinculado a `UserSession` via `sessionId`;
-- sessão revogada/expirada invalida o token no servidor;
-- usuário desativado deixa de autenticar;
-- `role`, `email` e `salonId` revalidados contra persistência;
-- token legado sem `sessionId` rejeitado em produção;
-- refresh token rotacionado a cada uso;
-- replay do refresh anterior rejeitado.
+```text
+Quality Gate
+  ↓
+Production Gate
+  ↓
+Vercel + Render no SHA exato
+  ↓
+/ready + MongoDB no mesmo build
+  ↓
+Production Smoke Validation
+```
 
-### Segurança comercial
-
-- RBAC por papel preservado;
-- rate limit por superfície/IP e tenant;
-- auditoria correlacionada por `requestId`/`sessionId` sem body sensível;
-- exportação LGPD tenant-safe;
-- eliminação/anônimização com confirmação explícita;
-- retenção manual/controlada;
-- snapshot de backup assinado;
-- restore guardado e desligado na operação normal.
-
-### Validação final de produção
-
-- PR #17 integrado;
-- correção strict-smoke PR #18 integrada;
-- commit validado: `afc22563d54645a8555cbafc53b1a9b6b31f2713`;
-- Render: Build ID `afc22563d546`;
-- `/health`: `ok=true`, header/body no mesmo Build ID;
-- `/ready`: `ok=true`, mesmo Build ID e `database.ok=true`;
-- backend: **100/100 testes**;
-- frontend: **61/61 testes**;
-- Quality Gate: **success**;
-- Production Gate: **success**;
-- Production Smoke Validation estrito: **success**;
-- Issue #14: **closed/completed**.
+A antiga condição de Release Candidate/PR #20 não é mais o estado atual do produto.
 
 ---
 
-# Marco 24 — Release comercial estável — RELEASE CANDIDATE
+# Ciclo 2 — Expansão comercial — Marcos 25–34
 
-Issue: #19. PR: #20.
+## Marco 25 — PDV / Checkout — IMPLEMENTADO
 
-Objetivo: transformar o produto tecnicamente maduro em uma release vendável e implantável de forma repetível, com decisão GO/NO-GO baseada em evidência.
+- vendas e itens;
+- múltiplos pagamentos;
+- estoque e financeiro;
+- estorno;
+- integração posterior com Agenda/Pacotes no Marco 35.
 
-## 1. Gate comercial — CONCLUÍDO
+## Marco 26 — Pacotes, Assinaturas e Gift Cards — IMPLEMENTADO
 
-`PRODUCTION_CHECKLIST.md` diferencia:
+- ofertas de pacote;
+- créditos e validade;
+- memberships;
+- gift cards;
+- consumo de crédito integrado ao checkout no Marco 35.
 
-- `AUTO-BLOCKER`;
-- `MANUAL-TENANT`;
-- `SANDBOX-EXTERNO`;
-- `N/A`.
+## Marco 27 — Compras e Fornecedores — IMPLEMENTADO
 
-A release não pode ser declarada aprovada por suposição.
+- fornecedores;
+- pedidos;
+- recebimento;
+- estoque/custo;
+- integração segura com contas a pagar consolidada no Marco 35.
 
-## 2. Matriz canônica de release — CONCLUÍDO
+## Marco 28 — Equipe, Ponto, Metas e Folha — IMPLEMENTADO
 
-`docs/engineering/MARCO24_RELEASE_VALIDATION.md` concentra:
+- ponto;
+- metas;
+- folha operacional;
+- validação de sequência de ponto e períodos sobrepostos consolidada no Marco 35.
 
-- baseline técnica;
-- evidências;
-- integrações;
-- riscos;
-- operações proibidas em homologação;
-- critério GO/NO-GO;
-- fechamento de produção.
+## Marco 29 — Clínico / Prontuário — IMPLEMENTADO
 
-## 3. Homologação pública desktop/mobile — CONCLUÍDA
+- anamnese;
+- tratamento/evolução;
+- alergias;
+- consentimento;
+- vínculo ao atendimento;
+- hardening de segurança/LGPD no Marco 35.
 
-Navegador real Chromium, sem login e sem escrita em produção.
+## Marco 30 — Marketing 360 — IMPLEMENTADO / EVOLUÇÃO PENDENTE
 
-Páginas:
+- campanhas;
+- cupons;
+- avaliações;
+- audiência baseada em consentimento;
+- preview/preparação para provider.
 
-- vitrine pública;
-- booking;
-- landing comercial.
+Ainda depende de worker/provider real, scheduler, gatilhos automáticos e métricas de conversão para sair de `EVOLUTION_REQUIRED`.
 
-Viewports:
+## Marco 31 — Portal do Cliente — IMPLEMENTADO
 
-- 1366×768;
-- 1920×1080;
-- 768×1024;
-- 430×932;
-- 360×800.
+- token aleatório com SHA-256 persistido;
+- expiração/revogação;
+- visão tenant/client-scoped;
+- rotação de link ativo e hardening no Marco 35.
 
-Resultado:
+## Marco 32 — Multiunidade / Redes — IMPLEMENTADO / EVOLUÇÃO PENDENTE
 
-- **15/15 PASS**;
-- HTTP 200 nas 15 combinações;
-- nenhum overflow horizontal bloqueador;
-- nenhum `pageerror`;
-- nenhum erro visível de API;
-- booking disponível;
-- screenshots + `report.json` preservados como artefato de CI;
-- runtime isolado de navegador auditado e sem vulnerabilidade bloqueadora.
+- convite HMAC direcionado;
+- expiração;
+- aceite por ADMIN do tenant correto;
+- saída/revogação;
+- zero compartilhamento operacional implícito.
 
-Workflow endurecido: `Marco 24 Public Responsive Validation`.
+Dashboards corporativos e qualquer compartilhamento de CRM/Agenda/Estoque/Financeiro exigem política explícita antes da implementação.
 
-## 4. Domínios críticos — REVALIDADOS
+## Marco 33 — Recursos Físicos — IMPLEMENTADO
 
-Baseline automatizada:
+Salas, cadeiras, macas, equipamentos, capacidade, reservas e integração com Agenda/checkout no Marco 35.
 
-- backend **100/100**;
-- frontend **61/61**;
-- Agenda comercial e conflitos: cobertos;
-- Estoque operacional: coberto;
-- CRM/consentimento: coberto;
-- IA/WhatsApp: contratos, webhook, idempotência e guards cobertos;
-- Super Admin/provisionamento/lifecycle: cobertos;
-- Segurança/LGPD/backup: cobertos sem operação destrutiva em produção.
+## Marco 34 — Financeiro Avançado / Fiscal — IMPLEMENTADO / EVOLUÇÃO PENDENTE
 
-Nenhuma mensagem WhatsApp real, eliminação LGPD, retenção destrutiva, restore, alteração de estoque ou criação de cliente/agendamento real foi usada para homologar a release.
+- centros de custo;
+- caixa;
+- contas a pagar/receber;
+- liquidação;
+- conciliação;
+- sincronização de compras;
+- metadados/evidência fiscal.
 
-## 5. Documentação de implantação e suporte — CONCLUÍDA
+NFS-e real continua dependente de provider fiscal autorizado.
 
-Revisados/atualizados:
+---
 
-- `README.md`;
-- `ROADMAP.md`;
-- `PRODUCTION_CHECKLIST.md`;
-- `DEPLOY_RENDER_VERCEL.md`;
-- `docs/RUNBOOK_OPERACIONAL.md`;
-- `docs/usuario/07_CHECKLIST_IMPLANTACAO.md`;
-- `docs/engineering/MARCO24_RELEASE_VALIDATION.md`.
+# Marco 35 — Consolidação e Homologação dos 19 módulos — EM FECHAMENTO
 
-Implantação de tenant agora separa release base, dados do cliente, provider externo, homologação e treinamento.
+Issue canônica: **#28**.
 
-## 6. Integrações opcionais
+## Objetivo
 
-Na readiness da baseline de entrada:
+Não adicionar novos domínios. Consolidar integração, consistência transacional, isolamento multi-tenant, diagnósticos, UX necessária à homologação e documentação real do produto.
 
-- OpenAI: connected;
-- WhatsApp via Twilio Trial: connected;
-- Deploy validável: connected;
-- Mercado Pago: missing;
-- Stripe: missing;
-- Sentry: missing.
+## Etapa 1 — Matriz canônica de maturidade — CONCLUÍDA
 
-Interpretação:
+`backend/src/services/module-readiness.service.ts` tornou-se a fonte tipada para estado e maturidade dos 19 módulos.
 
-- Mercado Pago/Stripe não bloqueiam plano sem billing automático integrado;
-- Sentry permanece hardening opcional enquanto não fizer parte de SLA contratado;
-- Twilio Trial é sandbox/trial, não linha definitiva do cliente;
-- provider ausente nunca deve ser exibido como conectado.
+## Etapa 2 — Homologação transacional — CONCLUÍDA
 
-## 7. P0/P1 — SEM BLOQUEIO CONHECIDO
+`GET /admin/homologation/transactional`
 
-Na revisão final do candidato, os únicos itens abertos no repositório são:
+Cobertura: PDV, Estoque, Compras, Financeiro e Pacotes.
 
-- Issue #19 — execução/fechamento do próprio Marco 24;
-- PR #20 — Release Candidate.
+Detecta, entre outros casos:
 
-Não existe issue conhecida aberta classificada como regressão P0/P1.
+- venda sem receita;
+- produto vendido sem saída de estoque;
+- estorno sem financeiro/devolução;
+- compra recebida sem estoque/financeiro;
+- inconsistências de saldo/validade de pacote.
 
-## 8. Decisão funcional
+## Etapa 3 — Homologação operacional — CONCLUÍDA
 
-**GO PARA PROMOÇÃO.**
+`GET /admin/homologation/operations`
 
-A release candidate atende os critérios funcionais, de segurança, documentação, responsividade e automação necessários para seguir ao deploy final.
+Cobertura: Equipe, Clínico, Portal e Recursos.
 
-## 9. Única pendência de encerramento
+Inclui verificações de referência, vínculo, consentimento, token/expiração e capacidade/overbooking.
 
-Após o merge do PR #20:
+## Etapa 4 — Evolução controlada — CONCLUÍDA NO ESCOPO DO MARCO
 
-1. Quality Gate do `main` precisa ficar verde;
-2. Production Gate do `main` precisa ficar verde;
-3. Vercel precisa publicar o SHA do merge;
-4. Render precisa servir exatamente os 12 primeiros caracteres desse SHA;
-5. `/ready` precisa responder no mesmo build com `database.ok=true`;
-6. `Production Smoke Validation` precisa ficar verde;
-7. Issue #19 é fechada como `completed` com as evidências.
+`GET /admin/homologation/evolution`
 
-### Critério de saída
+Entregue:
 
-Quando os sete itens acima estiverem satisfeitos:
+- Marketing: preparação de audiência tenant-safe com consentimento;
+- Multiunidade: saída/revogação e vínculo sem compartilhamento operacional;
+- Financeiro Avançado: compras → contas a pagar e evidência fiscal obrigatória antes de `ISSUED`.
 
-**GlossFlow = Release Comercial Estável, apto a ser vendido e operado como SaaS multi-tenant com implantação repetível, sem regressão crítica conhecida e com evidência rastreável do build de produção.**
+Os três continuam `EVOLUTION_REQUIRED` porque dependem de capacidades externas/políticas que não devem ser simuladas.
+
+## Etapa 5 — Checkout integrado — CONCLUÍDA E VALIDADA EM PRODUÇÃO
+
+Fluxo:
+
+```text
+Agenda
+  ↓
+Recursos
+  ↓
+Pacote elegível
+  ↓
+PDV
+  ↓
+Estoque + Financeiro
+  ↓
+Atendimento concluído / recurso liberado
+```
+
+Entregue:
+
+- preview server-side;
+- preços calculados no backend;
+- consumo automático de crédito;
+- idempotência por atendimento;
+- reserva/liberação de recurso;
+- venda, pagamentos, estoque, pacote, financeiro e atendimento na mesma transação Prisma;
+- UI de checkout na Agenda;
+- `GET /admin/homologation/checkout-flow`.
+
+O exact-build Production Smoke foi validado no build `3b6debc2814a`.
+
+## Etapa 6 — Hardening dos módulos em validação — CONCLUÍDA NO CÓDIGO
+
+`GET /admin/homologation/validation-suite`
+
+### WhatsApp
+
+- diagnóstico de provider/templates;
+- provider incompleto = erro;
+- Twilio Trial = aviso, nunca homologação comercial final.
+
+### Compras
+
+- recebimento completo em transação única;
+- estoque + custo + movimento `IN` + conta a pagar + `RECEIVED`;
+- rota legada da UI preservada via interceptação segura;
+- rota `/receive-safe` disponível;
+- recebimento parcial permanece decisão futura de schema.
+
+### Equipe
+
+- máquina de estados do ponto;
+- bloqueio de transições inválidas;
+- bloqueio de períodos de folha sobrepostos.
+
+### Clínico
+
+- `Cache-Control: no-store`;
+- validação tenant/atendimento/cliente;
+- consentimento exige texto, responsável e data/hora;
+- UI atualizada para preencher o contrato completo.
+
+### Portal do Cliente
+
+- rotação automática do link ativo;
+- `no-store` administrativo;
+- diagnóstico de múltiplos links e expirados não revogados.
+
+## Etapa 7 — Fechamento de isolamento e documentação — EM EXECUÇÃO
+
+Entregas desta etapa:
+
+- contrato final automatizado de isolamento tenant para a expansão;
+- prova estática de que o portal deriva tenant/client do token persistido;
+- prova de que multiunidade não consulta CRM/Agenda/Estoque/Financeiro de outra unidade;
+- sincronização de README e ROADMAP;
+- checklist final do Marco 35;
+- um único SHA final para deploy no Render.
+
+---
+
+# Matriz atual de módulos
+
+## READY — 8
+
+- SITE — 95%;
+- AGENDA — 95%;
+- ESTOQUE — 93%;
+- CRM — 92%;
+- FINANCEIRO — 90%;
+- FIDELIDADE — 90%;
+- IA — 92%;
+- ANALYTICS — 90%.
+
+## VALIDATION_REQUIRED — 8
+
+- WHATSAPP — 90%;
+- POS — 91%;
+- PACOTES — 89%;
+- COMPRAS — 91%;
+- EQUIPE — 89%;
+- CLINICO — 89%;
+- PORTAL_CLIENTE — 90%;
+- RECURSOS — 89%.
+
+## EVOLUTION_REQUIRED — 3
+
+- MARKETING — 78%;
+- MULTIUNIDADE — 78%;
+- FINANCEIRO_ADV — 82%.
+
+---
+
+# Dependências externas e limites declarados
+
+- Twilio Trial: conectado como sandbox/trial; sender final do tenant ainda precisa de homologação.
+- Mercado Pago: opcional/ausente enquanto billing automático não fizer parte do escopo vendido.
+- Stripe: opcional/ausente enquanto billing automático não fizer parte do escopo vendido.
+- Sentry: opcional enquanto não fizer parte de SLA contratado.
+- NFS-e: requer provider fiscal real; emissão legal não é simulada.
+- Folha legal brasileira: fora do escopo atual; o módulo Equipe oferece folha operacional, não motor trabalhista completo.
+- Recebimento parcial de compras: não representado pelo modelo atual e não é simulado.
+
+---
+
+# Hardening pendente fora do fechamento funcional
+
+## Clean reset via browser
+
+A rota de clean reset possui autenticação/guardas, mas ainda merece uma feature flag/env guard explícita para impedir disponibilidade acidental em produção, por exemplo:
+
+```text
+PLATFORM_CLEAN_RESET_ENABLED=false
+```
+
+Nunca executar reset/limpeza com dados reais de produção.
+
+## Deploy do Render
+
+O backend não está acompanhando automaticamente cada commit de `main`. Antes de encerrar o Marco 35 deve ser feito um deploy único do SHA final ou habilitado Auto-Deploy/deploy hook de forma controlada.
+
+---
+
+# Critério de saída do Marco 35
+
+Para declarar o Marco 35 oficialmente concluído:
+
+1. `GlossFlow Quality Gate` do SHA final = success;
+2. `Production Gate` do SHA final = success;
+3. Vercel publica o SHA final;
+4. Render publica o mesmo SHA final;
+5. `/health` retorna Build ID exato no body/header;
+6. `/ready` retorna o mesmo Build ID e `database.ok=true`;
+7. `Production Smoke Validation` = success;
+8. contratos de isolamento cross-tenant = success;
+9. README/ROADMAP/documentação final sincronizados;
+10. Issue #28 recebe a evidência final e é encerrada quando os itens automatizáveis e a decisão de homologação estiverem registrados.
+
+Homologação humana por tenant e providers externos permanecem separadas da CI. Nenhuma dependência externa deve ser declarada pronta por suposição.
+
+## Próximo marco após o encerramento
+
+Somente depois do Marco 35 fechado deve ser aberto novo ciclo. A prioridade recomendada é transformar os itens `EVOLUTION_REQUIRED` em entregas comerciais controladas, em vez de adicionar novos módulos sem consolidar Marketing, Multiunidade e Fiscal.
