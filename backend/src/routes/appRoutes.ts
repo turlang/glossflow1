@@ -30,6 +30,7 @@ import { transactionalHomologationRoutes } from './transactional-homologation.ro
 import { operationalHomologationRoutes } from './operational-homologation.routes';
 import { evolutionHardeningRoutes } from './evolution-hardening.routes';
 import { appointmentCheckoutRoutes } from './appointment-checkout.routes';
+import { enforceMarco35Etapa6BusinessRules, validationHardeningRoutes } from './validation-hardening.routes';
 import { writeAuditLog } from './audit';
 import { ensureAuthenticated, requireRoles } from '../middlewares/auth';
 import { enforceTenantRateLimit } from '../middlewares/rate-limit';
@@ -101,6 +102,7 @@ export async function appRoutes(app: FastifyInstance) {
       }
     });
     business.addHook('preHandler', enforceSalonModuleAccess);
+    business.addHook('preHandler', enforceMarco35Etapa6BusinessRules);
     business.addHook('onResponse', writeAuditLog);
     business.register(businessRoutes);
     business.register(analyticsRoutes);
@@ -113,6 +115,7 @@ export async function appRoutes(app: FastifyInstance) {
     business.register(operationalHomologationRoutes);
     business.register(evolutionHardeningRoutes);
     business.register(appointmentCheckoutRoutes);
+    business.register(validationHardeningRoutes);
   });
 
   app.register(async (criticalAdmin) => {
