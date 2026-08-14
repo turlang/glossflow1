@@ -22,7 +22,16 @@ const CONFIG = {
   },
   clinical: {
     title: 'Marco 29 • Anamnese / Prontuário', endpoint: '/admin/clinical-records', create: '/admin/clinical-records',
-    fields: [['clientId', 'Cliente', 'client'], ['recordType', 'Tipo', 'choice', ['ANAMNESIS', 'TREATMENT', 'EVOLUTION', 'CONSENT']], ['allergies', 'Alergias', 'text'], ['notes', 'Evolução / observações', 'textarea'], ['signedBy', 'Responsável', 'text']]
+    fields: [
+      ['clientId', 'Cliente', 'client'],
+      ['appointmentId', 'Atendimento relacionado', 'appointment'],
+      ['recordType', 'Tipo', 'choice', ['ANAMNESIS', 'TREATMENT', 'EVOLUTION', 'CONSENT']],
+      ['allergies', 'Alergias', 'text'],
+      ['notes', 'Evolução / observações', 'textarea'],
+      ['consentText', 'Texto do consentimento (obrigatório para CONSENT)', 'textarea'],
+      ['signedBy', 'Responsável / signatário', 'text'],
+      ['signedAt', 'Data e hora da assinatura', 'datetime-local']
+    ]
   },
   marketing: {
     title: 'Marco 30 • Marketing 360 e Reputação', endpoint: '/admin/marketing', create: '/admin/marketing/campaigns',
@@ -51,7 +60,7 @@ const DEFAULTS = {
   'customer-plans': { name: '', description: '', price: '', totalCredits: 1, validityDays: 90 },
   procurement: { name: '', document: '', phone: '', email: '', contact: '' },
   'team-management': { professionalId: '', type: 'CLOCK_IN', notes: '' },
-  clinical: { clientId: '', recordType: 'ANAMNESIS', allergies: '', notes: '', signedBy: '' },
+  clinical: { clientId: '', appointmentId: '', recordType: 'ANAMNESIS', allergies: '', notes: '', consentText: '', signedBy: '', signedAt: '' },
   marketing: { name: '', channel: 'WHATSAPP', segment: 'ALL', message: '', status: 'DRAFT' },
   'client-portal': { clientId: '', expiresInHours: 72 },
   organizations: { name: '', document: '' },
@@ -134,7 +143,14 @@ export function BusinessExpansionSuite({ module, clients = [], professionals = [
         discount: normalized.discount
       };
     }
-    if (module === 'clinical') return { ...normalized, photoUrls: [], consentText: '' };
+    if (module === 'clinical') {
+      return {
+        ...normalized,
+        appointmentId: normalized.appointmentId || undefined,
+        signedAt: normalized.signedAt || undefined,
+        photoUrls: []
+      };
+    }
     return normalized;
   }
 
@@ -207,6 +223,9 @@ export function BusinessExpansionSuite({ module, clients = [], professionals = [
           if (type === 'client' || type === 'professional') {
             const optionsList = type === 'client' ? clients : professionals;
             return <label key={key}>{label}<select required value={form[key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}><option value="">Selecione</option>{optionsList.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>;
+          }
+          if (type === 'appointment') {
+            return <label key={key}>{label}<select value={form[key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}><option value="">Sem vínculo</option>{appointments.map((item) => <option key={item.id} value={item.id}>{item.clientName || 'Cliente'} • {new Date(item.startTime).toLocaleString('pt-BR')}</option>)}</select></label>;
           }
           if (type === 'textarea') return <label key={key}>{label}<textarea value={form[key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))} /></label>;
           return <label key={key}>{label}<input type={type} value={form[key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))} /></label>;
