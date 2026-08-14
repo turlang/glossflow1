@@ -61,6 +61,53 @@ function validClockTransition(previous: string | undefined, next: string) {
   return false;
 }
 
+async function receivePurchaseSafely(salonId: string, id: string) {
+  const order = await prisma.purchaseOrder.findFirst({ where: { id, salonId } });
+  if (!order) throw httpError(404, 'Pedido de compra não encontrado.');
+  if (order.status === 'RECEIVED') throw httpError(409, 'Pedido já recebido.');
+
+  const items = purchaseItemsSchema.parse(order.items);
+  const duplicateMovement = await prisma.inventoryMovement.findFirst({
+    where: { salonId, reason: `Recebimento ${order.number}` },
+    select: { id: true }
+  });
+  if (duplicateMovement) throw httpError(409, 'Já existem movimentos de estoque para este pedido; execute o diagnóstico antes de tentar novamente.');
+
+  return prisma.$transaction(async (tx) => {
+    for (const item of items) {
+      const product = await tx.inventoryProduct.findFirst({ where: { id: item.productId, salonId, active: true } });
+      if (!product) throw httpError(409, `Produto indisponível no recebimento: ${item.description}.`);
+      await tx.inventoryProduct.update({ where: { id: product.id }, data: { quantity: { increment: item.quantity }, costPrice: item.unitCost } });
+      await tx.inventoryMovement.create({
+        data: { type: 'IN', quantity: item.quantity, reason: `Recebimento ${order.number}`, productId: product.id, salonId }
+      });
+    }
+
+    let payable = await tx.receivablePayable.findFirst({
+      where: { salonId, type: 'PAYABLE', description: { contains: order.number } }
+    });
+    if (!payable) {
+      payable = await tx.receivablePayable.create({
+        data: {
+          type: 'PAYABLE',
+          description: `Compra ${order.number}`,
+          category: 'COMPRAS',
+          amount: order.total,
+          dueDate: order.expectedAt || new Date(),
+          status: 'OPEN',
+          salonId
+        }
+      });
+    }
+
+    const updatedOrder = await tx.purchaseOrder.update({
+      where: { id: order.id },
+      data: { status: 'RECEIVED', receivedAt: new Date() }
+    });
+    return { order: updatedOrder, payable };
+  });
+}
+
 /**
  * Marco 35 — Etapa 6.
  * Regras preventivas executadas antes das rotas legadas da suite operacional.
@@ -75,10 +122,10 @@ export async function enforceMarco35Etapa6BusinessRules(request: FastifyRequest,
   }
 
   if (request.method === 'POST' && /^\/admin\/procurement\/orders\/[a-f\d]{24}\/receive$/i.test(path)) {
-    return reply.status(410).send({
-      code: 'SAFE_RECEIPT_REQUIRED',
-      message: 'Recebimento legado desativado. Use o fluxo seguro de recebimento para manter estoque e financeiro consistentes.'
-    });
+    const current = requireAdmin(request);
+    const id = objectId.parse(path.split('/')[4]);
+    const result = await receivePurchaseSafely(current.salonId, id);
+    return reply.status(200).send({ ...result, safeReceipt: true, compatibilityRoute: true });
   }
 
   if (request.method === 'POST' && path === '/admin/team-management/time-clock') {
@@ -163,51 +210,7 @@ export async function validationHardeningRoutes(app: FastifyInstance) {
   app.post('/admin/procurement/orders/:id/receive-safe', async (request, reply) => {
     const current = requireAdmin(request);
     const { id } = z.object({ id: objectId }).parse(request.params);
-    const order = await prisma.purchaseOrder.findFirst({ where: { id, salonId: current.salonId } });
-    if (!order) throw httpError(404, 'Pedido de compra não encontrado.');
-    if (order.status === 'RECEIVED') throw httpError(409, 'Pedido já recebido.');
-
-    const items = purchaseItemsSchema.parse(order.items);
-    const duplicateMovement = await prisma.inventoryMovement.findFirst({
-      where: { salonId: current.salonId, reason: `Recebimento ${order.number}` },
-      select: { id: true }
-    });
-    if (duplicateMovement) throw httpError(409, 'Já existem movimentos de estoque para este pedido; execute o diagnóstico antes de tentar novamente.');
-
-    const result = await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        const product = await tx.inventoryProduct.findFirst({ where: { id: item.productId, salonId: current.salonId, active: true } });
-        if (!product) throw httpError(409, `Produto indisponível no recebimento: ${item.description}.`);
-        await tx.inventoryProduct.update({ where: { id: product.id }, data: { quantity: { increment: item.quantity }, costPrice: item.unitCost } });
-        await tx.inventoryMovement.create({
-          data: { type: 'IN', quantity: item.quantity, reason: `Recebimento ${order.number}`, productId: product.id, salonId: current.salonId }
-        });
-      }
-
-      let payable = await tx.receivablePayable.findFirst({
-        where: { salonId: current.salonId, type: 'PAYABLE', description: { contains: order.number } }
-      });
-      if (!payable) {
-        payable = await tx.receivablePayable.create({
-          data: {
-            type: 'PAYABLE',
-            description: `Compra ${order.number}`,
-            category: 'COMPRAS',
-            amount: order.total,
-            dueDate: order.expectedAt || new Date(),
-            status: 'OPEN',
-            salonId: current.salonId
-          }
-        });
-      }
-
-      const updatedOrder = await tx.purchaseOrder.update({
-        where: { id: order.id },
-        data: { status: 'RECEIVED', receivedAt: new Date() }
-      });
-      return { order: updatedOrder, payable };
-    });
-
+    const result = await receivePurchaseSafely(current.salonId, id);
     return reply.status(200).send({ ...result, safeReceipt: true });
   });
 
