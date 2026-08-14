@@ -20,6 +20,7 @@ import { platformMaintenanceRoutes } from './platform-maintenance.routes';
 import { platformLifecycleRoutes } from './platform-lifecycle.routes';
 import { platformSiteRoutes } from './platform-site.routes';
 import { platformCostRoutes } from './platform-cost.routes';
+import { platformModuleReadinessRoutes } from './platform-module-readiness.routes';
 import { observabilityRoutes } from './observability.routes';
 import { commercialRoutes } from './commercial.routes';
 import { analyticsRoutes } from './analytics.routes';
@@ -56,6 +57,7 @@ export async function appRoutes(app: FastifyInstance) {
     platformAdmin.register(platformLifecycleRoutes);
     platformAdmin.register(platformSiteRoutes);
     platformAdmin.register(platformCostRoutes);
+    platformAdmin.register(platformModuleReadinessRoutes);
     platformAdmin.register(observabilityRoutes);
   });
 
