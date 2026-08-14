@@ -1,14 +1,16 @@
 # GlossFlow Smart — Roadmap Oficial
 
-Data-base: 2026-08-13.
+Data-base: 2026-08-14.
 
-Este documento é a fonte canônica da evolução do GlossFlow. A execução e evidências do ciclo atual são registradas na **Issue #28 — Marco 35: Consolidação e homologação dos 19 módulos**.
+Este documento é a fonte canônica da evolução do GlossFlow. O ciclo atual é acompanhado na **Issue #29 — Marco 36: Homologação comercial e higiene pós-Marco 35**.
 
 ## Estado do produto
 
-O GlossFlow está em **produção ativa**. Os Marcos 1–24 consolidaram a fundação comercial; os Marcos 25–34 ampliaram o catálogo operacional; o **Marco 35** integra, endurece e homologa os 19 módulos antes de qualquer nova expansão de domínio.
+O GlossFlow está em **produção ativa**. Os Marcos 1–24 consolidaram a fundação comercial; os Marcos 25–34 ampliaram o catálogo operacional; o **Marco 35 foi concluído e validado em produção** no SHA `42804f4d9e047684f2d84c5fb5e3e82f5ed7059e`.
 
-A produção foi comprovada com exact-build smoke até a Etapa 5 do Marco 35. As Etapas 6–7 estão no `main` e aguardam o deploy final único do backend no Render para o fechamento oficial.
+O fechamento do Marco 35 confirmou Quality Gate, Production Gate, Vercel, Render no SHA exato, `/ready` com MongoDB e Production Smoke integralmente verde. A Issue #28 foi encerrada como `completed`.
+
+O **Marco 36** começa sem alterar essa baseline de produção: primeiro sincroniza documentação e higiene do repositório em branch própria; depois conduz homologação comercial dos módulos que continuam `VALIDATION_REQUIRED`.
 
 ---
 
@@ -16,20 +18,15 @@ A produção foi comprovada com exact-build smoke até a Etapa 5 do Marco 35. As
 
 ## Marcos 1–15 — Fundação, higiene e modularização — CONCLUÍDOS
 
-- base full-stack higienizada;
-- rotas e serviços modularizados;
-- Admin, Agenda e operação comercial;
-- WhatsApp/IA inicial;
-- gates permanentes;
-- documentação e runbooks.
+Base full-stack higienizada, rotas e serviços modularizados, Admin/Agenda estruturados, testes, gates permanentes, documentação, manuais e redução da dívida estrutural inicial.
 
 ## Marco 16 — Homologação funcional por papel — CONCLUÍDO
 
-RBAC para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`.
+RBAC homologado para `SUPER_ADMIN`, `ADMIN`, `RECEPTION` e `PROFESSIONAL`, com Agenda read-only para PROFESSIONAL e separação explícita de permissões de operação.
 
 ## Marco 17 — Agenda comercial — CONCLUÍDO
 
-Agenda operacional, Smart Fit, lista de espera, conflitos, reagendamento, confirmação e comunicação.
+Agenda operacional, Smart Fit, lista de espera, conflitos, reagendamento, confirmação, comunicação e jornada diária da equipe.
 
 ## Marco 18 — Estoque — CONCLUÍDO
 
@@ -39,9 +36,9 @@ Entradas, saídas, ajustes, conciliação, mínimo/ruptura, histórico e reposi�
 
 Cadastro, histórico, segmentação, consentimento, opt-out, follow-up e retenção.
 
-## Marco 20 — IA e WhatsApp — CONCLUÍDO NA BASE FUNCIONAL
+## Marco 20 — IA e WhatsApp — BASE FUNCIONAL CONCLUÍDA
 
-Base factual, confirmação server-side, handoff, política de janela/template, webhook, métricas e guards. A homologação de sender definitivo continua dependente do provider de cada tenant.
+Base factual, confirmação server-side, handoff, janela/template, webhook, métricas e guards. Sender definitivo continua dependente de provider homologado por tenant.
 
 ## Marco 21 — Super Admin e ciclo de vida SaaS — CONCLUÍDO
 
@@ -49,7 +46,7 @@ Provisionamento, `TRIAL/ACTIVE/PAST_DUE/CANCELED`, módulos/entitlements, white-
 
 ## Marco 22 — Observabilidade e confiabilidade — CONCLUÍDO
 
-`X-Request-Id`, Build ID, `/health`, `/ready`, MongoDB readiness, métricas, Prometheus, painel global, índices e budgets de performance.
+`X-Request-Id`, Build ID, `/health`, `/ready`, readiness MongoDB, métricas, Prometheus, painel global, índices e budgets de performance.
 
 ## Marco 23 — Segurança e LGPD — CONCLUÍDO E VALIDADO
 
@@ -57,7 +54,7 @@ Sessões revogáveis, refresh rotation, RBAC, rate limit, auditoria, LGPD export
 
 ## Marco 24 — Release comercial estável — CONCLUÍDO
 
-O ciclo de release foi promovido e validado; o fluxo permanente passou a exigir:
+A release consolidou o fluxo permanente:
 
 ```text
 Quality Gate
@@ -71,225 +68,103 @@ Vercel + Render no SHA exato
 Production Smoke Validation
 ```
 
-A antiga condição de Release Candidate/PR #20 não é mais o estado atual do produto.
-
 ---
 
 # Ciclo 2 — Expansão comercial — Marcos 25–34
 
 ## Marco 25 — PDV / Checkout — IMPLEMENTADO
 
-- vendas e itens;
-- múltiplos pagamentos;
-- estoque e financeiro;
-- estorno;
-- integração posterior com Agenda/Pacotes no Marco 35.
+Vendas, itens, múltiplos pagamentos, baixa de estoque, receita e estorno.
 
 ## Marco 26 — Pacotes, Assinaturas e Gift Cards — IMPLEMENTADO
 
-- ofertas de pacote;
-- créditos e validade;
-- memberships;
-- gift cards;
-- consumo de crédito integrado ao checkout no Marco 35.
+Ofertas, créditos, validade, memberships e gift cards.
 
 ## Marco 27 — Compras e Fornecedores — IMPLEMENTADO
 
-- fornecedores;
-- pedidos;
-- recebimento;
-- estoque/custo;
-- integração segura com contas a pagar consolidada no Marco 35.
+Fornecedores, pedidos, recebimento, estoque/custo e integração com contas a pagar.
 
 ## Marco 28 — Equipe, Ponto, Metas e Folha — IMPLEMENTADO
 
-- ponto;
-- metas;
-- folha operacional;
-- validação de sequência de ponto e períodos sobrepostos consolidada no Marco 35.
+Ponto, metas, folha operacional e regras de período.
 
 ## Marco 29 — Clínico / Prontuário — IMPLEMENTADO
 
-- anamnese;
-- tratamento/evolução;
-- alergias;
-- consentimento;
-- vínculo ao atendimento;
-- hardening de segurança/LGPD no Marco 35.
+Anamnese, tratamento/evolução, alergias, consentimento e vínculo ao atendimento.
 
 ## Marco 30 — Marketing 360 — IMPLEMENTADO / EVOLUÇÃO PENDENTE
 
-- campanhas;
-- cupons;
-- avaliações;
-- audiência baseada em consentimento;
-- preview/preparação para provider.
-
-Ainda depende de worker/provider real, scheduler, gatilhos automáticos e métricas de conversão para sair de `EVOLUTION_REQUIRED`.
+Campanhas, cupons, avaliações e audiência consentida. Worker/provider de entrega, scheduler, gatilhos e métricas de conversão ainda são evolução explícita.
 
 ## Marco 31 — Portal do Cliente — IMPLEMENTADO
 
-- token aleatório com SHA-256 persistido;
-- expiração/revogação;
-- visão tenant/client-scoped;
-- rotação de link ativo e hardening no Marco 35.
+Token aleatório com SHA-256 persistido, expiração, revogação, rotação e visão tenant/client-scoped.
 
 ## Marco 32 — Multiunidade / Redes — IMPLEMENTADO / EVOLUÇÃO PENDENTE
 
-- convite HMAC direcionado;
-- expiração;
-- aceite por ADMIN do tenant correto;
-- saída/revogação;
-- zero compartilhamento operacional implícito.
-
-Dashboards corporativos e qualquer compartilhamento de CRM/Agenda/Estoque/Financeiro exigem política explícita antes da implementação.
+Convite HMAC, expiração, aceite por ADMIN, saída/revogação e ausência de compartilhamento operacional implícito. Dashboards corporativos dependem de política de acesso explícita.
 
 ## Marco 33 — Recursos Físicos — IMPLEMENTADO
 
-Salas, cadeiras, macas, equipamentos, capacidade, reservas e integração com Agenda/checkout no Marco 35.
+Salas, cadeiras, macas, equipamentos, capacidade, reservas e integração com Agenda/checkout.
 
 ## Marco 34 — Financeiro Avançado / Fiscal — IMPLEMENTADO / EVOLUÇÃO PENDENTE
 
-- centros de custo;
-- caixa;
-- contas a pagar/receber;
-- liquidação;
-- conciliação;
-- sincronização de compras;
-- metadados/evidência fiscal.
-
-NFS-e real continua dependente de provider fiscal autorizado.
+Centros de custo, caixa, contas, liquidação, conciliação, sincronização de compras e evidência fiscal. NFS-e legal continua dependente de provider autorizado.
 
 ---
 
-# Marco 35 — Consolidação e Homologação dos 19 módulos — EM FECHAMENTO
+# Marco 35 — Consolidação e Homologação dos 19 módulos — CONCLUÍDO
 
-Issue canônica: **#28**.
+Issue canônica encerrada: **#28**.
 
-## Objetivo
+SHA de produção homologado:
 
-Não adicionar novos domínios. Consolidar integração, consistência transacional, isolamento multi-tenant, diagnósticos, UX necessária à homologação e documentação real do produto.
+```text
+42804f4d9e047684f2d84c5fb5e3e82f5ed7059e
+```
 
 ## Etapa 1 — Matriz canônica de maturidade — CONCLUÍDA
 
-`backend/src/services/module-readiness.service.ts` tornou-se a fonte tipada para estado e maturidade dos 19 módulos.
+`backend/src/services/module-readiness.service.ts` registra estado e maturidade dos 19 módulos.
 
 ## Etapa 2 — Homologação transacional — CONCLUÍDA
 
-`GET /admin/homologation/transactional`
-
-Cobertura: PDV, Estoque, Compras, Financeiro e Pacotes.
-
-Detecta, entre outros casos:
-
-- venda sem receita;
-- produto vendido sem saída de estoque;
-- estorno sem financeiro/devolução;
-- compra recebida sem estoque/financeiro;
-- inconsistências de saldo/validade de pacote.
+`GET /admin/homologation/transactional` cobre PDV, Estoque, Compras, Financeiro e Pacotes.
 
 ## Etapa 3 — Homologação operacional — CONCLUÍDA
 
-`GET /admin/homologation/operations`
+`GET /admin/homologation/operations` cobre Equipe, Clínico, Portal e Recursos.
 
-Cobertura: Equipe, Clínico, Portal e Recursos.
+## Etapa 4 — Evolução controlada — CONCLUÍDA NO ESCOPO
 
-Inclui verificações de referência, vínculo, consentimento, token/expiração e capacidade/overbooking.
+`GET /admin/homologation/evolution` cobre Marketing, Multiunidade e Financeiro Avançado/Fiscal sem declarar completas as dependências ainda ausentes.
 
-## Etapa 4 — Evolução controlada — CONCLUÍDA NO ESCOPO DO MARCO
+## Etapa 5 — Checkout integrado — CONCLUÍDA E VALIDADA
 
-`GET /admin/homologation/evolution`
+Fluxo Agenda → Recursos → Pacotes → PDV → Estoque/Financeiro, com preview server-side, preços no backend, consumo automático de crédito, idempotência e transação crítica integrada.
 
-Entregue:
+## Etapa 6 — Hardening dos módulos em validação — CONCLUÍDA
 
-- Marketing: preparação de audiência tenant-safe com consentimento;
-- Multiunidade: saída/revogação e vínculo sem compartilhamento operacional;
-- Financeiro Avançado: compras → contas a pagar e evidência fiscal obrigatória antes de `ISSUED`.
+`GET /admin/homologation/validation-suite` consolida WhatsApp, Compras, Equipe, Clínico e Portal do Cliente. Foram endurecidos recebimento de compras, regras de ponto/folha, vínculo clínico/consentimento e rotação de links do portal.
 
-Os três continuam `EVOLUTION_REQUIRED` porque dependem de capacidades externas/políticas que não devem ser simuladas.
+## Etapa 7 — Isolamento e fechamento — CONCLUÍDA
 
-## Etapa 5 — Checkout integrado — CONCLUÍDA E VALIDADA EM PRODUÇÃO
+Contrato automatizado cross-tenant, checklist final, README/ROADMAP preparados para transição e exact-build Production Smoke integralmente verde.
 
-Fluxo:
+### Evidência final
 
-```text
-Agenda
-  ↓
-Recursos
-  ↓
-Pacote elegível
-  ↓
-PDV
-  ↓
-Estoque + Financeiro
-  ↓
-Atendimento concluído / recurso liberado
-```
-
-Entregue:
-
-- preview server-side;
-- preços calculados no backend;
-- consumo automático de crédito;
-- idempotência por atendimento;
-- reserva/liberação de recurso;
-- venda, pagamentos, estoque, pacote, financeiro e atendimento na mesma transação Prisma;
-- UI de checkout na Agenda;
-- `GET /admin/homologation/checkout-flow`.
-
-O exact-build Production Smoke foi validado no build `3b6debc2814a`.
-
-## Etapa 6 — Hardening dos módulos em validação — CONCLUÍDA NO CÓDIGO
-
-`GET /admin/homologation/validation-suite`
-
-### WhatsApp
-
-- diagnóstico de provider/templates;
-- provider incompleto = erro;
-- Twilio Trial = aviso, nunca homologação comercial final.
-
-### Compras
-
-- recebimento completo em transação única;
-- estoque + custo + movimento `IN` + conta a pagar + `RECEIVED`;
-- rota legada da UI preservada via interceptação segura;
-- rota `/receive-safe` disponível;
-- recebimento parcial permanece decisão futura de schema.
-
-### Equipe
-
-- máquina de estados do ponto;
-- bloqueio de transições inválidas;
-- bloqueio de períodos de folha sobrepostos.
-
-### Clínico
-
-- `Cache-Control: no-store`;
-- validação tenant/atendimento/cliente;
-- consentimento exige texto, responsável e data/hora;
-- UI atualizada para preencher o contrato completo.
-
-### Portal do Cliente
-
-- rotação automática do link ativo;
-- `no-store` administrativo;
-- diagnóstico de múltiplos links e expirados não revogados.
-
-## Etapa 7 — Fechamento de isolamento e documentação — EM EXECUÇÃO
-
-Entregas desta etapa:
-
-- contrato final automatizado de isolamento tenant para a expansão;
-- prova estática de que o portal deriva tenant/client do token persistido;
-- prova de que multiunidade não consulta CRM/Agenda/Estoque/Financeiro de outra unidade;
-- sincronização de README e ROADMAP;
-- checklist final do Marco 35;
-- um único SHA final para deploy no Render.
+- Quality Gate: success;
+- Production Gate: success;
+- Vercel: success;
+- Render: SHA exato;
+- `/ready`: `ok=true` e MongoDB pronto;
+- Production Smoke: success;
+- Issue #28: closed/completed.
 
 ---
 
-# Matriz atual de módulos
+# Matriz de módulos na entrada do Marco 36
 
 ## READY — 8
 
@@ -321,53 +196,86 @@ Entregas desta etapa:
 
 ---
 
-# Dependências externas e limites declarados
+# Marco 36 — Homologação comercial e higiene pós-Marco 35 — EM EXECUÇÃO
 
-- Twilio Trial: conectado como sandbox/trial; sender final do tenant ainda precisa de homologação.
-- Mercado Pago: opcional/ausente enquanto billing automático não fizer parte do escopo vendido.
-- Stripe: opcional/ausente enquanto billing automático não fizer parte do escopo vendido.
-- Sentry: opcional enquanto não fizer parte de SLA contratado.
-- NFS-e: requer provider fiscal real; emissão legal não é simulada.
-- Folha legal brasileira: fora do escopo atual; o módulo Equipe oferece folha operacional, não motor trabalhista completo.
-- Recebimento parcial de compras: não representado pelo modelo atual e não é simulado.
+Issue canônica: **#29**.
+
+## Objetivo
+
+Transformar a baseline técnica consolidada em uma operação comercial repetível por tenant, sem adicionar módulos novos antes de homologar corretamente o que já existe.
+
+## Etapa 1 — Sincronização documental e higiene de branches — EM EXECUÇÃO
+
+- corrigir README/ROADMAP que ainda descreviam o Marco 35 como pendente;
+- manter a baseline homologada de produção intacta enquanto a documentação evolui em branch/PR;
+- inventariar branches históricas;
+- classificar branches associadas a PRs já mesclados como candidatas à remoção;
+- separar branches intermediárias/sem PR para revisão antes de qualquer limpeza;
+- registrar tudo em `docs/engineering/MARCO36_BRANCH_HYGIENE.md`.
+
+Critério de saída: documentação sincronizada, relatório de higiene versionado e gates verdes no candidato.
+
+## Etapa 2 — Homologação comercial dos módulos VALIDATION_REQUIRED — PLANEJADA
+
+Executar em tenant QA/ambiente autorizado:
+
+- WhatsApp: sender/provider definitivo, inbound/outbound, templates e janela;
+- PDV: pagamentos, estoque, estorno e idempotência;
+- Pacotes: consumo de crédito, validade e elegibilidade;
+- Compras: recebimento completo, estoque/custo, conta a pagar e duplicidade;
+- Equipe: sequência de ponto e folha operacional;
+- Clínico: UX, vínculo, consentimento, auditoria e LGPD;
+- Portal: rotação, expiração/revogação e jornada mobile;
+- Recursos: capacidade, conflito, Agenda e liberação pós-checkout.
+
+Nenhuma homologação deve criar dados fictícios em tenant real de produção.
+
+## Etapa 3 — Promoção seletiva de maturidade — PLANEJADA
+
+Somente módulos com evidência humana/provider suficiente podem migrar de `VALIDATION_REQUIRED` para `READY`. A matriz tipada deve ser atualizada junto da evidência, nunca antes.
+
+## Etapa 4 — Evoluções comerciais controladas — FUTURA
+
+Marketing, Multiunidade e Financeiro Avançado/Fiscal só avançam quando as capacidades faltantes forem realmente implementadas e homologadas.
 
 ---
 
-# Hardening pendente fora do fechamento funcional
+# Dependências externas e limites declarados
+
+- Twilio Trial: sandbox/trial, não sender final.
+- Mercado Pago/Stripe: opcionais enquanto billing automático não estiver contratado.
+- Sentry: opcional enquanto não fizer parte de SLA.
+- NFS-e: exige provider fiscal real e autorizado.
+- Folha legal brasileira: fora do escopo atual; o módulo oferece folha operacional.
+- Recebimento parcial de compras: não representado pelo modelo atual.
+
+---
+
+# Hardening pendente
 
 ## Clean reset via browser
 
-A rota de clean reset possui autenticação/guardas, mas ainda merece uma feature flag/env guard explícita para impedir disponibilidade acidental em produção, por exemplo:
+A superfície de clean reset possui autenticação e confirmações fortes, mas ainda deve receber feature flag/env guard explícita antes de qualquer ampliação de uso:
 
 ```text
 PLATFORM_CLEAN_RESET_ENABLED=false
 ```
 
-Nunca executar reset/limpeza com dados reais de produção.
+Nunca executar reset/limpeza como teste em produção real.
 
 ## Deploy do Render
 
-O backend não está acompanhando automaticamente cada commit de `main`. Antes de encerrar o Marco 35 deve ser feito um deploy único do SHA final ou habilitado Auto-Deploy/deploy hook de forma controlada.
+Alterações do Marco 36 só devem ir ao `main` após gates verdes. Quando houver alteração de `main`, o Production Smoke continua exigindo convergência do Render para o SHA exato antes de declarar a produção sincronizada.
 
 ---
 
-# Critério de saída do Marco 35
+# Critério de saída do Marco 36
 
-Para declarar o Marco 35 oficialmente concluído:
-
-1. `GlossFlow Quality Gate` do SHA final = success;
-2. `Production Gate` do SHA final = success;
-3. Vercel publica o SHA final;
-4. Render publica o mesmo SHA final;
-5. `/health` retorna Build ID exato no body/header;
-6. `/ready` retorna o mesmo Build ID e `database.ok=true`;
-7. `Production Smoke Validation` = success;
-8. contratos de isolamento cross-tenant = success;
-9. README/ROADMAP/documentação final sincronizados;
-10. Issue #28 recebe a evidência final e é encerrada quando os itens automatizáveis e a decisão de homologação estiverem registrados.
-
-Homologação humana por tenant e providers externos permanecem separadas da CI. Nenhuma dependência externa deve ser declarada pronta por suposição.
-
-## Próximo marco após o encerramento
-
-Somente depois do Marco 35 fechado deve ser aberto novo ciclo. A prioridade recomendada é transformar os itens `EVOLUTION_REQUIRED` em entregas comerciais controladas, em vez de adicionar novos módulos sem consolidar Marketing, Multiunidade e Fiscal.
+1. documentação e branches históricas sob controle;
+2. Quality Gate e Production Gate verdes nos candidatos;
+3. módulos `VALIDATION_REQUIRED` homologados apenas com evidência real;
+4. nenhuma promoção indevida de provider Trial ou capacidade parcial;
+5. isolamento cross-tenant preservado;
+6. `main`, Vercel e Render novamente convergentes no SHA final do marco;
+7. Production Smoke exact-SHA verde;
+8. Issue #29 encerrada com evidências.
