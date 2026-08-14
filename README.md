@@ -1,257 +1,224 @@
 # GlossFlow Smart
 
-SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de estética. O GlossFlow centraliza vitrine pública, Agenda, CRM, Estoque, financeiro, fidelidade, automações, WhatsApp, IA e operação comercial da própria plataforma.
+SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de estética. O GlossFlow centraliza presença pública, Agenda, CRM, Estoque, financeiro, fidelidade, WhatsApp/IA e módulos operacionais avançados em uma única plataforma.
 
 ## Estado atual
 
-O projeto está em **produção ativa e Release Candidate comercial do Marco 24**.
+O produto está em **produção ativa** e o desenvolvimento está no **Marco 35 — Consolidação e Homologação dos 19 módulos**.
 
-Os **Marcos 1–23 estão concluídos e validados em produção**. O **Marco 24 — Release comercial estável** está **CONCLUÍDO FUNCIONALMENTE / PENDENTE SOMENTE DA VALIDAÇÃO FINAL DE PRODUÇÃO** na Issue #19 e no PR #20.
+Os Marcos 1–24 formam a base comercial estável. Os Marcos 25–34 ampliaram o produto com PDV, pacotes, compras, equipe, clínico, marketing, portal do cliente, multiunidade, recursos e financeiro avançado. O Marco 35 não abre novos domínios: ele integra, endurece, diagnostica e homologa o que já existe.
 
-A Issue #19 é a evidência canônica de encerramento. Quando o merge final estiver no Vercel/Render, o `Production Smoke Validation` confirmar o **Build ID exato do merge** e a Issue #19 for fechada como `completed`, o Marco 24 é considerado oficialmente validado em produção **sem exigir um commit documental adicional que alteraria novamente o SHA da release**.
-
-### Validação final do Marco 23
-
-O Marco 23 foi homologado somente depois que o smoke passou a exigir o SHA exato de `main` no Render.
-
-- build/commit validado: `afc22563d54645a8555cbafc53b1a9b6b31f2713`;
-- Build ID servido pelo Render: `afc22563d546`;
-- `/health`: `ok=true`, Build ID no body e em `X-GlossFlow-Build`;
-- `/ready`: mesmo Build ID e `database.ok=true`;
-- frontend de produção: **success**;
-- endpoints públicos: **success**;
-- `Production Smoke Validation` estrito: **success** no rerun do workflow `31639887820`;
-- Issue #14 encerrada como `completed`.
-
-### Release Candidate do Marco 24
-
-Evidência funcional já concluída antes do merge:
-
-- backend: **100/100 testes**;
-- frontend: **61/61 testes**;
-- `npm audit --audit-level=high`: sem vulnerabilidade bloqueadora nas dependências do produto;
-- TypeScript/ESLint: **success**;
-- builds backend/frontend: **success**;
-- `GlossFlow Quality Gate`: **success** no candidato;
-- `Production Gate`: **success** no candidato;
-- homologação pública real em Chromium: **15/15 PASS**;
-- páginas homologadas: vitrine, booking e landing comercial;
-- viewports: 1366×768, 1920×1080, 768×1024, 430×932 e 360×800;
-- 0 overflow horizontal bloqueador;
-- 0 `pageerror` nas 15 combinações;
-- nenhum erro visível de API/agendamento indisponível;
-- runtime isolado de navegador auditado antes da execução;
-- nenhuma issue P0/P1 conhecida aberta;
-- documentação de produção, implantação, suporte, incidente e recuperação revisada.
-
-A única pendência de promoção é operacional: **merge do PR #20 → Vercel/Render no SHA exato → `/ready` com MongoDB → Production Smoke final verde → fechamento da Issue #19**.
+A produção já foi comprovada com exact-build smoke até a Etapa 5 do Marco 35. As Etapas 6–7 estão no `main` e devem receber um único deploy final no Render antes do encerramento oficial do marco.
 
 ## Stack
 
 ### Frontend
 
-- React 18
-- Vite 8.2.1
-- ESLint 9
-- Vitest 4.1.10
-- Testing Library
-- CSS próprio / Design System por domínio
-- PWA
-- Vercel
+- React 18;
+- Vite 8.2.1;
+- ESLint 9;
+- Vitest 4.1.10;
+- Testing Library;
+- CSS próprio / Design System por domínio;
+- PWA;
+- Vercel.
 
 ### Backend
 
-- Node.js `>=20.19 <23`
-- Fastify 5.11.3
-- TypeScript `strict`
-- Zod
-- JWT / RBAC
-- Prisma 5.22
-- Render
+- Node.js `>=20.19 <23`;
+- Fastify 5.11.3;
+- TypeScript `strict`;
+- Zod;
+- JWT + sessões revogáveis + RBAC;
+- Prisma 5.22;
+- Render.
 
 ### Dados e integrações
 
-- MongoDB Atlas
-- Prisma ORM
-- Groq como provider principal de IA
-- OpenAI como fallback/opção de IA
-- Twilio / Meta / provider HTTP para WhatsApp
-- Mercado Pago / Stripe preparados como providers opcionais
-- métricas Prometheus e observabilidade interna
+- MongoDB Atlas;
+- Prisma ORM;
+- Groq como provider principal de IA;
+- OpenAI como fallback/opção;
+- Twilio / Meta / provider HTTP para WhatsApp;
+- Mercado Pago / Stripe preparados como providers opcionais;
+- Prometheus e observabilidade interna.
 
-## Agenda comercial
+## Catálogo comercial — 19 módulos
 
-O domínio de Agenda cobre:
+A classificação é controlada por `backend/src/services/module-readiness.service.ts`.
 
-- agendamento público;
-- capacidade por profissional/serviço;
-- jornada, pausa e bloqueio;
-- detecção de conflito no backend;
-- reagendamento com revalidação;
-- Agenda Operacional;
-- Smart Fit;
-- lista de espera;
-- confirmação, cancelamento e comunicação.
+### READY — 8
 
-A jornada comercial permanece protegida por testes dedicados, inclusive conflito e reagendamento.
+| Módulo | Maturidade | Estado |
+|---|---:|---|
+| Site & Marca | 95% | READY |
+| Agenda | 95% | READY |
+| Estoque | 93% | READY |
+| CRM | 92% | READY |
+| Financeiro | 90% | READY |
+| Fidelidade | 90% | READY |
+| IA | 92% | READY |
+| Analytics | 90% | READY |
 
-## Estoque operacional
+### VALIDATION_REQUIRED — 8
 
-O sistema mantém:
+| Módulo | Maturidade | Pendência principal |
+|---|---:|---|
+| WhatsApp | 90% | sender definitivo autorizado; Twilio Trial não é homologação comercial final |
+| PDV | 91% | homologação humana do checkout integrado |
+| Pacotes | 89% | homologação do consumo automático de créditos/benefícios |
+| Compras | 91% | homologação do recebimento completo; recebimento parcial exige evolução explícita do modelo |
+| Equipe | 89% | homologação operacional; folha legal/fiscal brasileira está fora do escopo atual |
+| Clínico | 89% | homologação dedicada de UX, segurança, auditoria e LGPD |
+| Portal do Cliente | 90% | homologação ponta a ponta da jornada self-service |
+| Recursos | 89% | homologação Agenda → reserva → atendimento → liberação |
 
-- entradas, saídas e ajustes;
-- bloqueio de saldo negativo;
-- histórico de movimentação;
-- mínimo/ruptura;
-- conciliação e reposição;
-- desativação lógica quando o histórico precisa ser preservado.
+### EVOLUTION_REQUIRED — 3
 
-## CRM, retenção e automações
+| Módulo | Maturidade | Evolução necessária |
+|---|---:|---|
+| Marketing 360 | 78% | worker/provider de entrega, scheduler, gatilhos e métricas de conversão |
+| Multiunidade | 78% | políticas corporativas e dashboards antes de qualquer compartilhamento operacional explícito |
+| Financeiro Avançado/Fiscal | 82% | provider fiscal/NFS-e real e homologado |
 
-O CRM inclui:
+Esses três módulos não são apresentados como completos onde existe dependência externa ou decisão corporativa ainda não homologada.
 
-- cadastro e histórico por cliente;
-- segmentação;
-- consentimento e opt-out;
-- follow-ups;
-- automações de retenção;
-- isolamento por tenant e RBAC.
+## Marco 35 — o que foi consolidado
 
-## IA e WhatsApp
+### Diagnósticos canônicos
 
-O agente usa base factual do salão, confirmação server-side para ações de negócio, handoff humano, política de janela/template e guards/fallbacks.
+- `GET /admin/homologation/transactional` — PDV, Estoque, Compras, Financeiro e Pacotes;
+- `GET /admin/homologation/operations` — Equipe, Clínico, Portal e Recursos;
+- `GET /admin/homologation/evolution` — Marketing, Multiunidade e Financeiro Avançado/Fiscal;
+- `GET /admin/homologation/checkout-flow` — Agenda → Recursos → Pacotes → PDV → Financeiro;
+- `GET /admin/homologation/validation-suite` — WhatsApp, Compras, Equipe, Clínico e Portal do Cliente.
 
-Durante homologações automáticas, **nenhuma mensagem real é enviada**. Provider/sender/callback devem ser validados apenas em sandbox ou ambiente autorizado quando fizerem parte do escopo do tenant.
+Os diagnósticos administrativos são tenant-scoped e exigem `ADMIN` quando manipulam/expõem estado sensível.
 
-## Super Admin e ciclo de vida SaaS
+### Checkout integrado
+
+O fluxo de atendimento pode fechar Agenda → Recursos → Pacotes → PDV → Financeiro com:
+
+- preview server-side;
+- preço de serviço/produto calculado no backend;
+- consumo de crédito de pacote elegível;
+- reserva e liberação de recursos;
+- venda e pagamentos;
+- baixa e movimento de estoque;
+- lançamento financeiro;
+- conclusão do atendimento;
+- idempotência por atendimento;
+- transação Prisma única para a mutação crítica.
+
+### Compras
+
+O recebimento seguro integra, na mesma operação:
+
+- atualização de quantidade;
+- atualização de custo;
+- movimento `IN`;
+- conta a pagar;
+- mudança do pedido para `RECEIVED`.
+
+O schema atual representa recebimento completo. **Recebimento parcial não é simulado**: se entrar no escopo comercial, deve receber uma evolução explícita do modelo de dados.
+
+### Equipe
+
+- máquina de estados para ponto;
+- rejeição de transições inválidas;
+- metas e folha operacional;
+- bloqueio de períodos de folha sobrepostos.
+
+O GlossFlow não reivindica cálculo trabalhista/legal brasileiro completo nesta fase.
+
+### Clínico
+
+- prontuário tenant-safe;
+- vínculo opcional ao atendimento;
+- verificação de compatibilidade cliente ↔ atendimento;
+- consentimento com texto, responsável e data/hora;
+- respostas administrativas sensíveis com `Cache-Control: no-store`;
+- interface para registrar vínculo e consentimento completo.
+
+### Portal do Cliente
+
+- token aleatório; somente SHA-256 persistido;
+- expiração e revogação;
+- rotação do link ativo ao gerar novo acesso para o cliente;
+- consultas públicas sempre derivadas do tenant/client do token persistido;
+- dados administrativos do portal sem cache.
+
+### Multiunidade
+
+O vínculo entre unidades exige:
+
+- convite HMAC assinado;
+- tenant de destino explícito;
+- expiração;
+- aceite por `ADMIN` da unidade correta;
+- `timingSafeEqual` na assinatura;
+- proteção contra vínculo duplicado;
+- saída/revogação explícitas.
+
+A associação **não concede acesso a CRM, Agenda, Estoque ou Financeiro de outra unidade**. Qualquer compartilhamento futuro depende de política corporativa explícita e nova autorização técnica.
+
+## Segurança e multi-tenancy
 
 A plataforma mantém:
 
-- provisionamento de tenants;
-- estados `TRIAL`, `ACTIVE`, `PAST_DUE` e `CANCELED`;
-- módulos/entitlements;
-- planos e billing preparado;
-- white-label;
+- JWT e sessão revogável;
+- refresh token de uso único/rotativo;
+- RBAC (`SUPER_ADMIN`, `ADMIN`, `RECEPTION`, `PROFESSIONAL`);
+- isolamento por `salonId`;
+- entitlements de módulo;
+- rate limit;
 - auditoria;
-- separação entre `SUPER_ADMIN` e operação do salão.
+- lifecycle `TRIAL`, `ACTIVE`, `PAST_DUE`, `CANCELED`;
+- LGPD export/anonymization;
+- backup assinado e restore guardado;
+- observabilidade com Build ID rastreável.
 
-## Segurança e sessões — Marco 23
+### Operações destrutivas
 
-### Access token vinculado à sessão
+Reset/limpeza de dados não deve ser executado em produção. O endpoint de clean reset continua sendo uma superfície que merece hardening adicional por feature flag/env guard antes de qualquer uso operacional mais amplo.
 
-O login cria `UserSession` revogável e inclui `sessionId` no JWT. Em produção, o backend só aceita o token quando a sessão existe, não foi revogada, não expirou e o usuário continua ativo. `role`, `email` e `salonId` são revalidados a partir do usuário persistido.
+## Integrações externas
 
-### Refresh token de uso único
+- WhatsApp possui suporte a Twilio/Meta/provider HTTP; a baseline conhecida usa Twilio Trial, que é sandbox/trial e não sender definitivo de cliente.
+- Mercado Pago/Stripe permanecem opcionais enquanto cobrança automática não fizer parte do plano vendido.
+- NFS-e real depende de provider fiscal autorizado; o GlossFlow não simula um documento como `ISSUED` sem evidência de provider.
+- Sentry permanece opcional enquanto não fizer parte de SLA contratado.
 
-Cada `/auth/refresh` rotaciona o refresh token. O token anterior deixa de funcionar, inclusive em replay concorrente.
+## CI/CD e rastreabilidade
 
-### Resposta a incidente
-
-O ADMIN pode encerrar sessão específica ou demais sessões do tenant. Auditoria correlaciona `requestId` e `sessionId` sem armazenar conteúdo sensível do body.
-
-## LGPD operacional
-
-### Exportação
-
-`GET /admin/security/lgpd/export/:clientId` gera pacote tenant-safe com perfil, atendimentos, lista de espera, fidelidade, consentimentos e eventos relacionados. A resposta usa `Cache-Control: no-store`.
-
-### Eliminação/anônimização
-
-`POST /admin/security/lgpd/erase/:clientId` exige `EXCLUIR DADOS` e motivo documentado. O histórico de atendimento é preservado sem PII e fila/fidelidade/consentimentos/perfil são removidos conforme o contrato implementado.
-
-Essa operação não deve ser usada como simples correção cadastral nem como teste em cliente real.
-
-## Retenção de dados
-
-Política explícita e manual/controlada:
-
-```text
-SESSION_RECORD_RETENTION_DAYS=30
-WHATSAPP_CONTENT_RETENTION_DAYS=180
-AUDIT_LOG_RETENTION_DAYS=730
-BACKUP_METADATA_RETENTION_DAYS=180
-```
-
-A execução exige preview e confirmação `APLICAR RETENCAO`. Não existe cron destrutivo habilitado silenciosamente.
-
-## Backup lógico e restore controlado
-
-O snapshot `glossflow-tenant-backup/v1` é assinado com HMAC SHA-256. O restore:
-
-- valida schema, tenant e assinatura;
-- fica bloqueado por `BACKUP_RESTORE_ENABLED=false` na operação normal;
-- exige confirmação `RESTAURAR BACKUP` quando habilitado;
-- restaura apenas o domínio operacional previsto;
-- gera auditoria.
-
-Usuários, senhas, sessões, lifecycle SaaS, domínio e audit logs ficam fora do snapshot operacional.
-
-## Observabilidade e deploy rastreável
-
-A API mantém:
-
-- `X-Request-Id`;
-- Build ID em `/health` e `/ready`;
-- readiness com ping real do MongoDB;
-- métricas p50/p95/p99, erros, slow requests, memória e dependências;
-- exportação Prometheus;
-- painel de observabilidade para `SUPER_ADMIN`;
-- índices MongoDB idempotentes;
-- paginação CRM;
-- code splitting e budget de bundle.
-
-O `Production Smoke Validation` **falha se o Render não estiver servindo exatamente os 12 primeiros caracteres do SHA de `main` que disparou o Production Gate**.
-
-## Release comercial — Marco 24
-
-O gate comercial separa:
-
-- **AUTO-BLOCKER**: CI, build, testes, exact-build smoke, banco, isolamento e contratos críticos;
-- **MANUAL-TENANT**: marca, conteúdo, dados iniciais e homologação humana por cliente;
-- **SANDBOX-EXTERNO**: WhatsApp, billing e providers que dependem de ambiente autorizado;
-- **N/A**: integrações opcionais não incluídas no plano vendido.
-
-Mercado Pago/Stripe não bloqueiam a release base quando cobrança automática não faz parte do escopo vendido. Sentry permanece hardening opcional enquanto não fizer parte de SLA contratado; sua ausência nunca é apresentada como integração ativa.
-
-## Testes e qualidade
-
-### Backend
-
-**100/100 testes automatizados**, incluindo autenticação, RBAC, Agenda, Estoque, CRM, IA/WhatsApp, observabilidade, lifecycle SaaS, sessões revogáveis, refresh rotation, LGPD, retenção, rate limit, auditoria e backup/restore.
-
-### Frontend
-
-**61/61 testes automatizados**, incluindo Agenda, CRM, estoque, navegação por papel, provisionamento e Segurança/LGPD.
-
-### Gates permanentes
+Gates permanentes:
 
 - `GlossFlow Quality Gate`;
 - `Production Gate`;
-- `Production Smoke Validation` com SHA exato.
+- `Production Smoke Validation`;
+- validação pública responsiva do Marco 24 quando aplicável.
 
-### Gate responsivo do Marco 24
+O Production Smoke exige que o Render sirva exatamente os 12 primeiros caracteres do SHA que disparou o gate, verifica `/health`, `/ready`, MongoDB e endpoints públicos.
 
-O workflow `Marco 24 Public Responsive Validation` usa Chromium real, audita o runtime isolado e valida vitrine, booking e landing comercial em cinco viewports. Screenshots e `report.json` são publicados como artefato de CI.
+### Render
 
-## Documentação
+O repositório não possui atualmente workflow GitHub que faça deploy do backend no Render, e o auto-deploy do serviço não tem acompanhado cada commit de `main`. No fechamento do Marco 35, deve ser feito um único deploy manual do SHA final ou configurado Auto-Deploy/deploy hook de forma explícita.
+
+## Documentação principal
 
 - [`ROADMAP.md`](ROADMAP.md)
-- [`HYGIENE_REPORT.md`](HYGIENE_REPORT.md)
 - [`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md)
-- [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md)
-- [`QUALITY_GATE.md`](QUALITY_GATE.md)
 - [`DEPLOY_RENDER_VERCEL.md`](DEPLOY_RENDER_VERCEL.md)
 - [`docs/RUNBOOK_OPERACIONAL.md`](docs/RUNBOOK_OPERACIONAL.md)
 - [`docs/engineering/ARCHITECTURE.md`](docs/engineering/ARCHITECTURE.md)
-- [`docs/engineering/OBSERVABILITY.md`](docs/engineering/OBSERVABILITY.md)
 - [`docs/engineering/SECURITY_LGPD.md`](docs/engineering/SECURITY_LGPD.md)
-- [`docs/engineering/MARCO24_RELEASE_VALIDATION.md`](docs/engineering/MARCO24_RELEASE_VALIDATION.md)
-- [`docs/usuario/07_CHECKLIST_IMPLANTACAO.md`](docs/usuario/07_CHECKLIST_IMPLANTACAO.md)
-- [`docs/usuario/14_SUPER_ADMIN_SAAS.md`](docs/usuario/14_SUPER_ADMIN_SAAS.md)
-- [`docs/usuario/15_SEGURANCA_LGPD.md`](docs/usuario/15_SEGURANCA_LGPD.md)
+- [`docs/engineering/MARCOS25_34_IMPLEMENTATION.md`](docs/engineering/MARCOS25_34_IMPLEMENTATION.md)
+- [`docs/engineering/MARCOS25_34_VALIDATION.md`](docs/engineering/MARCOS25_34_VALIDATION.md)
+- [`docs/engineering/MARCO35_ETAPA5_CHECKOUT.md`](docs/engineering/MARCO35_ETAPA5_CHECKOUT.md)
+- [`docs/engineering/MARCO35_ETAPA6_VALIDATION.md`](docs/engineering/MARCO35_ETAPA6_VALIDATION.md)
 
 ## Marco atual
 
-**Marco 24 — Release comercial estável — RELEASE CANDIDATE.**
+**Marco 35 — Consolidação e Homologação dos 19 módulos.**
 
-Decisão funcional: **GO para promoção**. Validação oficial de produção: **pendente exclusivamente do merge e do exact-build smoke final**.
+Condição para encerramento oficial: gates do SHA final verdes, deploy do mesmo SHA no Vercel/Render, `/ready` com MongoDB no mesmo build, Production Smoke exact-SHA verde e registro final da Issue #28. Homologações humanas e providers externos continuam explicitamente separados da evidência automatizada.
