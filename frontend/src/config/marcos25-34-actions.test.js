@@ -41,4 +41,13 @@ describe('Marcos 25–34 — contratos operacionais da UI', () => {
     expect(suite).toContain('/admin/organizations/join');
     expect(suite).toContain('Vincular unidades com consentimento');
   });
+
+  it('expõe vínculo do atendimento e consentimento clínico completo', () => {
+    expect(suite).toContain("['appointmentId', 'Atendimento relacionado', 'appointment']");
+    expect(suite).toContain("['consentText', 'Texto do consentimento (obrigatório para CONSENT)', 'textarea']");
+    expect(suite).toContain("['signedAt', 'Data e hora da assinatura', 'datetime-local']");
+    expect(suite).toContain('appointmentId: normalized.appointmentId || undefined');
+    expect(suite).toContain('signedAt: normalized.signedAt || undefined');
+    expect(suite).not.toContain("consentText: '' });");
+  });
 });
