@@ -4,11 +4,11 @@ SaaS multi-tenant white-label para salões de beleza, barbearias e clínicas de 
 
 ## Estado atual
 
-O produto está em **produção ativa** e o desenvolvimento está no **Marco 35 — Consolidação e Homologação dos 19 módulos**.
+O produto está em **produção ativa** e o desenvolvimento entrou no **Marco 36 — Homologação comercial e higiene pós-Marco 35**.
 
-Os Marcos 1–24 formam a base comercial estável. Os Marcos 25–34 ampliaram o produto com PDV, pacotes, compras, equipe, clínico, marketing, portal do cliente, multiunidade, recursos e financeiro avançado. O Marco 35 não abre novos domínios: ele integra, endurece, diagnostica e homologa o que já existe.
+Os Marcos 1–24 formam a base comercial estável. Os Marcos 25–34 ampliaram o catálogo com PDV, pacotes, compras, equipe, clínico, marketing, portal do cliente, multiunidade, recursos e financeiro avançado. O **Marco 35 foi oficialmente concluído** no SHA `42804f4d9e047684f2d84c5fb5e3e82f5ed7059e`, com Quality Gate, Production Gate, Vercel, Render e Production Smoke exact-SHA verdes. A Issue #28 foi encerrada como `completed`.
 
-A produção já foi comprovada com exact-build smoke até a Etapa 5 do Marco 35. As Etapas 6–7 estão no `main` e devem receber um único deploy final no Render antes do encerramento oficial do marco.
+O Marco 36 não reabre domínios concluídos. Seu foco inicial é remover estado documental stale, organizar branches históricas e conduzir a homologação comercial dos módulos que continuam `VALIDATION_REQUIRED`, sem transformar dependências externas em falso `READY`.
 
 ## Stack
 
@@ -81,9 +81,9 @@ A classificação é controlada por `backend/src/services/module-readiness.servi
 | Multiunidade | 78% | políticas corporativas e dashboards antes de qualquer compartilhamento operacional explícito |
 | Financeiro Avançado/Fiscal | 82% | provider fiscal/NFS-e real e homologado |
 
-Esses três módulos não são apresentados como completos onde existe dependência externa ou decisão corporativa ainda não homologada.
+Nenhum módulo é promovido apenas porque existe código parcial ou integração preparada.
 
-## Marco 35 — o que foi consolidado
+## Marco 35 — consolidado e validado
 
 ### Diagnósticos canônicos
 
@@ -93,101 +93,45 @@ Esses três módulos não são apresentados como completos onde existe dependên
 - `GET /admin/homologation/checkout-flow` — Agenda → Recursos → Pacotes → PDV → Financeiro;
 - `GET /admin/homologation/validation-suite` — WhatsApp, Compras, Equipe, Clínico e Portal do Cliente.
 
-Os diagnósticos administrativos são tenant-scoped e exigem `ADMIN` quando manipulam/expõem estado sensível.
-
 ### Checkout integrado
 
-O fluxo de atendimento pode fechar Agenda → Recursos → Pacotes → PDV → Financeiro com:
-
-- preview server-side;
-- preço de serviço/produto calculado no backend;
-- consumo de crédito de pacote elegível;
-- reserva e liberação de recursos;
-- venda e pagamentos;
-- baixa e movimento de estoque;
-- lançamento financeiro;
-- conclusão do atendimento;
-- idempotência por atendimento;
-- transação Prisma única para a mutação crítica.
+O fechamento de atendimento cobre Agenda → Recursos → Pacotes → PDV → Estoque/Financeiro com preview server-side, preços calculados no backend, consumo de crédito elegível, múltiplos pagamentos, baixa de estoque, lançamento financeiro, conclusão do atendimento, liberação de recursos e idempotência dentro do fluxo transacional.
 
 ### Compras
 
-O recebimento seguro integra, na mesma operação:
-
-- atualização de quantidade;
-- atualização de custo;
-- movimento `IN`;
-- conta a pagar;
-- mudança do pedido para `RECEIVED`.
-
-O schema atual representa recebimento completo. **Recebimento parcial não é simulado**: se entrar no escopo comercial, deve receber uma evolução explícita do modelo de dados.
+O recebimento seguro integra atualização de quantidade/custo, movimento `IN`, conta a pagar e mudança para `RECEIVED`. O modelo atual representa recebimento completo; recebimento parcial não é simulado.
 
 ### Equipe
 
-- máquina de estados para ponto;
+- máquina de estados do ponto;
 - rejeição de transições inválidas;
 - metas e folha operacional;
 - bloqueio de períodos de folha sobrepostos.
 
-O GlossFlow não reivindica cálculo trabalhista/legal brasileiro completo nesta fase.
+O sistema não reivindica motor trabalhista/legal brasileiro completo.
 
-### Clínico
+### Clínico e Portal
 
-- prontuário tenant-safe;
-- vínculo opcional ao atendimento;
-- verificação de compatibilidade cliente ↔ atendimento;
-- consentimento com texto, responsável e data/hora;
-- respostas administrativas sensíveis com `Cache-Control: no-store`;
-- interface para registrar vínculo e consentimento completo.
-
-### Portal do Cliente
-
-- token aleatório; somente SHA-256 persistido;
-- expiração e revogação;
-- rotação do link ativo ao gerar novo acesso para o cliente;
-- consultas públicas sempre derivadas do tenant/client do token persistido;
-- dados administrativos do portal sem cache.
+O Clínico valida tenant, cliente e atendimento, suporta consentimento com texto/responsável/data e usa `Cache-Control: no-store` em respostas sensíveis. O Portal usa token aleatório com somente SHA-256 persistido, expiração/revogação, rotação de link e consultas sempre derivadas do tenant/client do token persistido.
 
 ### Multiunidade
 
-O vínculo entre unidades exige:
-
-- convite HMAC assinado;
-- tenant de destino explícito;
-- expiração;
-- aceite por `ADMIN` da unidade correta;
-- `timingSafeEqual` na assinatura;
-- proteção contra vínculo duplicado;
-- saída/revogação explícitas.
-
-A associação **não concede acesso a CRM, Agenda, Estoque ou Financeiro de outra unidade**. Qualquer compartilhamento futuro depende de política corporativa explícita e nova autorização técnica.
+Convites HMAC são direcionados ao tenant de destino, expiram, exigem ADMIN correto e não concedem acesso implícito a CRM, Agenda, Estoque ou Financeiro de outra unidade.
 
 ## Segurança e multi-tenancy
 
-A plataforma mantém:
-
-- JWT e sessão revogável;
-- refresh token de uso único/rotativo;
-- RBAC (`SUPER_ADMIN`, `ADMIN`, `RECEPTION`, `PROFESSIONAL`);
-- isolamento por `salonId`;
-- entitlements de módulo;
-- rate limit;
-- auditoria;
-- lifecycle `TRIAL`, `ACTIVE`, `PAST_DUE`, `CANCELED`;
-- LGPD export/anonymization;
-- backup assinado e restore guardado;
-- observabilidade com Build ID rastreável.
+A plataforma mantém JWT, sessão revogável, refresh token rotativo de uso único, RBAC (`SUPER_ADMIN`, `ADMIN`, `RECEPTION`, `PROFESSIONAL`), isolamento por `salonId`, entitlements de módulo, rate limit, auditoria, lifecycle SaaS, LGPD, backup assinado, restore guardado e observabilidade com Build ID rastreável.
 
 ### Operações destrutivas
 
-Reset/limpeza de dados não deve ser executado em produção. O endpoint de clean reset continua sendo uma superfície que merece hardening adicional por feature flag/env guard antes de qualquer uso operacional mais amplo.
+Reset/limpeza de dados não deve ser executado como homologação em produção. A superfície de clean reset continua registrada como dívida de hardening e deve receber feature flag/env guard explícita antes de qualquer ampliação de uso, por exemplo `PLATFORM_CLEAN_RESET_ENABLED=false` por padrão.
 
 ## Integrações externas
 
-- WhatsApp possui suporte a Twilio/Meta/provider HTTP; a baseline conhecida usa Twilio Trial, que é sandbox/trial e não sender definitivo de cliente.
-- Mercado Pago/Stripe permanecem opcionais enquanto cobrança automática não fizer parte do plano vendido.
-- NFS-e real depende de provider fiscal autorizado; o GlossFlow não simula um documento como `ISSUED` sem evidência de provider.
-- Sentry permanece opcional enquanto não fizer parte de SLA contratado.
+- WhatsApp: suporte a Twilio/Meta/provider HTTP; Twilio Trial é sandbox/trial, não sender definitivo de cliente.
+- Mercado Pago/Stripe: opcionais enquanto billing automático não fizer parte do plano vendido.
+- NFS-e: depende de provider fiscal autorizado; o GlossFlow não simula documento como `ISSUED` sem evidência de provider.
+- Sentry: opcional enquanto não fizer parte de SLA contratado.
 
 ## CI/CD e rastreabilidade
 
@@ -196,13 +140,19 @@ Gates permanentes:
 - `GlossFlow Quality Gate`;
 - `Production Gate`;
 - `Production Smoke Validation`;
-- validação pública responsiva do Marco 24 quando aplicável.
+- validação pública responsiva quando aplicável.
 
-O Production Smoke exige que o Render sirva exatamente os 12 primeiros caracteres do SHA que disparou o gate, verifica `/health`, `/ready`, MongoDB e endpoints públicos.
+O Production Smoke exige que o Render sirva exatamente os 12 primeiros caracteres do SHA esperado e valida frontend, `/health`, `/ready`, MongoDB e endpoints públicos.
 
-### Render
+### Baseline de produção homologada
 
-O repositório não possui atualmente workflow GitHub que faça deploy do backend no Render, e o auto-deploy do serviço não tem acompanhado cada commit de `main`. No fechamento do Marco 35, deve ser feito um único deploy manual do SHA final ou configurado Auto-Deploy/deploy hook de forma explícita.
+O encerramento do Marco 35 foi homologado no SHA:
+
+```text
+42804f4d9e047684f2d84c5fb5e3e82f5ed7059e
+```
+
+Esse SHA é a baseline de entrada do Marco 36. Alterações do Marco 36 são desenvolvidas em branch/PR antes de qualquer promoção para `main`, evitando quebrar desnecessariamente o sincronismo entre o `main` homologado e o backend de produção.
 
 ## Documentação principal
 
@@ -214,11 +164,13 @@ O repositório não possui atualmente workflow GitHub que faça deploy do backen
 - [`docs/engineering/SECURITY_LGPD.md`](docs/engineering/SECURITY_LGPD.md)
 - [`docs/engineering/MARCOS25_34_IMPLEMENTATION.md`](docs/engineering/MARCOS25_34_IMPLEMENTATION.md)
 - [`docs/engineering/MARCOS25_34_VALIDATION.md`](docs/engineering/MARCOS25_34_VALIDATION.md)
-- [`docs/engineering/MARCO35_ETAPA5_CHECKOUT.md`](docs/engineering/MARCO35_ETAPA5_CHECKOUT.md)
-- [`docs/engineering/MARCO35_ETAPA6_VALIDATION.md`](docs/engineering/MARCO35_ETAPA6_VALIDATION.md)
+- [`docs/engineering/MARCO35_FINAL_VALIDATION.md`](docs/engineering/MARCO35_FINAL_VALIDATION.md)
+- [`docs/engineering/MARCO36_BRANCH_HYGIENE.md`](docs/engineering/MARCO36_BRANCH_HYGIENE.md)
 
 ## Marco atual
 
-**Marco 35 — Consolidação e Homologação dos 19 módulos.**
+**Marco 36 — Homologação comercial e higiene pós-Marco 35.**
 
-Condição para encerramento oficial: gates do SHA final verdes, deploy do mesmo SHA no Vercel/Render, `/ready` com MongoDB no mesmo build, Production Smoke exact-SHA verde e registro final da Issue #28. Homologações humanas e providers externos continuam explicitamente separados da evidência automatizada.
+Issue canônica: **#29**.
+
+Prioridades imediatas: documentação sincronizada, higiene segura de branches históricas e homologação dos oito módulos `VALIDATION_REQUIRED` em tenant QA/ambiente autorizado. Marketing, Multiunidade e Fiscal permanecem `EVOLUTION_REQUIRED` até que as capacidades declaradas sejam realmente entregues.
