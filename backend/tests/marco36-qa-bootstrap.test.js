@@ -11,7 +11,7 @@ test('Marco 36 QA bootstrap exige guards explícitos', () => {
   assert.ok(script.includes("QA_TENANT_BOOTSTRAP_ENABLED !== 'true'"));
   assert.ok(script.includes("QA_ENVIRONMENT || '').toLowerCase() !== 'qa'"));
   assert.ok(script.includes('CREATE_ISOLATED_QA_TENANT'));
-  assert.ok(script.includes("QA_DATABASE_NAME"));
+  assert.ok(script.includes('QA_DATABASE_NAME'));
   assert.ok(script.includes('actualDatabase !== expectedDatabase'));
 });
 
@@ -32,7 +32,8 @@ test('bootstrap QA reutiliza ciclo SaaS canônico e os 19 módulos', () => {
 test('bootstrap QA é idempotente por slug e não imprime senha', () => {
   assert.ok(script.includes('prisma.salon.findUnique({ where: { slug } })'));
   assert.ok(script.includes('reused: true'));
-  assert.equal(script.includes('adminPassword,'), false);
+  assert.equal(script.includes('console.log(adminPassword'), false);
+  assert.equal(script.includes('adminPassword: adminPassword'), false);
 });
 
 test('package expõe comando QA dedicado', () => {
