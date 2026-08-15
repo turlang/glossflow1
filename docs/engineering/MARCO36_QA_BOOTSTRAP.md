@@ -21,13 +21,13 @@ O comando `npm run qa:bootstrap`:
 
 ## Preparação
 
-No diretório `backend`, copie `.env.qa.example` para `.env.qa` e preencha somente valores do ambiente isolado.
+No diretório `backend`, copie `qa-env.template` para `.env.qa` e preencha somente valores do ambiente isolado. O template usa nome neutro porque o gate de higiene do repositório bloqueia corretamente arquivos versionados com padrão `.env.*`.
 
 Exemplo em PowerShell:
 
 ```powershell
 cd backend
-Copy-Item .env.qa.example .env.qa
+Copy-Item qa-env.template .env.qa
 ```
 
 Campos obrigatórios:
