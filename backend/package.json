@@ -11,6 +11,7 @@
     "prisma:push": "prisma db push --schema prisma/schema.prisma",
     "seed": "node prisma/seed.js",
     "admin:bootstrap": "node scripts/bootstrap-super-admin.js",
+    "qa:bootstrap": "node -r ts-node/register/transpile-only scripts/provision-qa-tenant.ts",
     "data:reset:clean": "node scripts/reset-test-data.js",
     "render:build": "npm ci && npx prisma generate --schema prisma/schema.prisma && npm run build",
     "render:start": "node dist/server.js",
