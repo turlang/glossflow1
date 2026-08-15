@@ -1,0 +1,109 @@
+name: Marco 36 QA Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Digite CREATE_ISOLATED_QA_TENANT para confirmar'
+        required: true
+        type: string
+      qa_database_name:
+        description: 'Nome exato do banco QA usado em QA_DATABASE_URL'
+        required: true
+        default: 'glossflow-qa'
+        type: string
+      tenant_slug:
+        description: 'Slug do tenant QA (precisa conter qa)'
+        required: true
+        default: 'glossflow-qa'
+        type: string
+      tenant_name:
+        description: 'Nome visível do tenant QA'
+        required: true
+        default: 'GlossFlow QA'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marco36-qa-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Provision isolated QA tenant
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Guard manual execution
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Este workflow só pode provisionar QA a partir da branch main."
+            exit 1
+          fi
+          if [ "$CONFIRMATION" != "CREATE_ISOLATED_QA_TENANT" ]; then
+            echo "Confirmação inválida. Nenhuma alteração foi executada."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify QA secrets without printing values
+        env:
+          DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+          QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "Secret QA_DATABASE_URL ausente."; exit 1; fi
+          if [ -z "$QA_ADMIN_EMAIL" ]; then echo "Secret QA_ADMIN_EMAIL ausente."; exit 1; fi
+          if [ -z "$QA_ADMIN_PASSWORD" ]; then echo "Secret QA_ADMIN_PASSWORD ausente."; exit 1; fi
+          if [ ${#QA_ADMIN_PASSWORD} -lt 12 ]; then echo "QA_ADMIN_PASSWORD precisa ter pelo menos 12 caracteres."; exit 1; fi
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Provision or reuse isolated QA tenant
+        working-directory: backend
+        env:
+          QA_TENANT_BOOTSTRAP_ENABLED: 'true'
+          QA_ENVIRONMENT: 'qa'
+          QA_CONFIRMATION: 'CREATE_ISOLATED_QA_TENANT'
+          QA_DATABASE_NAME: ${{ inputs.qa_database_name }}
+          DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_TENANT_SLUG: ${{ inputs.tenant_slug }}
+          QA_TENANT_NAME: ${{ inputs.tenant_name }}
+          QA_PLAN_NAME: 'QA Internal'
+          QA_ADMIN_NAME: 'GlossFlow QA Admin'
+          QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+          QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
+          QA_PHONE: '5500000000000'
+          QA_WHATSAPP: '5500000000000'
+          QA_ADDRESS: 'Ambiente QA isolado'
+        run: |
+          set -o pipefail
+          npm run qa:bootstrap | sed -E 's/("adminEmail"[[:space:]]*:[[:space:]]*)"[^"]+"/\1"[redacted]"/'
+
+      - name: Record safe summary
+        if: success()
+        run: |
+          echo "### Marco 36 — QA bootstrap" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tenant QA provisionado/reutilizado com sucesso." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Banco declarado: \`${{ inputs.qa_database_name }}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Slug: \`${{ inputs.tenant_slug }}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Credenciais e DATABASE_URL não são exibidos." >> "$GITHUB_STEP_SUMMARY"
