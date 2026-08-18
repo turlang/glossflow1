@@ -43,7 +43,14 @@ export async function transactionalHomologationRoutes(app: FastifyInstance) {
       if (!revenue && sale.status !== 'REFUNDED') findings.push({ severity: 'ERROR', domain: 'POS_FINANCE', reference: sale.number, message: 'Venda paga sem lançamento financeiro PDV correspondente.' });
 
       for (const item of sale.items.filter((entry) => entry.kind === 'PRODUCT' && entry.inventoryProductId)) {
-        const movement = await prisma.inventoryMovement.findFirst({ where: { salonId, productId: item.inventoryProductId!, type: 'OUT', reason: `Venda ${sale.number}` } });
+        const movement = await prisma.inventoryMovement.findFirst({
+          where: {
+            salonId,
+            productId: item.inventoryProductId!,
+            type: 'OUT',
+            reason: { startsWith: `Venda ${sale.number}` }
+          }
+        });
         if (!movement || movement.quantity < item.quantity) findings.push({ severity: 'ERROR', domain: 'POS_STOCK', reference: sale.number, message: `Baixa de estoque ausente/incompleta para ${item.description}.` });
 
         if (sale.status === 'REFUNDED') {
