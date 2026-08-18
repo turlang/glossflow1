@@ -1,0 +1,102 @@
+name: Marco 36 QA Commercial Probes
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Digite RUN_COMMERCIAL_QA_PROBES para confirmar'
+        required: true
+        type: string
+      qa_database_name:
+        description: 'Nome exato do banco QA usado em QA_DATABASE_URL'
+        required: true
+        default: 'glossflow-qa'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marco36-qa-commercial-probes
+  cancel-in-progress: false
+
+jobs:
+  probes:
+    name: Validate commercial QA probes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Guard isolated QA execution
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          QA_DATABASE_NAME: ${{ inputs.qa_database_name }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Este workflow só pode rodar a partir da branch main."
+            exit 1
+          fi
+          if [ "$CONFIRMATION" != "RUN_COMMERCIAL_QA_PROBES" ]; then
+            echo "Confirmação inválida. Nenhum probe foi executado."
+            exit 1
+          fi
+          case "$QA_DATABASE_NAME" in
+            *qa*|*QA*) ;;
+            *) echo "O banco declarado precisa ser explicitamente QA."; exit 1 ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify QA secrets without printing values
+        env:
+          DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+          QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "Secret QA_DATABASE_URL ausente."; exit 1; fi
+          if [ -z "$QA_ADMIN_EMAIL" ]; then echo "Secret QA_ADMIN_EMAIL ausente."; exit 1; fi
+          if [ -z "$QA_ADMIN_PASSWORD" ]; then echo "Secret QA_ADMIN_PASSWORD ausente."; exit 1; fi
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Run isolated commercial probes
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          QA_COMMERCIAL_PROBES_ENABLED: 'true'
+          QA_ENVIRONMENT: 'qa'
+          QA_CONFIRMATION: 'RUN_COMMERCIAL_QA_PROBES'
+          QA_DATABASE_NAME: ${{ inputs.qa_database_name }}
+          DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+          QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
+          TWILIO_TRIAL_MODE: 'true'
+        run: node -r ts-node/register/transpile-only scripts/run-commercial-qa-probes.ts
+
+      - name: Publish safe job summary
+        if: success()
+        run: cat backend/qa-commercial-probe-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marco36-qa-commercial-probes
+          path: |
+            backend/qa-commercial-probe-report.json
+            backend/qa-commercial-probe-summary.md
+          if-no-files-found: warn
+          retention-days: 14
