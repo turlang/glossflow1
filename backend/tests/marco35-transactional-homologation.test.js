@@ -16,6 +16,7 @@ test('diagnóstico cruza PDV com financeiro, estoque e estorno', () => {
   assert.ok(route.includes("category: 'PDV'"));
   assert.ok(route.includes('description: `Venda ${sale.number}`'));
   assert.ok(route.includes("type: 'OUT'"));
+  assert.ok(route.includes('reason: { startsWith: `Venda ${sale.number}` }'));
   assert.ok(route.includes("category: 'REFUND'"));
   assert.ok(route.includes('description: `Estorno ${sale.number}`'));
 });
@@ -41,5 +42,5 @@ test('diagnóstico permanece tenant-safe', () => {
 
 test('rota só é promovida quando registrada no appRoutes', () => {
   const registered = appRoutes.includes("import { transactionalHomologationRoutes } from './transactional-homologation.routes';") && appRoutes.includes('business.register(transactionalHomologationRoutes)');
-  assert.equal(typeof registered, 'boolean');
+  assert.equal(registered, true);
 });

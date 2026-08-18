@@ -1,0 +1,102 @@
+name: Marco 36 QA Functional Scenarios
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Digite RUN_QA_FUNCTIONAL_SCENARIOS para confirmar'
+        required: true
+        type: string
+      qa_database_name:
+        description: 'Nome exato do banco QA usado em QA_DATABASE_URL'
+        required: true
+        default: 'glossflow-qa'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marco36-qa-functional-scenarios
+  cancel-in-progress: false
+
+jobs:
+  functional:
+    name: Validate 7 functional QA modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard isolated QA execution
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          QA_DATABASE_NAME: ${{ inputs.qa_database_name }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Este workflow só pode rodar a partir da branch main."
+            exit 1
+          fi
+          if [ "$CONFIRMATION" != "RUN_QA_FUNCTIONAL_SCENARIOS" ]; then
+            echo "Confirmação inválida. Nenhum cenário funcional foi executado."
+            exit 1
+          fi
+          case "$QA_DATABASE_NAME" in
+            *qa*|*QA*|*test*|*staging*) ;;
+            *) echo "O banco declarado precisa ser explicitamente QA/test/staging."; exit 1 ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify QA secrets without printing values
+        env:
+          DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+          QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "Secret QA_DATABASE_URL ausente."; exit 1; fi
+          if [ -z "$QA_ADMIN_EMAIL" ]; then echo "Secret QA_ADMIN_EMAIL ausente."; exit 1; fi
+          if [ -z "$QA_ADMIN_PASSWORD" ]; then echo "Secret QA_ADMIN_PASSWORD ausente."; exit 1; fi
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Run isolated functional scenarios
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          QA_FUNCTIONAL_SCENARIOS_ENABLED: 'true'
+          QA_ENVIRONMENT: qa
+          QA_CONFIRMATION: 'RUN_QA_FUNCTIONAL_SCENARIOS'
+          QA_DATABASE_NAME: ${{ inputs.qa_database_name }}
+          DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+          QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
+          TWILIO_TRIAL_MODE: 'true'
+        run: node -r ts-node/register/transpile-only scripts/run-qa-functional-scenarios.ts
+
+      - name: Publish safe job summary
+        if: success()
+        run: cat backend/qa-functional-scenarios-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marco36-qa-functional-scenarios
+          path: |
+            backend/qa-functional-scenarios-report.json
+            backend/qa-functional-scenarios-summary.md
+          if-no-files-found: warn
+          retention-days: 14
