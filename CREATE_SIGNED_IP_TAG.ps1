@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Repository = "turlang/glossflow1"
-$TargetCommit = "8728dd3a53caa5ed892957933c129fcae4985f62"
+$TargetCommit = "58ce16ed8321d913f155f7f5bf29786ca50a4af1"
 
 function Assert-LastExitCode([string]$Message) {
   if ($LASTEXITCODE -ne 0) { throw $Message }
