@@ -1,0 +1,91 @@
+name: IP Provenance
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'ip-evidence-*'
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  provenance:
+    name: Source provenance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build source archive and SHA-256
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          SAFE_REF="${GITHUB_REF_NAME//\//-}"
+          NAME="${GITHUB_REPOSITORY##*/}-${SAFE_REF}-${GITHUB_SHA::12}"
+          git archive --format=zip --output "${NAME}.zip" "$GITHUB_SHA"
+          sha256sum "${NAME}.zip" | tee "${NAME}.zip.sha256"
+          echo "artifact=${NAME}.zip" >> "$GITHUB_OUTPUT"
+          echo "checksum=${NAME}.zip.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload provenance package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip-provenance-${{ github.sha }}
+          path: |
+            ${{ steps.archive.outputs.artifact }}
+            ${{ steps.archive.outputs.checksum }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Attest build provenance with Sigstore
+        if: ${{ github.event.repository.visibility == 'public' }}
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.archive.outputs.artifact }}
+
+      - name: Create or update GitHub Release for signed tag
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="$GITHUB_REF_NAME"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              "${{ steps.archive.outputs.artifact }}" \
+              "${{ steps.archive.outputs.checksum }}" \
+              --clobber
+          else
+            gh release create "$TAG" \
+              "${{ steps.archive.outputs.artifact }}" \
+              "${{ steps.archive.outputs.checksum }}" \
+              --title "$TAG" \
+              --generate-notes
+          fi
+
+      - name: Write provenance summary
+        shell: bash
+        run: |
+          {
+            echo '## IP Provenance'
+            echo
+            echo "- Repository: \`${GITHUB_REPOSITORY}\`"
+            echo "- Ref: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Archive: \`${{ steps.archive.outputs.artifact }}\`"
+            echo "- SHA-256 file: \`${{ steps.archive.outputs.checksum }}\`"
+            if [[ "${{ github.event.repository.visibility }}" == "public" ]]; then
+              echo '- Sigstore attestation: enabled'
+            else
+              echo '- Sigstore attestation: skipped for private repository unless Enterprise Cloud support is configured'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
