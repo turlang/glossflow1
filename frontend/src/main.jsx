@@ -1,3 +1,9 @@
+/**
+ * Copyright © 2026 Evandro Ricardo. All Rights Reserved.
+ * Proprietary software. Unauthorized copying, modification, distribution,
+ * or commercial use is prohibited. See LICENSE.md for terms.
+ */
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
