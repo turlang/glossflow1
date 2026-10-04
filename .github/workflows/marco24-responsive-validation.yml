@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      WEB_URL: https://glossflow1.vercel.app
+      WEB_URL: ${{ github.event_name == 'pull_request' && 'http://127.0.0.1:4173' || 'https://glossflow1.vercel.app' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,6 +34,22 @@ jobs:
           npm audit --audit-level=high
           npx playwright install --with-deps chromium
 
+      - name: Build PR frontend with local fixture
+        if: github.event_name == 'pull_request'
+        working-directory: frontend
+        env:
+          VITE_API_URL: http://127.0.0.1:3333
+        run: |
+          npm ci
+          npm run build
+          node scripts/public-ci-fixture.cjs > /tmp/glossflow-api-fixture.log 2>&1 &
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/glossflow-preview.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+
       - name: Validate public responsive journeys
         run: |
           mkdir -p "$GITHUB_WORKSPACE/responsive-artifacts"
@@ -50,11 +66,13 @@ jobs:
             { key: 'commercial', url: `${baseUrl}/?action=commercial` }
           ];
           const viewports = [
+            { key: 'mobile-320', width: 320, height: 800 },
             { key: 'desktop-1366', width: 1366, height: 768 },
             { key: 'desktop-1920', width: 1920, height: 1080 },
             { key: 'tablet-portrait', width: 768, height: 1024 },
             { key: 'mobile-large', width: 430, height: 932 },
-            { key: 'mobile-small', width: 360, height: 800 }
+            { key: 'mobile-small', width: 360, height: 800 },
+            { key: 'ultrawide', width: 2560, height: 1440 }
           ];
 
           const browser = await chromium.launch({ headless: true });
@@ -70,6 +88,13 @@ jobs:
 
               const response = await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
               await page.waitForTimeout(2500);
+
+              if (target.key === 'booking' && baseUrl.startsWith('http://127.0.0.1')) {
+                await page.locator('.booking-service').first().click();
+                await page.locator('.booking-day:not(:disabled)').first().click();
+                await page.locator('.booking-slot').first().click();
+                await page.getByRole('button', { name: 'Confirmar este horário' }).waitFor();
+              }
 
               const state = await page.evaluate(() => {
                 const root = document.documentElement;

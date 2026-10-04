@@ -26,12 +26,16 @@ Ambiente: Windows, Node 22.23.3. Os comandos `npm test` iniciam testes em UTC pa
 - Backend: geração Prisma, lint TypeScript, build e 180 testes passaram.
 - Frontend: lint ESLint, build com orçamento de bundles e 87 testes passaram.
 - Gate de higiene do repositório e `git diff --check` passaram.
+- Auditorias npm de frontend/backend sem vulnerabilidades após atualização do Fastify 5.12.5, Vitest 4.1.11 e dependências transitivas. O watcher antigo `ts-node-dev`, sem correção disponível para sua cadeia vulnerável, foi substituído pelo modo watch nativo do Node com o mesmo registro ts-node.
+- O check responsivo de PR agora compila a própria branch, usa preview e fixture pública locais e abre também a confirmação do agendamento. O disparo manual continua verificando o site publicado. A fixture não acessa banco ou provedores reais.
 - Navegador: login por perfil, acesso à gestão completa, agenda profissional somente leitura e confirmação pública exercitados com API local de dados fictícios.
 - Layouts de hoje e agendamento verificados em 320, 430, 768, 1024, 1920 e 2560 px. Sem transbordamento horizontal global. Campos e confirmação do agendamento com altura de 48 px após a correção.
 
 ## Limites e ativação
 
 Não houve alteração do banco de produção, merge na main ou implantação manual. Os testes HTTP usam a aplicação Fastify com persistência simulada; a navegação usa dados fictícios locais. MongoDB real, entrega de WhatsApp, pagamentos e implantação em produção não foram homologados nesta execução.
+
+Os checks da Vercel indicam implantação bloqueada na conta; o site publicado retornou 402 / Deployment Paused no smoke anterior. Esse impedimento externo não foi contornado nem apresentado como implantação bem-sucedida.
 
 Antes de disponibilizar a nova versão, o build da API deve gerar o cliente Prisma com o campo opcional `Professional.userId`. O administrador deve vincular as contas existentes aos profissionais; não há associação automática por nome ou e-mail. Contas ainda sem vínculo receberão a mensagem de configuração pendente, sem acesso à agenda do salão.
 
