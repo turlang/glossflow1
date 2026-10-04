@@ -168,6 +168,18 @@ test('ADMIN vincula uma conta ativa do próprio salão', async () => {
   });
 });
 
+test('equipe administrativa é consultada no salão da sessão', async () => {
+  await withMocks({
+    salon: { findUnique: async () => enabledSalon() },
+    professional: { findMany: async ({where}) => { assert.deepEqual(where,{salonId}); return [{id:appointmentId,name:'Equipe própria'}]; } }
+  }, async () => {
+    const response=await inject('ADMIN',{method:'GET',url:'/admin/professionals?salon=outro'});
+    assert.equal(response.statusCode,200); assert.equal(response.json()[0].name,'Equipe própria');
+    const denied=await inject('PROFESSIONAL',{method:'GET',url:'/admin/professionals'});
+    assert.equal(denied.statusCode,403);
+  });
+});
+
 test('PROFESSIONAL não pode reagendar atendimento', async () => {
   const response = await inject('PROFESSIONAL', {
     method: 'PUT',

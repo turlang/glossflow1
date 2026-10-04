@@ -23,6 +23,10 @@ const adminOrReception = { preHandler: requireRouteRoles(['ADMIN', 'RECEPTION'])
  * Cada consulta usa salonId vindo do token para garantir isolamento multi-tenant.
  */
 export async function adminCrudRoutes(app: FastifyInstance) {
+  app.get('/admin/professionals', adminOrReception, async (request) => {
+    const tenant = getTenant(request);
+    return prisma.professional.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: 'asc' } });
+  });
   app.get('/admin/professionals/user-links', adminOnly, async (request) => {
     const tenant = getTenant(request);
     return prisma.professional.findMany({ where: { salonId: tenant.salonId }, select: { id: true, userId: true } });

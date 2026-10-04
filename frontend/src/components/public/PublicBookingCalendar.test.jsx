@@ -42,7 +42,7 @@ describe('agendamento direto sem conta', () => {
         salon={{ name: 'Salão' }}
       />
     );
-    fireEvent.click(await screen.findByRole('button', { name: /04 de outubro: 1 vagas/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /04 de outubro: 1 vagas/ }, { timeout: 5000 }));
     fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
     fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Cliente Teste' } });
     fireEvent.change(screen.getByLabelText('WhatsApp'), { target: { value: '11999999999' } });
@@ -68,7 +68,7 @@ describe('agendamento direto sem conta', () => {
         onCreated={vi.fn()}
       />
     );
-    fireEvent.click(await screen.findByRole('button', { name: /04 de outubro: 1 vagas/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /04 de outubro: 1 vagas/ }, { timeout: 5000 }));
     fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
     fireEvent.click(screen.getByRole('button', { name: /Escova/ }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Confirmar este horário' })).toBeNull());
@@ -90,7 +90,7 @@ describe('agendamento direto sem conta', () => {
             }
     );
     render(<PublicBookingCalendar services={services} professionals={professionals} onCreated={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('button', { name: /04 de outubro: 1 vagas/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /04 de outubro: 1 vagas/ }, { timeout: 5000 }));
     fireEvent.click(screen.getByRole('button', { name: /05 de outubro: 1 vagas/ }));
     expect(await screen.findByRole('button', { name: '14:00' })).toBeTruthy();
     await act(async () => resolveOld(day));

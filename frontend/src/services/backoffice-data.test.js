@@ -35,6 +35,7 @@ describe('loadTenantBackofficeData por papel', () => {
     await loadTenantBackofficeData({ role: ROLES.ADMIN });
     const paths = calledPaths();
     expect(paths).toContain('/admin/users');
+    expect(paths).toContain('/admin/professionals');
     expect(paths).toContain('/admin/financial');
     expect(paths).toContain('/admin/commissions');
     expect(paths).toContain('/admin/subscription');
@@ -60,5 +61,11 @@ describe('loadTenantBackofficeData por papel', () => {
   it('PROFESSIONAL consulta apenas salão e Agenda', async () => {
     await loadTenantBackofficeData({ role: ROLES.PROFESSIONAL });
     expect(calledPaths()).toEqual(['/admin/salon-info', '/admin/appointments']);
+  });
+  it('carrega a equipe pelo endpoint autenticado, sem reutilizar catálogo público', async () => {
+    request.mockImplementation(async path => path === '/admin/professionals' ? [{id:'own-professional',name:'Equipe própria'}] : responseFor(path));
+    const result=await loadTenantBackofficeData({role:ROLES.ADMIN});
+    expect(result.adminProfessionals).toEqual([{id:'own-professional',name:'Equipe própria'}]);
+    expect(calledPaths()).not.toContain('/professionals');
   });
 });

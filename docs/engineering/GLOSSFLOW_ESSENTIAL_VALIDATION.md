@@ -14,6 +14,7 @@
 - `/admin/appointments` deriva o profissional de `Professional.userId` e do salão da sessão. Sem vínculo ativo único, responde 403 antes de ler atendimentos. Parâmetros da URL não substituem essa identidade.
 - Notificações operacionais ficam restritas a administrador/recepção para não expor atendimentos da equipe ao profissional.
 - Administrador vincula contas ativas com papel PROFESSIONAL em Gestão completa → Profissionais → Contas da equipe. Conta de outro salão é rejeitada. Recepção e profissional não podem alterar esse vínculo.
+- A equipe administrativa é carregada por `/admin/professionals` usando o salão da sessão, mesmo se o login começar pela vitrine pública de outro salão. A agenda completa do profissional deriva sua equipe dos atendimentos já filtrados.
 - Login administrador abre Meu negócio hoje. Previsão exclui cancelamentos/faltas; recebido considera apenas receitas pagas com referência no dia. Módulos desabilitados aparecem como indisponíveis.
 - Agendamento direto: `/?action=booking&salon=SLUG`. Os parâmetros opcionais `service=ID` e `professional=ID` só pré-selecionam registros válidos carregados pelo salão e profissional elegível ao serviço.
 - Cliente escolhe serviço → profissional opcional → dia/horário → nome/WhatsApp → confirmação. E-mail e observações ficam em informações opcionais. Não exige conta.
@@ -23,8 +24,8 @@
 
 Ambiente: Windows, Node 22.23.3. Os comandos `npm test` iniciam testes em UTC para os cenários existentes com datas fixas; três testes de backend fixam também a data do cenário. O fuso da aplicação não foi alterado.
 
-- Backend: geração Prisma, lint TypeScript, build e 180 testes passaram.
-- Frontend: lint ESLint, build com orçamento de bundles e 87 testes passaram.
+- Backend: geração Prisma, lint TypeScript, build e 181 testes passaram.
+- Frontend: lint ESLint, build com orçamento de bundles e 88 testes passaram.
 - Gate de higiene do repositório e `git diff --check` passaram.
 - Auditorias npm de frontend/backend sem vulnerabilidades após atualização do Fastify 5.12.5, Vitest 4.1.11 e dependências transitivas. O watcher antigo `ts-node-dev`, sem correção disponível para sua cadeia vulnerável, foi substituído pelo modo watch nativo do Node com o mesmo registro ts-node.
 - O check responsivo de PR agora compila a própria branch, usa preview e fixture pública locais e abre também a confirmação do agendamento. O disparo manual continua verificando o site publicado. A fixture não acessa banco ou provedores reais.
