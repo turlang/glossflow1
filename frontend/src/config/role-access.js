@@ -24,6 +24,8 @@ export const DASHBOARD_MENU_KEYS_BY_ROLE = Object.freeze({
 });
 
 const TENANT_PAGE_ROLES = Object.freeze({
+  'professional-today': Object.freeze([ROLES.PROFESSIONAL]),
+  'professional-agenda': Object.freeze([ROLES.PROFESSIONAL]),
   admin: Object.freeze([ROLES.ADMIN, ROLES.RECEPTION, ROLES.PROFESSIONAL]),
   'agent-test': Object.freeze([ROLES.ADMIN, ROLES.RECEPTION]),
   'professional-services': Object.freeze([ROLES.ADMIN, ROLES.RECEPTION]),

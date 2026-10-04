@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { professionalIdentity } from '../../services/professional-identity.service';
 import { prisma } from '../../lib/prisma';
 import { getTenant } from '../helpers';
 import { professionalCanPerform } from '../../services/professional-capability.service';
@@ -17,23 +18,25 @@ import { adminAgendaAccess, agendaManageAccess } from './access';
 import { appointmentUpdateSchema, idParamSchema, smartFitQuerySchema } from './contracts';
 
 export async function adminAppointmentRoutes(app: FastifyInstance) {
-  app.get('/admin/appointments', adminAgendaAccess, async (request) => {
+  app.get('/admin/appointments', adminAgendaAccess, async (request, reply) => {
     const tenant = getTenant(request);
-    return prisma.appointment.findMany({ where: { salonId: tenant.salonId }, include: { service: true, professional: true }, orderBy: { startTime: 'asc' } });
+    const professionalId = tenant.role === 'PROFESSIONAL' ? await professionalIdentity(tenant) : undefined;
+    if (professionalId === null) return reply.status(403).send({ message: 'Peça ao administrador para vincular sua conta ao cadastro profissional.' });
+    return prisma.appointment.findMany({ where: { salonId: tenant.salonId, ...(professionalId ? { professionalId } : {}) }, include: { service: true, professional: true }, orderBy: { startTime: 'asc' } });
   });
 
-  app.get('/admin/appointments/notifications', adminAgendaAccess, async (request) => {
+  app.get('/admin/appointments/notifications', agendaManageAccess, async (request) => {
     const tenant = getTenant(request);
     const notifications = await listOperationalNotifications({ salonId: tenant.salonId, userId: tenant.id, limit: 50 });
     return { notifications, unread: notifications.filter((item) => !item.read).length };
   });
 
-  app.put('/admin/appointments/notifications/read-all', adminAgendaAccess, async (request) => {
+  app.put('/admin/appointments/notifications/read-all', agendaManageAccess, async (request) => {
     const tenant = getTenant(request);
     return markAllOperationalNotificationsRead({ salonId: tenant.salonId, userId: tenant.id });
   });
 
-  app.put('/admin/appointments/notifications/:id/read', adminAgendaAccess, async (request, reply) => {
+  app.put('/admin/appointments/notifications/:id/read', agendaManageAccess, async (request, reply) => {
     const tenant = getTenant(request);
     const { id } = idParamSchema.parse(request.params);
     const marked = await markOperationalNotificationRead({ salonId: tenant.salonId, userId: tenant.id, notificationId: id });

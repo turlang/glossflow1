@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { ProfessionalAccountLinks } from './ProfessionalAccountLinks.jsx';
 import { currency } from '../../utils/format.js';
 import { dashboardMenuForRole, defaultDashboardTabForRole } from '../../config/role-access.js';
 import { OnboardingChecklist, ExecutiveDashboard, AdvancedMetricsAdmin } from './AdminOverview.jsx';
@@ -120,7 +121,7 @@ export function AdminDashboard({ role, salon, services, professionals, portfolio
           {tab === 'executive' && <ExecutiveDashboard services={services} professionals={professionals} appointments={appointments} clients={clients} inventory={inventory} financialEntries={financialEntries} commissions={commissions} insights={insights} setTab={selectTab} />}
           {tab === 'analytics' && <AdvancedMetricsAdmin appointments={appointments} clients={clients} financialEntries={financialEntries} inventory={inventory} />}
           {tab === 'services' && <ServicesAdmin services={services} reload={reload} />}
-          {tab === 'professionals' && <ProfessionalsAdmin professionals={professionals} reload={reload} />}
+          {tab === 'professionals' && <><ProfessionalsAdmin professionals={professionals} reload={reload} />{role === 'ADMIN' && <ProfessionalAccountLinks professionals={professionals} users={users} />}</>}
           {tab === 'portfolio' && <PortfolioAdmin portfolio={portfolio} reload={reload} />}
           {tab === 'appointments' && <AgendaCommercialHub role={role} appointments={appointments} professionals={professionals} services={services} reload={reload} setPage={setPage} />}
           {tab === 'inventory' && <InventoryAdmin inventory={inventory} reload={reload} />}

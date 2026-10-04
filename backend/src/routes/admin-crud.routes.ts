@@ -23,6 +23,24 @@ const adminOrReception = { preHandler: requireRouteRoles(['ADMIN', 'RECEPTION'])
  * Cada consulta usa salonId vindo do token para garantir isolamento multi-tenant.
  */
 export async function adminCrudRoutes(app: FastifyInstance) {
+  app.get('/admin/professionals/user-links', adminOnly, async (request) => {
+    const tenant = getTenant(request);
+    return prisma.professional.findMany({ where: { salonId: tenant.salonId }, select: { id: true, userId: true } });
+  });
+  app.put('/admin/professionals/:id/user-link', adminOnly, async (request, reply) => {
+    const tenant = getTenant(request);
+    const { id } = z.object({ id: objectIdSchema }).parse(request.params);
+    const { userId } = z.object({ userId: objectIdSchema.nullable() }).parse(request.body);
+    if (userId) {
+      const user = await prisma.user.findFirst({ where: { id: userId, salonId: tenant.salonId, role: 'PROFESSIONAL', active: true } });
+      if (!user) return reply.status(404).send({ message: 'Conta profissional não encontrada neste salão.' });
+      const existing = await prisma.professional.findFirst({ where: { salonId: tenant.salonId, userId, id: { not: id } } });
+      if (existing) return reply.status(409).send({ message: 'Esta conta já está vinculada a outro profissional.' });
+    }
+    const result = await prisma.professional.updateMany({ where: { id, salonId: tenant.salonId }, data: { userId } });
+    if (!result.count) return reply.status(404).send({ message: 'Profissional não encontrado neste salão.' });
+    return { linked: Boolean(userId) };
+  });
   app.put('/admin/salon', adminOnly, async (request) => {
     const tenant = getTenant(request);
     const data = salonSchema.parse(request.body);

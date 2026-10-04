@@ -1,3 +1,6 @@
+import { ProfessionalToday } from './components/professional/ProfessionalToday.jsx';
+import { AgendaEnterprise } from './components/admin/AgendaEnterprise.jsx';
+import './professional-today.css';
 import React, { Suspense, useEffect, useState } from 'react';
 import { isAuthExpiredError, logoutSession, markAuthenticatedSession, onAuthExpired, request } from './services/api.js';
 import { emptyBackofficeData, loadTenantBackofficeData } from './services/backoffice-data.js';
@@ -120,6 +123,8 @@ export default function App() {
       {!loading && error && <StateMessage title="Não foi possível conectar à API." text={error} danger />}
 
       <Suspense fallback={<SkeletonPage />}>
+        {!loading && !error && page === 'professional-today' && <ProfessionalToday appointments={appointments} setPage={navigateFromAuthenticatedShell} />}
+        {!loading && !error && page === 'professional-agenda' && <main className="container"><button onClick={() => setPage('professional-today')}>Voltar para hoje</button><AgendaEnterprise appointments={appointments} professionals={professionals.filter(p => appointments.some(a => a.professionalId === p.id))} readOnly /></main>}
         {!loading && !error && page === 'public' && <PublicShowcase salon={salon} services={services} professionals={professionals} portfolio={portfolio} setPage={setPage} />}
         {!loading && !error && page === 'commercial' && <CommercialLanding />}
         {!loading && !error && page === 'client-portal' && <ClientPortalPage token={portalToken} setPage={setPage} />}

@@ -51,8 +51,8 @@ describe('matriz de homologação por papel', () => {
   });
 
   it('troca de papel redireciona uma tela proibida para o dashboard do tenant', () => {
-    expect(normalizePageForRole({ page: 'waitlist', authenticated: true, role: ROLES.PROFESSIONAL })).toBe('admin');
-    expect(normalizePageForRole({ page: 'professional-schedule', authenticated: true, role: ROLES.PROFESSIONAL })).toBe('admin');
+    expect(normalizePageForRole({ page: 'waitlist', authenticated: true, role: ROLES.PROFESSIONAL })).toBe('professional-today');
+    expect(normalizePageForRole({ page: 'professional-schedule', authenticated: true, role: ROLES.PROFESSIONAL })).toBe('professional-today');
   });
 
   it('SUPER_ADMIN nunca permanece no painel operacional de um tenant', () => {
