@@ -70,6 +70,7 @@ jobs:
             { key: 'desktop-1366', width: 1366, height: 768 },
             { key: 'desktop-1920', width: 1920, height: 1080 },
             { key: 'tablet-portrait', width: 768, height: 1024 },
+            { key: 'tablet-landscape', width: 1024, height: 768 },
             { key: 'mobile-large', width: 430, height: 932 },
             { key: 'mobile-small', width: 360, height: 800 },
             { key: 'ultrawide', width: 2560, height: 1440 }
@@ -91,7 +92,7 @@ jobs:
 
               if (target.key === 'booking' && baseUrl.startsWith('http://127.0.0.1')) {
                 await page.locator('.booking-service').first().click();
-                await page.locator('.booking-day:not(:disabled)').first().click();
+                await page.locator('button.booking-day:not(:disabled)').first().click();
                 await page.locator('.booking-slot').first().click();
                 await page.getByRole('button', { name: 'Confirmar este horário' }).waitFor();
               }
