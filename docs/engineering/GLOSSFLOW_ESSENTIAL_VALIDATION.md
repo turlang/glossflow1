@@ -1,0 +1,38 @@
+# GlossFlow Essential — validação de 04/10/2026
+
+## Recuperação da branch
+
+- `main` preservada no commit `acb5f97557955d66b80ae73429141542b8effa83`.
+- Branch incorreta preservada em `backup/glossflow-essential-20261004`, commit `4e458f993f1c5980d8ffec079c51344d9945b3d3`.
+- `feat/glossflow-essential` reconstruída a partir da `main`. A primeira correção está em `a6ac4be`.
+- Nenhuma exclusão de arquivo da `main` faz parte da recuperação. Os commits antigos não foram aplicados integralmente, pois continham árvores incompletas.
+
+## Entregas
+
+- Direção de UX recuperada em `docs/GLOSSFLOW-ESSENTIAL-UX.md`.
+- Login profissional abre Minha agenda de hoje, usa `startTime` da API, mostra duração, estado traduzido e próximo atendimento. Outros dias abre agenda somente leitura.
+- `/admin/appointments` deriva o profissional de `Professional.userId` e do salão da sessão. Sem vínculo ativo único, responde 403 antes de ler atendimentos. Parâmetros da URL não substituem essa identidade.
+- Notificações operacionais ficam restritas a administrador/recepção para não expor atendimentos da equipe ao profissional.
+- Administrador vincula contas ativas com papel PROFESSIONAL em Gestão completa → Profissionais → Contas da equipe. Conta de outro salão é rejeitada. Recepção e profissional não podem alterar esse vínculo.
+- Login administrador abre Meu negócio hoje. Previsão exclui cancelamentos/faltas; recebido considera apenas receitas pagas com referência no dia. Módulos desabilitados aparecem como indisponíveis.
+- Agendamento direto: `/?action=booking&salon=SLUG`. Os parâmetros opcionais `service=ID` e `professional=ID` só pré-selecionam registros válidos carregados pelo salão e profissional elegível ao serviço.
+- Cliente escolhe serviço → profissional opcional → dia/horário → nome/WhatsApp → confirmação. E-mail e observações ficam em informações opcionais. Não exige conta.
+- Respostas atrasadas de disponibilidade de outro dia são descartadas; trocar serviço remove o horário anterior.
+
+## Verificação
+
+Ambiente: Windows, Node 22.23.3. Os comandos `npm test` iniciam testes em UTC para os cenários existentes com datas fixas; três testes de backend fixam também a data do cenário. O fuso da aplicação não foi alterado.
+
+- Backend: geração Prisma, lint TypeScript, build e 180 testes passaram.
+- Frontend: lint ESLint, build com orçamento de bundles e 87 testes passaram.
+- Gate de higiene do repositório e `git diff --check` passaram.
+- Navegador: login por perfil, acesso à gestão completa, agenda profissional somente leitura e confirmação pública exercitados com API local de dados fictícios.
+- Layouts de hoje e agendamento verificados em 320, 430, 768, 1024, 1920 e 2560 px. Sem transbordamento horizontal global. Campos e confirmação do agendamento com altura de 48 px após a correção.
+
+## Limites e ativação
+
+Não houve alteração do banco de produção, merge na main ou implantação manual. Os testes HTTP usam a aplicação Fastify com persistência simulada; a navegação usa dados fictícios locais. MongoDB real, entrega de WhatsApp, pagamentos e implantação em produção não foram homologados nesta execução.
+
+Antes de disponibilizar a nova versão, o build da API deve gerar o cliente Prisma com o campo opcional `Professional.userId`. O administrador deve vincular as contas existentes aos profissionais; não há associação automática por nome ou e-mail. Contas ainda sem vínculo receberão a mensagem de configuração pendente, sem acesso à agenda do salão.
+
+Chegou, Finalizar, Reagendar, Cancelar e criação de horários pelo profissional permanecem sujeitos ao RBAC existente, que reserva essas mutações à administração/recepção. Esta fase mantém o profissional em leitura; não oferece botões que o servidor recusaria.

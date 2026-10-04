@@ -154,6 +154,20 @@ test('recepção não pode alterar vínculo da conta profissional', async () => 
   });
 });
 
+test('ADMIN vincula uma conta ativa do próprio salão', async () => {
+  await withMocks({
+    salon: { findUnique: async () => enabledSalon() },
+    user: { findFirst: async ({ where }) => { assert.equal(where.salonId,salonId); return {id:appointmentId}; } },
+    professional: {
+      findFirst: async ({ where }) => { assert.equal(where.salonId,salonId); assert.equal(where.userId,appointmentId); return null; },
+      updateMany: async ({ where,data }) => { assert.deepEqual(where,{id:appointmentId,salonId}); assert.equal(data.userId,appointmentId); return {count:1}; }
+    }
+  }, async () => {
+    const response=await inject('ADMIN',{method:'PUT',url:`/admin/professionals/${appointmentId}/user-link`,payload:{userId:appointmentId}});
+    assert.equal(response.statusCode,200); assert.deepEqual(response.json(),{linked:true});
+  });
+});
+
 test('PROFESSIONAL não pode reagendar atendimento', async () => {
   const response = await inject('PROFESSIONAL', {
     method: 'PUT',

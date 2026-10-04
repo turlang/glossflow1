@@ -11,6 +11,14 @@ const menu = [
 ].map((key) => ({ key, label: key, description: key }));
 
 describe('matriz de homologação por papel', () => {
+  it('abre a experiência inicial por perfil e preserva o isolamento visual', () => {
+    expect(resolveInitialPage({action:'admin',authenticated:true,role:ROLES.ADMIN})).toBe('business-today');
+    expect(resolveInitialPage({action:'admin',authenticated:true,role:ROLES.PROFESSIONAL})).toBe('professional-today');
+    expect(resolveInitialPage({action:'booking',authenticated:false})).toBe('booking');
+    expect(normalizePageForRole({page:'business-today',authenticated:true,role:ROLES.PROFESSIONAL})).toBe('professional-today');
+    expect(normalizePageForRole({page:'business-today',authenticated:false})).toBe('login');
+    expect(canAccessTenantPage(ROLES.RECEPTION,'business-today')).toBe(false);
+  });
   it('ADMIN mantém todos os módulos administrativos', () => {
     expect(dashboardMenuForRole(ROLES.ADMIN, menu).map((item) => item.key)).toEqual(menu.map((item) => item.key));
   });

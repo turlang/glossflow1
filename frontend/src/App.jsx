@@ -1,4 +1,5 @@
 import { ProfessionalToday } from './components/professional/ProfessionalToday.jsx';
+import { BusinessToday } from './components/admin/BusinessToday.jsx';
 import { AgendaEnterprise } from './components/admin/AgendaEnterprise.jsx';
 import './professional-today.css';
 import React, { Suspense, useEffect, useState } from 'react';
@@ -116,15 +117,16 @@ export default function App() {
   return (
     <div className="app-shell">
       {isAuthenticated && !isSuperAdmin && backofficeSalon && <ModuleVisibilityGuard salon={backofficeSalon} />}
-      {page !== 'platform-admin' && page !== 'client-portal' && (
+      {!['platform-admin', 'client-portal', 'professional-today', 'professional-agenda', 'business-today'].includes(page) && (
         <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={page === 'public' || page === 'booking' ? salon : backofficeSalon} />
       )}
       {loading && <SkeletonPage />}
       {!loading && error && <StateMessage title="Não foi possível conectar à API." text={error} danger />}
 
       <Suspense fallback={<SkeletonPage />}>
+        {!loading && !error && page === 'business-today' && <BusinessToday appointments={appointments} financialEntries={financialEntries} professionals={professionals} inventory={inventory} salon={backofficeSalon} setPage={navigateFromAuthenticatedShell} />}
         {!loading && !error && page === 'professional-today' && <ProfessionalToday appointments={appointments} setPage={navigateFromAuthenticatedShell} />}
-        {!loading && !error && page === 'professional-agenda' && <main className="container"><button onClick={() => setPage('professional-today')}>Voltar para hoje</button><AgendaEnterprise appointments={appointments} professionals={professionals.filter(p => appointments.some(a => a.professionalId === p.id))} readOnly /></main>}
+        {!loading && !error && page === 'professional-agenda' && <main className="container"><button onClick={() => setPage('professional-today')}>Voltar para hoje</button><AgendaEnterprise appointments={appointments} professionals={professionals.filter(p => appointments.some(a => a.professionalId === p.id))} services={services} readOnly /></main>}
         {!loading && !error && page === 'public' && <PublicShowcase salon={salon} services={services} professionals={professionals} portfolio={portfolio} setPage={setPage} />}
         {!loading && !error && page === 'commercial' && <CommercialLanding />}
         {!loading && !error && page === 'client-portal' && <ClientPortalPage token={portalToken} setPage={setPage} />}

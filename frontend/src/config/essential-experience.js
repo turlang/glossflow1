@@ -7,7 +7,7 @@ import { ROLES } from '../utils/auth.js';
  * este arquivo descreve somente navegação e prioridades de UX.
  */
 export const ESSENTIAL_HOME_BY_ROLE = Object.freeze({
-  [ROLES.ADMIN]: 'admin',
+  [ROLES.ADMIN]: 'business-today',
   [ROLES.RECEPTION]: 'admin',
   [ROLES.PROFESSIONAL]: 'professional-today'
 });

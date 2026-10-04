@@ -1,0 +1,76 @@
+.business-today {
+  width: min(1200px, calc(100% - 32px));
+  margin: auto;
+  padding: 32px 0;
+}
+.business-today header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.business-today h1 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.15;
+}
+.business-today__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.business-today__metrics article {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  overflow-wrap: anywhere;
+}
+.business-today__metrics strong {
+  font-size: clamp(1.3rem, 2vw, 2rem);
+}
+.business-today__columns {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+.business-today__row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.business-today__row div {
+  min-width: 0;
+}
+.business-today button {
+  min-height: 48px;
+}
+.business-today p {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 800px) {
+  .business-today__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .business-today__columns {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 430px) {
+  .business-today header {
+    display: block;
+  }
+  .business-today header button {
+    width: 100%;
+  }
+  .business-today__metrics {
+    grid-template-columns: 1fr;
+  }
+  .business-today__row {
+    gap: 12px;
+  }
+}

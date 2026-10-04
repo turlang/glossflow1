@@ -1,0 +1,60 @@
+.booking-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+.booking-step,
+.booking-checkout,
+.booking-step-head > div,
+.booking-step-head-copy > div {
+  min-width: 0;
+}
+.booking-day {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.booking-client-form .field input,
+.booking-client-form button[type='submit'],
+.booking-slot {
+  min-height: 48px !important;
+}
+.booking-month-nav button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+.booking-client-form details {
+  padding: 12px 0;
+}
+.booking-client-form summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+.booking-client-form details[open] {
+  display: grid;
+  gap: 12px;
+}
+@media (max-width: 430px) {
+  .booking-service-grid {
+    grid-template-columns: 1fr;
+  }
+  .booking-pro-summary {
+    flex-wrap: wrap;
+  }
+  .booking-pro-summary > span {
+    max-width: 100%;
+  }
+  .booking-summary-card {
+    padding: 14px;
+  }
+  .booking-step-head strong {
+    font-size: 0.95rem;
+  }
+  .booking-professional-row {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .booking-pro-chip {
+    width: 100%;
+    min-width: 0;
+  }
+}

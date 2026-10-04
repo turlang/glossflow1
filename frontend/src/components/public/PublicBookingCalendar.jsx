@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { request } from '../../services/api';
 import { currency } from '../../utils/format';
 import { Input, Textarea } from '../ui/Forms.jsx';
 import { PublicWaitlistForm } from './PublicWaitlistForm.jsx';
+import { bookingSelection } from '../../config/booking-link.js';
+import '../../essential-booking.css';
 
 function tenantStyle(salon) {
   if (!salon) return undefined;
@@ -57,8 +59,9 @@ function durationLabel(minutes) {
 }
 
 export function PublicBookingCalendar({ services, professionals, onCreated, salon }) {
-  const [serviceId, setServiceId] = useState('');
-  const [professionalId, setProfessionalId] = useState('');
+  const availabilityRequest = useRef(0);
+  const [serviceId, setServiceId] = useState(() => bookingSelection(window.location.search,services,professionals).serviceId);
+  const [professionalId, setProfessionalId] = useState(() => bookingSelection(window.location.search,services,professionals).professionalId);
   const [month, setMonth] = useState(currentMonth());
   const [monthData, setMonthData] = useState(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -102,6 +105,8 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
   }, [serviceId, professionalId, month]);
 
   useEffect(() => {
+    availabilityRequest.current += 1;
+    setLoadingDay(false);
     setSelectedDate('');
     setDayData(null);
     setSelectedSlot(null);
@@ -115,6 +120,8 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
 
   async function chooseDate(day) {
     if (!day || !serviceId || day.date < todayIso()) return;
+    const requestId = ++availabilityRequest.current;
+    setDayData(null);
     setSelectedDate(day.date);
     setSelectedSlot(null);
     setFeedback('');
@@ -122,12 +129,12 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
     const params = new URLSearchParams({ serviceId, date: day.date });
     if (professionalId) params.set('professionalId', professionalId);
     try {
-      setDayData(await request(`/appointments/availability?${params}`));
+      const data = await request(`/appointments/availability?${params}`);
+      if (requestId === availabilityRequest.current) setDayData(data);
     } catch (error) {
-      setFeedback(error.message);
-      setDayData(null);
+      if (requestId === availabilityRequest.current) { setFeedback(error.message); setDayData(null); }
     } finally {
-      setLoadingDay(false);
+      if (requestId === availabilityRequest.current) setLoadingDay(false);
     }
   }
 
@@ -144,7 +151,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
 
   async function submit(event) {
     event.preventDefault();
-    if (!selectedService || !selectedSlot) return;
+    if (submitting || !selectedService || !selectedSlot) return;
     setSubmitting(true);
     setFeedback('');
     try {
@@ -183,14 +190,14 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
       <div className="booking-shell">
         <header className="booking-hero">
           <span className="eyebrow">Agendamento online</span>
-          <h1>Escolha o melhor momento para você</h1>
-          <p>Primeiro escolha o serviço. O calendário calcula a capacidade real de cada profissional considerando duração do atendimento e horários já ocupados.</p>
+          <h1>Agende seu horário</h1>
+          <p>Escolha o serviço e o horário. Para confirmar, precisamos apenas do seu nome e WhatsApp.</p>
         </header>
 
         <section className="booking-step">
           <div className="booking-step-head">
             <span className="booking-step-number">1</span>
-            <div><strong>Escolha o serviço</strong><small>A duração define quanto espaço precisa existir na agenda.</small></div>
+            <div><strong>Escolha o serviço</strong><small>Veja o preço e a duração antes de escolher.</small></div>
           </div>
           <div className="booking-service-grid">
             {services.map((service) => (
@@ -207,7 +214,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
           <section className="booking-step">
             <div className="booking-step-head">
               <span className="booking-step-number">2</span>
-              <div><strong>Profissional</strong><small>Mostramos somente quem está habilitado para executar este serviço.</small></div>
+              <div><strong>Profissional (opcional)</strong><small>Escolha sua preferência ou veja todos os horários.</small></div>
             </div>
             {eligibleProfessionals.length > 0 ? (
               <div className="booking-professional-row">
@@ -240,18 +247,20 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
             </div>
 
             <div className="booking-capacity-note">
-              <strong>{selectedService.name}</strong> ocupa <strong>{durationLabel(selectedService.durationMin)}</strong>. “Vagas” representa atendimentos completos que realmente cabem no dia.
+              <strong>{selectedService.name}</strong> · <strong>{durationLabel(selectedService.durationMin)}</strong>. Escolha um dia para ver os horários.
             </div>
 
             {loadingMonth ? <div className="booking-loading">Calculando disponibilidade real…</div> : (
               <div className="booking-calendar">
                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((label) => <div key={label} className="booking-weekday">{label}</div>)}
-                {calendarCells.map((day, index) => day ? (() => {
+                {calendarCells.map((day, index) => {
+                  if (!day) return <div className="booking-day is-empty" key={`blank-${index}`} />;
                   const past = day.date < todayIso();
                   return (
                     <button
                       type="button"
                       key={day.date}
+                      aria-label={`${dateTitle(day.date)}: ${day.totalCapacity > 0 ? `${day.totalCapacity} vagas` : 'lista de espera'}`}
                       className={`booking-day ${selectedDate === day.date ? 'is-selected' : ''} ${day.totalCapacity <= 0 ? 'is-full' : ''} ${past ? 'is-past' : ''}`}
                       onClick={() => chooseDate(day)}
                       disabled={past}
@@ -263,7 +272,7 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
                       </span>
                     </button>
                   );
-                })() : <div className="booking-day is-empty" key={`blank-${index}`} />)}
+                })}
               </div>
             )}
           </section>
@@ -318,10 +327,9 @@ export function PublicBookingCalendar({ services, professionals, onCreated, salo
               <h2>Seus dados</h2>
               <div className="booking-contact-grid">
                 <Input label="Nome" value={form.clientName} onChange={(clientName) => setForm({ ...form, clientName })} required />
-                <Input label="WhatsApp" value={form.clientPhone} onChange={(clientPhone) => setForm({ ...form, clientPhone })} required />
-                <Input label="E-mail opcional" type="email" value={form.clientEmail} onChange={(clientEmail) => setForm({ ...form, clientEmail })} />
+                <Input label="WhatsApp" type="tel" value={form.clientPhone} onChange={(clientPhone) => setForm({ ...form, clientPhone })} required />
               </div>
-              <Textarea label="Observações" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
+              <details><summary>Adicionar informações opcionais</summary><Input label="E-mail opcional" type="email" value={form.clientEmail} onChange={(clientEmail) => setForm({ ...form, clientEmail })} /><Textarea label="Observações" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} /></details>
               <button className="primary full" type="submit" disabled={submitting}>{submitting ? 'Reservando…' : 'Confirmar este horário'}</button>
             </form>
           </section>

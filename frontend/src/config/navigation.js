@@ -8,6 +8,7 @@ import { canAccessTenantPage } from './role-access.js';
  */
 export const TENANT_BACKOFFICE_PAGES = Object.freeze([
   'admin',
+  'business-today',
   'professional-today',
   'professional-agenda',
   'agent-test',
