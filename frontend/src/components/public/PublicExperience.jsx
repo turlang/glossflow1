@@ -59,6 +59,8 @@ export function Header({ page, setPage, isAuthenticated, theme, toggleTheme, sal
 }
 
 export function PublicShowcase({ salon, services, professionals, portfolio, setPage }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   return (
     <main style={tenantStyle(salon)} data-site-template={(salon.siteTemplate || 'ELEGANCE').toLowerCase()}>
       <section className="hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(14,12,23,.92), rgba(14,12,23,.55)), url(${salon.heroImage})` }}>
@@ -69,6 +71,7 @@ export function PublicShowcase({ salon, services, professionals, portfolio, setP
           <div className="hero-actions">
             <button className="primary" onClick={() => setPage('booking')}>Agendar agora</button>
             <a className="secondary" href={`https://wa.me/${salon.whatsapp}`} target="_blank" rel="noreferrer">Chamar no WhatsApp</a>
+            <button className="secondary" type="button" onClick={() => setDetailsOpen(true)}>Conhecer o salão</button>
           </div>
           <div className="hero-meta">
             <span>{salon.openingHours}</span>
@@ -77,6 +80,13 @@ export function PublicShowcase({ salon, services, professionals, portfolio, setP
         </div>
       </section>
 
+      {detailsOpen && (
+        <section className="public-details-overlay" role="dialog" aria-modal="true" aria-label="Detalhes do salão">
+          <div className="public-details-heading">
+            <h2>Conheça o salão</h2>
+            <button type="button" className="secondary" onClick={() => setDetailsOpen(false)} autoFocus>Fechar</button>
+          </div>
+          <div className="public-details-content">
       <section className="container section-grid" id="servicos">
         <SectionTitle label="Serviços" title="Encontre o cuidado ideal para você" text="Consulte nossos serviços, duração e valores antes de reservar seu horário." />
         <div className="cards three">
@@ -127,6 +137,9 @@ export function PublicShowcase({ salon, services, professionals, portfolio, setP
           {salon.instagram && <a className="secondary" href={`https://instagram.com/${salon.instagram.replace('@', '')}`} target="_blank" rel="noreferrer">Instagram</a>}
         </div>
       </section>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

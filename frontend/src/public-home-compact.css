@@ -1,8 +1,19 @@
-/* Compacta a primeira tela pública sem ocultar serviços, equipe ou contato. */
+/* Mantém a vitrine pública em uma tela; os detalhes abrem em um painel próprio. */
+.public-home-app {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .public-home-app > .header {
   height: var(--header) !important;
   min-height: var(--header) !important;
   flex: 0 0 var(--header);
+  position: relative;
   flex-wrap: nowrap;
   align-items: center !important;
   padding-inline: clamp(12px, 3vw, 42px);
@@ -20,8 +31,54 @@
 }
 
 .public-home-app .hero {
-  min-height: clamp(360px, calc(100svh - var(--header) - 190px), 480px) !important;
+  min-height: 0 !important;
+  flex: 1 1 0;
   padding: clamp(30px, 5vh, 54px) clamp(20px, 4.8vw, 72px) !important;
+}
+
+.public-home-app > main {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.public-home-app .public-details-overlay {
+  position: absolute;
+  z-index: 100;
+  inset: 0;
+  overflow-y: auto;
+  padding: clamp(16px, 3vw, 40px);
+  background: color-mix(in srgb, var(--bg) 96%, #000);
+  overscroll-behavior: contain;
+}
+
+.public-details-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: calc(0px - clamp(16px, 3vw, 40px));
+  margin-bottom: 18px;
+  padding: 12px clamp(16px, 3vw, 40px);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.public-details-heading h2 {
+  margin: 0;
+  color: var(--strong);
+  font-size: clamp(1.3rem, 3vw, 2rem);
+}
+
+.public-details-content .container {
+  padding-block: 24px;
 }
 
 .public-home-app .hero-content {
@@ -61,12 +118,16 @@
     height: 60px !important;
     min-height: 60px !important;
     flex-basis: 60px;
+    flex-direction: row !important;
+    align-items: center !important;
+    padding-inline: 12px;
   }
 
   .public-home-app .hero {
-    min-height: clamp(390px, calc(100svh - 60px - 180px), 500px) !important;
-    padding: 34px clamp(18px, 4vw, 36px) !important;
+    padding: clamp(18px, 4vh, 34px) clamp(18px, 4vw, 36px) !important;
   }
+
+  .public-home-app .nav { justify-content: flex-end; }
 }
 
 @media (max-width: 640px) {
@@ -111,8 +172,7 @@
   }
 
   .public-home-app .hero {
-    min-height: clamp(400px, calc(100svh - 56px - 160px), 500px) !important;
-    padding: 32px 18px !important;
+    padding: 22px 18px !important;
     background-position: 58% center !important;
   }
 
@@ -127,12 +187,40 @@
   .public-home-app .hero-meta {
     align-items: flex-start;
     flex-direction: column;
+    margin-top: 8px !important;
+    gap: 5px !important;
   }
+
+  .public-home-app .hero-actions { margin-top: 10px !important; }
+  .public-home-app .hero-actions > * { min-height: 36px; }
+
+  .public-home-app .brand > span:last-child {
+    max-width: 24vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
 }
 
-@media (max-height: 640px) and (min-width: 641px) {
+@media (max-height: 640px) {
   .public-home-app .hero {
-    min-height: 340px !important;
-    padding-block: 24px !important;
+    padding-block: 16px !important;
   }
+
+  .public-home-app .hero h1 {
+    margin-block: 7px !important;
+    font-size: clamp(1.8rem, 5vw, 3.2rem) !important;
+  }
+
+  .public-home-app .hero p { line-height: 1.35 !important; }
+  .public-home-app .hero-actions { margin-top: 9px !important; }
+  .public-home-app .hero-meta { margin-top: 8px !important; }
+
+  .public-home-app .hero-meta span { padding: .32rem .55rem !important; }
+}
+
+@media (max-width: 390px) {
+  .public-home-app .nav button { padding-inline: 5px; font-size: .66rem; }
+  .public-home-app .hero-actions { align-items: stretch; flex-direction: column; }
 }
