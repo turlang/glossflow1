@@ -73,7 +73,7 @@ describe('CRMRetentionHub', () => {
   it('exibe indicadores e explica a segmentação', async () => {
     render(<CRMRetentionHub clients={clients} reload={vi.fn()} />);
     expect(await screen.findByRole('heading', { name: 'Quem precisa de atenção agora' })).toBeTruthy();
-    expect(screen.getByText('Aniversário em 2 dia(s).')).toBeTruthy();
+    expect(await screen.findByText('Aniversário em 2 dia(s).')).toBeTruthy();
     expect(screen.getByText(/3 atendimentos nos últimos 90 dias/i)).toBeTruthy();
     expect(screen.getByText('Reativação')).toBeTruthy();
     await waitFor(() => expect(request).toHaveBeenCalledWith('/admin/clients/retention'));

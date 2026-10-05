@@ -1,6 +1,8 @@
 require('ts-node/register/transpile-only');
 
 const test = require('node:test');
+test.before(() => test.mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-18T12:00:00Z') }));
+test.after(() => test.mock.timers.reset());
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 

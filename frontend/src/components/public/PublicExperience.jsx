@@ -3,6 +3,7 @@ import { request } from '../../services/api';
 import { currency } from '../../utils/format';
 import { SectionTitle, Input } from '../ui/Forms.jsx';
 import { PublicBookingCalendar } from './PublicBookingCalendar.jsx';
+import { essentialHomeForRole } from '../../config/essential-experience.js';
 
 function tenantStyle(salon) {
   if (!salon) return undefined;
@@ -149,7 +150,7 @@ export function LoginPage({ setPage, onLogin }) {
       localStorage.setItem('glossflow.token', data.token);
       if (data.refreshToken) localStorage.setItem('glossflow.refreshToken', data.refreshToken);
       onLogin(data.token);
-      setPage(data.user?.role === 'SUPER_ADMIN' ? 'platform-admin' : 'admin');
+      setPage(data.user?.role === 'SUPER_ADMIN' ? 'platform-admin' : essentialHomeForRole(data.user?.role));
     } catch (err) {
       setMessage(err.message);
     }

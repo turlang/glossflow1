@@ -107,6 +107,7 @@ model Service {
 }
 
 model Professional {
+  userId                 String?  @db.ObjectId
   id                     String   @id @default(auto()) @map("_id") @db.ObjectId
   name                   String
   specialty              String

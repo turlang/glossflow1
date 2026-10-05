@@ -1,3 +1,4 @@
+import { essentialHomeForRole } from './essential-experience.js';
 import { isSuperAdmin } from '../utils/auth';
 import { canAccessTenantPage } from './role-access.js';
 
@@ -7,6 +8,9 @@ import { canAccessTenantPage } from './role-access.js';
  */
 export const TENANT_BACKOFFICE_PAGES = Object.freeze([
   'admin',
+  'business-today',
+  'professional-today',
+  'professional-agenda',
   'agent-test',
   'professional-services',
   'professional-schedule',
@@ -33,7 +37,7 @@ export function resolveInitialPage({ action, authenticated, role }) {
   if (action === 'admin' || action === 'site-settings') {
     if (!authenticated) return 'login';
     if (isSuperAdmin(role)) return 'platform-admin';
-    return canAccessTenantPage(role, 'admin') ? 'admin' : 'login';
+    return essentialHomeForRole(role);
   }
 
   if (TENANT_ACTIONS.has(action)) {
@@ -55,12 +59,13 @@ export function normalizePageForRole({ page, authenticated, role }) {
   }
 
   if (authenticated && !isSuperAdmin(role) && page === 'platform-admin') {
-    return canAccessTenantPage(role, 'admin') ? 'admin' : 'login';
+    return essentialHomeForRole(role);
   }
 
   if (authenticated && !isSuperAdmin(role) && TENANT_BACKOFFICE_PAGES.includes(page) && !canAccessTenantPage(role, page)) {
-    return canAccessTenantPage(role, 'admin') ? 'admin' : 'login';
+    return essentialHomeForRole(role);
   }
 
+  if (authenticated && page === 'admin' && role === 'PROFESSIONAL') return 'professional-today';
   return page;
 }

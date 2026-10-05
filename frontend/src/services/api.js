@@ -26,6 +26,14 @@ function storageValue(key) {
   return localStorage.getItem(key) || '';
 }
 
+export function isPlatformHost(hostname) {
+  const normalized = String(hostname || '').toLowerCase().replace(/^www\./, '');
+  return normalized === 'localhost'
+    || normalized === '127.0.0.1'
+    || normalized.endsWith('.vercel.app')
+    || normalized.endsWith('.onrender.com');
+}
+
 /**
  * Um refresh token é de uso único no backend. Requisições protegidas podem
  * receber 401 simultaneamente, então todas precisam compartilhar a mesma
@@ -75,7 +83,7 @@ export function isAuthExpiredError(error) {
 /**
  * Identifica o tenant público sem confiar em dados administrativos.
  * Em domínios próprios enviamos `X-Salon-Host`; no host da plataforma usamos
- * slug explícito para permitir múltiplas vitrines na mesma aplicação Vercel.
+ * slug explícito para permitir múltiplas vitrines na mesma aplicação Render.
  */
 function publicTenantHeaders() {
   if (typeof window === 'undefined') return {};
@@ -83,13 +91,11 @@ function publicTenantHeaders() {
   const params = new URLSearchParams(window.location.search);
   const explicitSlug = (params.get('salon') || import.meta.env.VITE_SALON_SLUG || '').trim().toLowerCase();
   const hostname = window.location.hostname.toLowerCase().replace(/^www\./, '');
-  const isPlatformHost = hostname === 'localhost'
-    || hostname === '127.0.0.1'
-    || hostname.endsWith('.vercel.app');
+  const platformHost = isPlatformHost(hostname);
 
   return {
     ...(explicitSlug ? { 'X-Salon-Slug': explicitSlug } : {}),
-    ...(!isPlatformHost && hostname ? { 'X-Salon-Host': hostname } : {})
+    ...(!platformHost && hostname ? { 'X-Salon-Host': hostname } : {})
   };
 }
 

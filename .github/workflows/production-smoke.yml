@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 12
     env:
       API_URL: https://glossflow-api.onrender.com
-      WEB_URL: https://glossflow1.vercel.app
+      WEB_URL: https://glossflow1-frontend.onrender.com
     steps:
       - name: Resolve expected production build
         run: |

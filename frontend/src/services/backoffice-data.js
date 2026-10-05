@@ -10,6 +10,7 @@ import { canUseBusinessBackoffice, isSalonAdmin } from '../utils/auth';
 export function emptyBackofficeData() {
   return {
     adminSalon: null,
+    adminProfessionals: [],
     appointments: [],
     inventory: [],
     users: [],
@@ -45,6 +46,7 @@ export async function loadTenantBackofficeData({ role }) {
   const aiEnabled = hasModule(adminSalon, 'IA');
 
   const [
+    adminProfessionals,
     appointments,
     inventory,
     users,
@@ -56,6 +58,7 @@ export async function loadTenantBackofficeData({ role }) {
     whatsappTemplates,
     insights
   ] = await Promise.all([
+    businessAccess ? request('/admin/professionals') : Promise.resolve([]),
     agendaEnabled ? request('/admin/appointments') : Promise.resolve([]),
     businessAccess && inventoryEnabled ? request('/admin/inventory') : Promise.resolve([]),
     admin ? request('/admin/users') : Promise.resolve([]),
@@ -70,6 +73,7 @@ export async function loadTenantBackofficeData({ role }) {
 
   return {
     adminSalon,
+    adminProfessionals,
     appointments,
     inventory,
     users,

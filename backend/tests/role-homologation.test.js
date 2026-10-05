@@ -104,14 +104,79 @@ test('RECEPTION não acessa lançamentos financeiros exclusivos do ADMIN', async
   });
 });
 
-test('PROFESSIONAL mantém leitura da Agenda do tenant', async () => {
+test('PROFESSIONAL lê somente a própria Agenda do tenant', async () => {
   await withMocks({
     salon: { findUnique: async () => enabledSalon() },
-    appointment: { findMany: async ({ where }) => { assert.equal(where.salonId, salonId); return []; } }
+    professional: { findMany: async ({ where }) => { assert.equal(where.salonId, salonId); assert.ok(where.userId); return [{ id: '507f1f77bcf86cd799439099' }]; } },
+    appointment: { findMany: async ({ where }) => { assert.equal(where.salonId, salonId); assert.equal(where.professionalId, '507f1f77bcf86cd799439099'); return []; } }
   }, async () => {
     const response = await inject('PROFESSIONAL', { method: 'GET', url: '/admin/appointments' });
     assert.equal(response.statusCode, 200, response.body);
     assert.deepEqual(response.json(), []);
+  });
+});
+
+for (const matches of [[], [{ id: 'one' }, { id: 'two' }]]) {
+  test(`PROFESSIONAL bloqueia vínculo ausente ou ambíguo (${matches.length})`, async () => {
+    await withMocks({
+      salon: { findUnique: async () => enabledSalon() },
+      professional: { findMany: async () => matches },
+      appointment: { findMany: async () => { assert.fail('Não pode ler atendimentos sem vínculo único'); } }
+    }, async () => {
+      const response = await inject('PROFESSIONAL', { method: 'GET', url: '/admin/appointments?professionalId=outro' });
+      assert.equal(response.statusCode, 403);
+    });
+  });
+}
+
+test('PROFESSIONAL não lê notificações de outros atendimentos', async () => {
+  await withMocks({ salon: { findUnique: async () => enabledSalon() } }, async () => {
+    const response = await inject('PROFESSIONAL', { method: 'GET', url: '/admin/appointments/notifications' });
+    assert.equal(response.statusCode, 403);
+  });
+});
+
+test('vínculo rejeita conta fora do salão e não escreve', async () => {
+  await withMocks({
+    salon: { findUnique: async () => enabledSalon() },
+    user: { findFirst: async ({ where }) => { assert.equal(where.salonId, salonId); assert.equal(where.role, 'PROFESSIONAL'); return null; } },
+    professional: { updateMany: async () => assert.fail('Não pode vincular outra conta') }
+  }, async () => {
+    const response = await inject('ADMIN', { method: 'PUT', url: `/admin/professionals/${appointmentId}/user-link`, payload: { userId: appointmentId } });
+    assert.equal(response.statusCode, 404);
+  });
+});
+
+test('recepção não pode alterar vínculo da conta profissional', async () => {
+  await withMocks({ salon: { findUnique: async () => enabledSalon() } }, async () => {
+    const response = await inject('RECEPTION', { method: 'PUT', url: `/admin/professionals/${appointmentId}/user-link`, payload: { userId: appointmentId } });
+    assert.equal(response.statusCode, 403);
+  });
+});
+
+test('ADMIN vincula uma conta ativa do próprio salão', async () => {
+  await withMocks({
+    salon: { findUnique: async () => enabledSalon() },
+    user: { findFirst: async ({ where }) => { assert.equal(where.salonId,salonId); return {id:appointmentId}; } },
+    professional: {
+      findFirst: async ({ where }) => { assert.equal(where.salonId,salonId); assert.equal(where.userId,appointmentId); return null; },
+      updateMany: async ({ where,data }) => { assert.deepEqual(where,{id:appointmentId,salonId}); assert.equal(data.userId,appointmentId); return {count:1}; }
+    }
+  }, async () => {
+    const response=await inject('ADMIN',{method:'PUT',url:`/admin/professionals/${appointmentId}/user-link`,payload:{userId:appointmentId}});
+    assert.equal(response.statusCode,200); assert.deepEqual(response.json(),{linked:true});
+  });
+});
+
+test('equipe administrativa é consultada no salão da sessão', async () => {
+  await withMocks({
+    salon: { findUnique: async () => enabledSalon() },
+    professional: { findMany: async ({where}) => { assert.deepEqual(where,{salonId}); return [{id:appointmentId,name:'Equipe própria'}]; } }
+  }, async () => {
+    const response=await inject('ADMIN',{method:'GET',url:'/admin/professionals?salon=outro'});
+    assert.equal(response.statusCode,200); assert.equal(response.json()[0].name,'Equipe própria');
+    const denied=await inject('PROFESSIONAL',{method:'GET',url:'/admin/professionals'});
+    assert.equal(denied.statusCode,403);
   });
 });
 
