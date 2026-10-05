@@ -81,7 +81,8 @@ export function NewClientWizard({ value, setValue, modules, saving, onSubmit }) 
     setStep((current) => Math.max(current - 1, 0));
   }
 
-  const previewUrl = value.slug ? `glossflow1.vercel.app/?salon=${value.slug}` : 'glossflow1.vercel.app/?salon=slug-do-cliente';
+  const previewSlug = value.slug || 'slug-do-cliente';
+  const previewUrl = `${window.location.host}/?salon=${encodeURIComponent(previewSlug)}`;
 
   return (
     <section className="nc-shell" aria-label="Cadastro de novo cliente">

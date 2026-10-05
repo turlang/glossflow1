@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   isAuthExpiredError,
+  isPlatformHost,
   logoutSession,
   markAuthenticatedSession,
   onAuthExpired,
@@ -222,5 +223,17 @@ describe('HTTP client authentication lifecycle', () => {
     expect(localStorage.getItem('glossflow.token')).toBeNull();
     expect(localStorage.getItem('glossflow.refreshToken')).toBeNull();
     expect(fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith('/auth/logout'))).toHaveLength(1);
+  });
+});
+
+describe('host da plataforma pública', () => {
+  it('reconhece os domínios Vercel/Render como hosts compartilhados', () => {
+    expect(isPlatformHost('glossflow1.vercel.app')).toBe(true);
+    expect(isPlatformHost('glossflow1-frontend.onrender.com')).toBe(true);
+    expect(isPlatformHost('localhost')).toBe(true);
+  });
+
+  it('preserva domínios de salão como hosts white-label', () => {
+    expect(isPlatformHost('salao.exemplo.com.br')).toBe(false);
   });
 });

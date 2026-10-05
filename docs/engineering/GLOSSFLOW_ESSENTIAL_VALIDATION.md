@@ -41,3 +41,13 @@ Os checks da Vercel indicam implantação bloqueada na conta; o site publicado r
 Antes de disponibilizar a nova versão, o build da API deve gerar o cliente Prisma com o campo opcional `Professional.userId`. O administrador deve vincular as contas existentes aos profissionais; não há associação automática por nome ou e-mail. Contas ainda sem vínculo receberão a mensagem de configuração pendente, sem acesso à agenda do salão.
 
 Chegou, Finalizar, Reagendar, Cancelar e criação de horários pelo profissional permanecem sujeitos ao RBAC existente, que reserva essas mutações à administração/recepção. Esta fase mantém o profissional em leitura; não oferece botões que o servidor recusaria.
+
+## Migração de hospedagem do frontend — 05/10/2026
+
+- O Blueprint `render.yaml` agora define o frontend Vite como Render Static Site, com build `npm ci && npm run build`, publicação de `dist`, fallback SPA e API/slug padrão configurados.
+- `VITE_API_URL` aponta para a API Render existente. O cliente HTTP reconhece `*.onrender.com` como host compartilhado e mantém seleção por slug para tenants.
+- O Blueprint atualiza `FRONTEND_ORIGIN` para aceitar o novo host Render e mantém o domínio Vercel durante a janela de transição; `APP_PUBLIC_URL` passa a gerar links pelo frontend Render.
+- Workflows de smoke manual e responsividade manual apontam para `https://glossflow1-frontend.onrender.com`.
+- Lint, build e 90 testes frontend passaram após a mudança de host; o YAML do Blueprint foi parseado localmente.
+- A publicação ainda não foi feita: a conexão Render deste ambiente solicitou reautenticação, e a mudança permanece na branch/PR até revisão e merge. Após o site existir, a API deve receber a nova origem em `FRONTEND_ORIGIN` e `APP_PUBLIC_URL`.
+- O arquivo `frontend/vercel.json` foi mantido temporariamente para rollback. A integração Vercel e os checks de branch precisam ser desligados depois que o site Render for validado.

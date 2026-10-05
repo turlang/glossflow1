@@ -21,7 +21,7 @@ O Marco 36 não reabre domínios concluídos. Seu foco inicial é remover estado
 - Testing Library;
 - CSS próprio / Design System por domínio;
 - PWA;
-- Vercel.
+- Render Static Site (CDN global).
 
 ### Backend
 

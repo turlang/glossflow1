@@ -1,16 +1,16 @@
-# Deploy do GlossFlow — Render + Vercel
+# Deploy do GlossFlow — Render
 
 Arquitetura operacional atual:
 
 ```text
-Frontend React/Vite  -> Vercel
+Frontend React/Vite  -> Render Static Site
 Backend Fastify/TS   -> Render
 Banco                -> MongoDB Atlas
 IA                   -> Groq/OpenAI conforme ambiente
 WhatsApp             -> Twilio/Meta/provider configurado
 ```
 
-O arquivo `render.yaml` é o blueprint canônico do backend.
+O arquivo `render.yaml` é o blueprint canônico dos serviços Render. O frontend migra da Vercel para o Static Site `glossflow1-frontend`.
 
 ## 1. Pré-requisitos
 
@@ -19,8 +19,8 @@ O arquivo `render.yaml` é o blueprint canônico do backend.
 - `DATABASE_URL` válida;
 - `JWT_SECRET` forte;
 - `FRONTEND_ORIGIN` correto;
-- projeto Vercel apontando para `frontend/`;
-- serviço Render apontando para `backend/`;
+- Static Site Render apontando para `frontend/`;
+- serviço Web Render apontando para `backend/`;
 - credenciais de IA/WhatsApp apenas quando os módulos forem ativados;
 - nenhum segredo real versionado.
 
@@ -45,9 +45,9 @@ Variáveis mínimas:
 NODE_ENV=production
 DATABASE_URL=...
 JWT_SECRET=...
-FRONTEND_ORIGIN=https://seu-frontend.vercel.app
+FRONTEND_ORIGIN=https://glossflow1-frontend.onrender.com
 PUBLIC_API_URL=https://glossflow-api.onrender.com
-APP_PUBLIC_URL=https://seu-frontend.vercel.app
+APP_PUBLIC_URL=https://glossflow1-frontend.onrender.com
 ```
 
 Segurança/backup:
@@ -81,31 +81,36 @@ TWILIO_STATUS_CALLBACK_URL=https://glossflow-api.onrender.com/webhooks/whatsapp/
 
 Para Sandbox/Trial, configure os campos específicos do provider. **Trial/Sandbox não deve ser apresentado como linha definitiva de produção do cliente.**
 
-## 3. Frontend no Vercel
+## 3. Frontend estático no Render
 
 ```text
+Service name: glossflow1-frontend
 Root Directory: frontend
-Framework Preset: Vite
-Install Command: npm ci
-Build Command: npm run build
-Output Directory: dist
+Runtime: Static
+Build Command: npm ci && npm run build
+Publish Directory: dist
+URL esperada: https://glossflow1-frontend.onrender.com
+Regra de SPA: /* -> /index.html
 ```
 
 Variável principal:
 
 ```env
 VITE_API_URL=https://glossflow-api.onrender.com
+VITE_SALON_SLUG=glossflow
 ```
 
-`VITE_SALON_SLUG` pode definir um tenant padrão quando a estratégia de vitrine exigir.
+`VITE_API_URL` é incorporada ao bundle durante a compilação. `VITE_SALON_SLUG` define a vitrine padrão; o parâmetro `?salon=` continua selecionando outros salões.
+
+O Blueprint já define `FRONTEND_ORIGIN` para o host Render e mantém o host Vercel durante a transição; também move `APP_PUBLIC_URL` para o novo frontend. Após validar o Static Site, desligue a integração de deploy Vercel do repositório e retire os checks Vercel das regras de proteção do GitHub. O arquivo `frontend/vercel.json` fica como configuração de rollback até o corte ser confirmado.
 
 ## 4. Ordem segura de publicação
 
 1. criar branch/PR;
 2. aguardar `GlossFlow Quality Gate` e `Production Gate` do head;
 3. revisar a alteração e fazer merge em `main`;
-4. aguardar Vercel publicar o SHA de `main`;
-5. aguardar Render publicar o mesmo ciclo de release;
+4. sincronizar o Blueprint no Render e aguardar o Static Site e a API ficarem saudáveis;
+5. confirmar CORS, links públicos e navegação direta nas rotas da SPA;
 6. executar `Production Smoke Validation`;
 7. o smoke deve comparar os 12 primeiros caracteres do SHA esperado com `/health.build`, `X-GlossFlow-Build` e `/ready.build`;
 8. `/ready.database.ok` deve ser `true`;
@@ -182,8 +187,8 @@ Instâncias gratuitas podem hibernar. Isso aumenta a latência do primeiro reque
 O deploy está apto ao go-live quando:
 
 1. gates estão verdes;
-2. Vercel está `READY` no SHA esperado;
-3. Render serve o Build ID exato;
+2. Render Static Site publica a interface;
+3. Render API está `LIVE` no SHA esperado;
 4. MongoDB está ready;
 5. smoke final está verde;
 6. não há regressão P0/P1 conhecida;
