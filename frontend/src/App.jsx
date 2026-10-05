@@ -118,7 +118,7 @@ export default function App() {
   const canUseBooking = salon ? hasModule(salon, 'AGENDA') : true;
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${page === 'public' && !loading && !error ? ' public-home-app' : ''}`}>
       {isAuthenticated && !isSuperAdmin && backofficeSalon && <ModuleVisibilityGuard salon={backofficeSalon} />}
       {!['platform-admin', 'client-portal', 'professional-today', 'professional-agenda', 'business-today'].includes(page) && (
         <Header page={page} setPage={setPage} isAuthenticated={isAuthenticated} theme={theme} toggleTheme={toggleTheme} salon={page === 'public' || page === 'booking' ? salon : backofficeSalon} />
