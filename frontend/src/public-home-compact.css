@@ -19,40 +19,40 @@
   font-size: .84rem;
 }
 
-.public-home-screen .hero {
+.public-home-app .hero {
   min-height: clamp(360px, calc(100svh - var(--header) - 190px), 480px) !important;
   padding: clamp(30px, 5vh, 54px) clamp(20px, 4.8vw, 72px) !important;
 }
 
-.public-home-screen .hero-content {
+.public-home-app .hero-content {
   max-width: 760px !important;
 }
 
-.public-home-screen .hero h1 {
+.public-home-app .hero h1 {
   margin-block: 12px !important;
   font-size: clamp(2.15rem, 4.3vw, 4.2rem) !important;
   line-height: .98 !important;
   letter-spacing: -.07em !important;
 }
 
-.public-home-screen .hero p {
+.public-home-app .hero p {
   max-width: 620px !important;
   font-size: clamp(.94rem, 1.25vw, 1.08rem) !important;
   line-height: 1.48 !important;
 }
 
-.public-home-screen .hero-actions {
+.public-home-app .hero-actions {
   margin-top: 16px !important;
   gap: 8px !important;
 }
 
-.public-home-screen .hero-meta {
+.public-home-app .hero-meta {
   margin-top: 12px !important;
   gap: 8px !important;
   font-size: .82rem !important;
 }
 
-.public-home-screen .hero-meta span {
+.public-home-app .hero-meta span {
   padding: .42rem .68rem !important;
 }
 
@@ -63,7 +63,7 @@
     flex-basis: 60px;
   }
 
-  .public-home-screen .hero {
+  .public-home-app .hero {
     min-height: clamp(390px, calc(100svh - 60px - 180px), 500px) !important;
     padding: 34px clamp(18px, 4vw, 36px) !important;
   }
@@ -110,28 +110,28 @@
     font-size: .7rem !important;
   }
 
-  .public-home-screen .hero {
+  .public-home-app .hero {
     min-height: clamp(400px, calc(100svh - 56px - 160px), 500px) !important;
     padding: 32px 18px !important;
     background-position: 58% center !important;
   }
 
-  .public-home-screen .hero h1 {
+  .public-home-app .hero h1 {
     font-size: clamp(2rem, 9vw, 3.1rem) !important;
   }
 
-  .public-home-screen .hero-actions > * {
+  .public-home-app .hero-actions > * {
     min-height: 40px;
   }
 
-  .public-home-screen .hero-meta {
+  .public-home-app .hero-meta {
     align-items: flex-start;
     flex-direction: column;
   }
 }
 
 @media (max-height: 640px) and (min-width: 641px) {
-  .public-home-screen .hero {
+  .public-home-app .hero {
     min-height: 340px !important;
     padding-block: 24px !important;
   }
